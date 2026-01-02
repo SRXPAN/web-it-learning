@@ -37,6 +37,21 @@ export default function AdminSettings() {
 
   return (
     <div className="space-y-6">
+      {/* WIP Warning */}
+      <div className="p-4 bg-yellow-50 dark:bg-yellow-900/20 border border-yellow-200 dark:border-yellow-800 rounded-lg">
+        <div className="flex items-start gap-3">
+          <AlertCircle className="text-yellow-600 dark:text-yellow-400 flex-shrink-0" size={20} />
+          <div>
+            <h3 className="font-medium text-yellow-900 dark:text-yellow-100">
+              🚧 Work In Progress
+            </h3>
+            <p className="text-sm text-yellow-700 dark:text-yellow-300 mt-1">
+              Ця сторінка ще в розробці. Зміни не зберігаються на сервері.
+            </p>
+          </div>
+        </div>
+      </div>
+      
       {/* Header */}
       <PageHeader
         title={t('admin.settings')}

@@ -1,5 +1,6 @@
 import { useCallback, useState } from 'react'
 import RequireAuth from './components/RequireAuth'
+import { RequireRole } from './components/RequireRole'
 import ErrorBoundary from './components/ErrorBoundary'
 import { Routes, Route, NavLink, useNavigate, useLocation } from 'react-router-dom'
 import { LayoutDashboard, BookOpen, Trophy, User, LogIn, LogOut, LucideIcon, Menu, X, Shield } from 'lucide-react'
@@ -27,6 +28,8 @@ import AdminSettings from './pages/admin/AdminSettings'
 import AdminTopics from './pages/admin/AdminTopics'
 import AdminMaterials from './pages/admin/AdminMaterials'
 import AdminQuizzes from './pages/admin/AdminQuizzes'
+import AdminUserDetails from './pages/admin/AdminUserDetails'
+import EditorLayout from './pages/editor/EditorLayout'
 
 interface NavItemProps {
   to: string
@@ -183,20 +186,22 @@ export default function App(){
             <Route path="/quiz" element={<RequireAuth><Quiz/></RequireAuth>} />
             <Route path="/leaderboard" element={<RequireAuth><Leaderboard/></RequireAuth>} />
             <Route path="/profile" element={<RequireAuth><Profile/></RequireAuth>} />
+            <Route path="/editor" element={<RequireAuth roles={['ADMIN','EDITOR']}><EditorLayout/></RequireAuth>} />
             <Route path="/login" element={<Login/>} />
             <Route path="/register" element={<Register/>} />
             {/* Admin Panel - for ADMIN and EDITOR roles */}
             <Route path="/admin" element={<RequireAuth roles={['ADMIN','EDITOR']}><AdminLayout /></RequireAuth>}>
               <Route index element={<AdminDashboard />} />
-              <Route path="users" element={<AdminUsers />} />
-              <Route path="files" element={<AdminFiles />} />
-              <Route path="audit" element={<AdminAuditLogs />} />
-              <Route path="translations" element={<AdminTranslations />} />
-              <Route path="content" element={<AdminContent />} />
+              <Route path="users" element={<RequireRole allowedRoles={['ADMIN']}><AdminUsers /></RequireRole>} />
+              <Route path="users/:id" element={<RequireRole allowedRoles={['ADMIN']}><AdminUserDetails /></RequireRole>} />
+              <Route path="files" element={<RequireRole allowedRoles={['ADMIN']}><AdminFiles /></RequireRole>} />
+              <Route path="audit" element={<RequireRole allowedRoles={['ADMIN']}><AdminAuditLogs /></RequireRole>} />
+              <Route path="translations" element={<RequireRole allowedRoles={['ADMIN']}><AdminTranslations /></RequireRole>} />
+              <Route path="content" element={<RequireRole allowedRoles={['ADMIN']}><AdminContent /></RequireRole>} />
               <Route path="topics" element={<AdminTopics />} />
               <Route path="materials" element={<AdminMaterials />} />
               <Route path="quizzes" element={<AdminQuizzes />} />
-              <Route path="settings" element={<AdminSettings />} />
+              <Route path="settings" element={<RequireRole allowedRoles={['ADMIN']}><AdminSettings /></RequireRole>} />
             </Route>
             <Route path="*" element={<NotFound/>} />
           </Routes>

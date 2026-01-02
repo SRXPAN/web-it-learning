@@ -1,11 +1,24 @@
 // src/routes/auth.ts
 import { Router } from 'express'
 import { prisma } from '../db.js'
-import { z } from 'zod'
 import { requireAuth, COOKIE_NAME, REFRESH_COOKIE_NAME } from '../middleware/auth.js'
 import { authLimiter } from '../middleware/rateLimit.js'
 import { setCsrfToken } from '../middleware/csrf.js'
-import { emailSchema, passwordSchemaSimple, nameSchema } from '../utils/validation.js'
+import { 
+  emailSchema, 
+  passwordSchemaSimple, 
+  nameSchema,
+  registerSchema,
+  loginSchema,
+  changePasswordSchema,
+  changeEmailSchema,
+  forgotPasswordSchema,
+  resetPasswordSchema,
+  verifyEmailSchema,
+  avatarSchema,
+  resendVerificationEmailSchema,
+  updateProfileSchema,
+} from '../utils/validation.js'
 import { 
   getAccessCookieOptions, 
   getRefreshCookieOptions,
@@ -28,48 +41,6 @@ import { validateImageBase64 } from '../utils/imageValidation.js'
 import { logger } from '../utils/logger.js'
 
 const router = Router()
-
-// ============================================
-// SCHEMAS
-// ============================================
-
-const registerSchema = z.object({
-  name: nameSchema,
-  email: emailSchema,
-  password: passwordSchemaSimple,
-})
-
-const loginSchema = z.object({
-  email: emailSchema,
-  password: z.string().min(1, 'Password is required'),
-})
-
-const changePasswordSchema = z.object({
-  currentPassword: z.string().min(1, 'Current password is required'),
-  newPassword: passwordSchemaSimple,
-})
-
-const changeEmailSchema = z.object({
-  newEmail: emailSchema,
-  password: z.string().min(1, 'Password is required'),
-})
-
-const forgotPasswordSchema = z.object({
-  email: emailSchema,
-})
-
-const resetPasswordSchema = z.object({
-  token: z.string().min(1, 'Token is required'),
-  password: passwordSchemaSimple,
-})
-
-const verifyEmailSchema = z.object({
-  token: z.string().min(1, 'Token is required'),
-})
-
-const avatarSchema = z.object({
-  avatar: z.string().max(500000, 'Avatar too large'),
-})
 
 // ============================================
 // UTILITY FUNCTIONS

@@ -2,8 +2,36 @@
  * Admin API Hooks
  * For user management, audit logs, system stats
  */
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useCallback, useRef } from 'react'
 import { apiGet, apiPost, apiPut, apiDelete } from '@/lib/http'
+
+// ============================================
+// ABORT CONTROLLER HELPER
+// ============================================
+
+/**
+ * Хук для управління AbortController і скасування запитів при unmount
+ */
+function useAbortController() {
+  const controllerRef = useRef<AbortController | null>(null)
+
+  // Ініціалізуємо новий AbortController
+  const getSignal = useCallback(() => {
+    controllerRef.current = new AbortController()
+    return controllerRef.current.signal
+  }, [])
+
+  // Скасовуємо запит при unmount
+  useEffect(() => {
+    return () => {
+      if (controllerRef.current) {
+        controllerRef.current.abort()
+      }
+    }
+  }, [])
+
+  return { getSignal }
+}
 
 // Types
 interface User {
@@ -83,6 +111,7 @@ export function useAdminUsers(initialPage = 1, initialLimit = 20) {
   const [pagination, setPagination] = useState({ page: 1, limit: 20, total: 0, pages: 0 })
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const { getSignal } = useAbortController()
 
   const fetchUsers = useCallback(async (params?: {
     page?: number
@@ -99,15 +128,19 @@ export function useAdminUsers(initialPage = 1, initialLimit = 20) {
       if (params?.role) query.set('role', params.role)
       if (params?.search) query.set('search', params.search)
 
-      const response = await apiGet<UsersResponse>(`/admin/users?${query}`)
+      const response = await apiGet<UsersResponse>(`/admin/users?${query}`, getSignal())
       setUsers(response.users)
       setPagination(response.pagination)
     } catch (err) {
+      // Ігноруємо помилку AbortError
+      if (err instanceof Error && err.name === 'AbortError') {
+        return
+      }
       setError(err instanceof Error ? err.message : 'Failed to load users')
     } finally {
       setLoading(false)
     }
-  }, [])
+  }, [getSignal])
 
   const updateRole = useCallback(async (userId: string, role: string) => {
     try {
@@ -117,6 +150,17 @@ export function useAdminUsers(initialPage = 1, initialLimit = 20) {
       return true
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to update role')
+      return false
+    }
+  }, [fetchUsers, pagination])
+
+  const verifyUser = useCallback(async (userId: string) => {
+    try {
+      await apiPut(`/admin/users/${userId}/verify`, {})
+      fetchUsers({ page: pagination.page, limit: pagination.limit })
+      return true
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to verify user')
       return false
     }
   }, [fetchUsers, pagination])
@@ -159,6 +203,7 @@ export function useAdminUsers(initialPage = 1, initialLimit = 20) {
     error,
     fetchUsers,
     updateRole,
+    verifyUser,
     createUser,
     deleteUser,
   }
@@ -170,6 +215,7 @@ export function useAdminAuditLogs(initialPage = 1, initialLimit = 50) {
   const [pagination, setPagination] = useState({ page: 1, limit: 50, total: 0, pages: 0 })
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const { getSignal } = useAbortController()
 
   const fetchLogs = useCallback(async (params?: {
     page?: number
@@ -192,15 +238,19 @@ export function useAdminAuditLogs(initialPage = 1, initialLimit = 50) {
       if (params?.startDate) query.set('startDate', params.startDate)
       if (params?.endDate) query.set('endDate', params.endDate)
 
-      const response = await apiGet<AuditLogsResponse>(`/admin/audit-logs?${query}`)
+      const response = await apiGet<AuditLogsResponse>(`/admin/audit-logs?${query}`, getSignal())
       setLogs(response.logs)
       setPagination(response.pagination)
     } catch (err) {
+      // Ігноруємо AbortError
+      if (err instanceof Error && err.name === 'AbortError') {
+        return
+      }
       setError(err instanceof Error ? err.message : 'Failed to load audit logs')
     } finally {
       setLoading(false)
     }
-  }, [])
+  }, [getSignal])
 
   useEffect(() => {
     fetchLogs({ page: initialPage, limit: initialLimit })
@@ -218,21 +268,32 @@ export function useAdminAuditLogs(initialPage = 1, initialLimit = 50) {
 // System Stats Hook
 export function useAdminStats() {
   const [stats, setStats] = useState<SystemStats | null>(null)
-  const [loading, setLoading] = useState(false)
+  const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
+  const { getSignal } = useAbortController()
 
   const fetchStats = useCallback(async () => {
+    console.log('useAdminStats: Starting fetch...')
     setLoading(true)
     setError(null)
     try {
-      const response = await apiGet<SystemStats>('/admin/stats')
+      console.log('useAdminStats: Calling API...')
+      const response = await apiGet<SystemStats>('/admin/stats', getSignal())
+      console.log('useAdminStats: Response received:', response)
       setStats(response)
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to load stats')
+      // Ігноруємо AbortError
+      if (err instanceof Error && err.name === 'AbortError') {
+        console.log('useAdminStats: Request aborted')
+        return
+      }
+      const errorMessage = err instanceof Error ? err.message : 'Failed to load stats'
+      console.error('useAdminStats: Error:', errorMessage, err)
+      setError(errorMessage)
     } finally {
       setLoading(false)
     }
-  }, [])
+  }, [getSignal])
 
   useEffect(() => {
     fetchStats()
@@ -287,20 +348,25 @@ export function useAdminContent() {
   const [total, setTotal] = useState(0)
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const { getSignal } = useAbortController()
 
   const fetchTopics = useCallback(async () => {
     setLoading(true)
     setError(null)
     try {
-      const response = await apiGet<{ topics: Topic[]; total: number }>('/admin/content/topics')
+      const response = await apiGet<{ topics: Topic[]; total: number }>('/admin/content/topics', getSignal())
       setTopics(response.topics)
       setTotal(response.total)
     } catch (err) {
+      // Ігноруємо AbortError
+      if (err instanceof Error && err.name === 'AbortError') {
+        return
+      }
       setError(err instanceof Error ? err.message : 'Failed to load topics')
     } finally {
       setLoading(false)
     }
-  }, [])
+  }, [getSignal])
 
   const createTopic = useCallback(async (data: TopicCreateData) => {
     try {

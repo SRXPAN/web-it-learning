@@ -14,6 +14,9 @@
     "prisma:migrate": "prisma migrate dev",
     "seed": "tsx prisma/seed.safe.ts",
     "seed:unsafe": "tsx prisma/seed.ts",
+    "i18n:seed": "tsx scripts/seed-translations.ts",
+    "i18n:seed:normalized": "tsx scripts/seed-i18n-normalized.ts",
+    "i18n:check": "tsx scripts/checkI18nKeys.ts",
     "db:reset": "echo '⚠️ This will DELETE ALL DATA! Use db:reset:confirm to proceed.'",
     "db:reset:confirm": "prisma migrate reset --force",
     "db:seed": "prisma db seed",
@@ -25,7 +28,7 @@
   },
   "prisma": {
     "schema": "src/prisma/schema.prisma",
-    "seed": "tsx prisma/seed.safe.ts"
+    "seed": "tsx src/prisma/seed.safe.ts"
   },
   "dependencies": {
     "@aws-sdk/client-s3": "^3.958.0",
@@ -58,7 +61,7 @@
     "@vitest/coverage-v8": "^1.6.0",
     "prisma": "^5.19.1",
     "supertest": "^7.0.0",
-    "tsx": "^4.19.2",
+    "tsx": "^4.21.0",
     "typescript": "^5.6.2",
     "vitest": "^1.6.0"
   }

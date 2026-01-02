@@ -21,8 +21,9 @@ export default function Editor(){
       const data = await listRootTopics()
       setTopics(data)
       if (!activeTopicId && data.length) setActiveTopicId(data[0].id)
-    } catch (e:any) {
-      push({ type:'error', msg: e.message || t('editor.error.loadTopicsFailed') })
+    } catch (e: unknown) {
+      const msg = e instanceof Error ? e.message : t('editor.error.loadTopicsFailed')
+      push({ type:'error', msg })
     }
   }
 

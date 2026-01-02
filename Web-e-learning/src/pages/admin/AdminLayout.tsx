@@ -18,18 +18,26 @@ import {
   LogOut,
   BookOpen,
 } from 'lucide-react'
+import { type TranslationKey } from '@/i18n/translations'
 
-const navItems = [
+type NavItem = {
+  path: string
+  icon: typeof Users
+  labelKey: TranslationKey
+  roles: string[]
+  end?: boolean
+  badge?: string
+}
+
+const navItems: NavItem[] = [
   { path: '/admin', icon: BarChart3, labelKey: 'admin.dashboard' as const, end: true, roles: ['ADMIN', 'EDITOR'] },
   { path: '/admin/users', icon: Users, labelKey: 'admin.users' as const, roles: ['ADMIN'] },
   { path: '/admin/content', icon: BookOpen, labelKey: 'admin.content' as const, roles: ['ADMIN'] },
   { path: '/admin/topics', icon: BookOpen, labelKey: 'editor.tab.topics' as const, roles: ['ADMIN', 'EDITOR'] },
-  { path: '/admin/materials', icon: FileText, labelKey: 'editor.tab.materials' as const, roles: ['ADMIN', 'EDITOR'] },
-  { path: '/admin/quizzes', icon: FileText, labelKey: 'editor.tab.quizzes' as const, roles: ['ADMIN', 'EDITOR'] },
   { path: '/admin/files', icon: FolderOpen, labelKey: 'admin.files' as const, roles: ['ADMIN'] },
   { path: '/admin/translations', icon: Languages, labelKey: 'admin.translations' as const, roles: ['ADMIN'] },
   { path: '/admin/audit', icon: Activity, labelKey: 'admin.auditLogs' as const, roles: ['ADMIN'] },
-  { path: '/admin/settings', icon: Settings, labelKey: 'admin.settings' as const, roles: ['ADMIN'] },
+  // { path: '/admin/settings', icon: Settings, labelKey: 'admin.settings' as const, roles: ['ADMIN'], badge: 'WIP' },
 ]
 
 export default function AdminLayout() {
@@ -59,7 +67,7 @@ export default function AdminLayout() {
 
         {/* Navigation */}
         <nav className="flex-1 px-3 py-4 space-y-1">
-          {visibleNavItems.map(({ path, icon: Icon, labelKey, end }) => (
+          {visibleNavItems.map(({ path, icon: Icon, labelKey, end, badge }) => (
             <NavLink
               key={path}
               to={path}
@@ -73,7 +81,12 @@ export default function AdminLayout() {
               }
             >
               <Icon className="w-5 h-5 mr-3" />
-              {t(labelKey)}
+              <span className="flex-1">{t(labelKey)}</span>
+              {badge && (
+                <span className="text-xs px-1.5 py-0.5 bg-yellow-100 text-yellow-700 dark:bg-yellow-900/30 dark:text-yellow-400 rounded">
+                  {badge}
+                </span>
+              )}
               <ChevronRight className="w-4 h-4 ml-auto opacity-50" />
             </NavLink>
           ))}
@@ -106,7 +119,7 @@ export default function AdminLayout() {
 
       {/* Main content */}
       <main className="flex-1 overflow-auto">
-        <div className="p-6">
+        <div className="px-3 sm:px-4 md:px-6 lg:px-8 xl:px-10 2xl:px-12 py-6 lg:py-8 w-full">
           <Outlet />
         </div>
       </main>

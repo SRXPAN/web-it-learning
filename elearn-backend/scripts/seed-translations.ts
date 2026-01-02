@@ -251,6 +251,10 @@ const translationsData: Record<string, { UA: string; PL: string; EN: string; des
   'lesson.achievement.fastAnswer': { UA: '⚡ Швидка відповідь', PL: '⚡ Szybka odpowiedź', EN: '⚡ Fast Answer', description: 'Achievement' },
   'lesson.achievement.accuracy90': { UA: '🎯 Точність 90%', PL: '🎯 Dokładność 90%', EN: '🎯 90% Accuracy', description: 'Achievement' },
   'lesson.test.expected': { UA: 'Очікується:', PL: 'Oczekiwano:', EN: 'Expected:', description: 'Test expected' },
+  'lesson.openPdf': { UA: 'Відкрити PDF', PL: 'Otwórz PDF', EN: 'Open PDF', description: 'Open PDF button' },
+  'lesson.openLink': { UA: 'Відкрити посилання', PL: 'Otwórz link', EN: 'Open Link', description: 'Open link button' },
+  'lesson.noContent': { UA: 'Контент недоступний', PL: 'Treść niedostępna', EN: 'Content not available', description: 'No content message' },
+  'lesson.noVideo': { UA: 'Відео недоступне', PL: 'Wideo niedostępne', EN: 'Video not available', description: 'No video message' },
 
   // Profile
   'profile.title': { UA: 'Профіль', PL: 'Profil', EN: 'Profile', description: 'Page title' },

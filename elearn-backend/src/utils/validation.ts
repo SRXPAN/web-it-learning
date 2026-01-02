@@ -62,6 +62,57 @@ export const sortSchema = z.object({
   sortOrder: z.enum(['asc', 'desc']).default('asc'),
 })
 
+// ============================================
+// AUTH REQUEST SCHEMAS
+// ============================================
+
+export const registerSchema = z.object({
+  name: nameSchema,
+  email: emailSchema,
+  password: passwordSchemaSimple,
+})
+
+export const loginSchema = z.object({
+  email: emailSchema,
+  password: z.string().min(1, 'Password is required'),
+})
+
+export const changePasswordSchema = z.object({
+  currentPassword: z.string().min(1, 'Current password is required'),
+  newPassword: passwordSchemaSimple,
+})
+
+export const changeEmailSchema = z.object({
+  newEmail: emailSchema,
+  password: z.string().min(1, 'Password is required'),
+})
+
+export const forgotPasswordSchema = z.object({
+  email: emailSchema,
+})
+
+export const resetPasswordSchema = z.object({
+  token: z.string().min(1, 'Token is required'),
+  password: passwordSchemaSimple,
+})
+
+export const verifyEmailSchema = z.object({
+  token: z.string().min(1, 'Token is required'),
+})
+
+export const resendVerificationEmailSchema = z.object({
+  email: emailSchema,
+})
+
+export const avatarSchema = z.object({
+  avatar: z.string().max(500000, 'Avatar too large'),
+})
+
+export const updateProfileSchema = z.object({
+  name: nameSchema.optional(),
+  email: emailSchema.optional(),
+})
+
 /**
  * Хелпер для безпечного парсингу з Zod
  */

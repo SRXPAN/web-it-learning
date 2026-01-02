@@ -70,8 +70,9 @@ export default function QuizzesTab({ topicId }: { topicId?: string }) {
     try {
       const data = await listQuizzes(topicId)
       setQuizzes(data.map((q) => ({ ...q, expanded: false })))
-    } catch (e: any) {
-      push({ type: 'error', msg: e.message })
+    } catch (e: unknown) {
+      const msg = e instanceof Error ? e.message : 'Failed to load quizzes'
+      push({ type: 'error', msg })
     } finally {
       setLoading(false)
     }
@@ -97,8 +98,9 @@ export default function QuizzesTab({ topicId }: { topicId?: string }) {
             : q
         )
       )
-    } catch (e: any) {
-      push({ type: 'error', msg: e.message })
+    } catch (e: unknown) {
+      const msg = e instanceof Error ? e.message : 'Failed to load questions'
+      push({ type: 'error', msg })
       setQuizzes((prev) =>
         prev.map((q) =>
           q.id === quizId ? { ...q, loadingQuestions: false } : q
@@ -153,8 +155,9 @@ export default function QuizzesTab({ topicId }: { topicId?: string }) {
         push({ type: 'success', msg: t('editor.success.quizCreated') })
       }
       resetQuizForm()
-    } catch (e: any) {
-      push({ type: 'error', msg: e.message })
+    } catch (e: unknown) {
+      const msg = e instanceof Error ? e.message : 'Failed to save quiz'
+      push({ type: 'error', msg })
     }
   }, [topicId, quizTitle, quizDuration, editingQuizId, push])
 
@@ -167,8 +170,9 @@ export default function QuizzesTab({ topicId }: { topicId?: string }) {
       await deleteQuiz(topicId, id)
       setQuizzes((prev) => prev.filter((q) => q.id !== id))
       push({ type: 'success', msg: t('editor.success.quizDeleted') })
-    } catch (e: any) {
-      push({ type: 'error', msg: e.message })
+    } catch (e: unknown) {
+      const msg = e instanceof Error ? e.message : 'Failed to delete quiz'
+      push({ type: 'error', msg })
     }
   }, [topicId, push])
 
@@ -243,8 +247,9 @@ export default function QuizzesTab({ topicId }: { topicId?: string }) {
         push({ type: 'success', msg: t('editor.success.questionCreated') })
       }
       resetQuestionForm()
-    } catch (e: any) {
-      push({ type: 'error', msg: e.message })
+    } catch (e: unknown) {
+      const msg = e instanceof Error ? e.message : 'Failed to save question'
+      push({ type: 'error', msg })
     }
   }, [activeQuizId, questionText, questionExplanation, questionDifficulty, options, editingQuestionId, push])
 

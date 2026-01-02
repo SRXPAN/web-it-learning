@@ -16,7 +16,10 @@ export default function MaterialsTab({ topicId }:{ topicId?:string }){
 
   async function load(){
     if (!topicId) { setItems([]); return }
-    try { setItems(await listMaterials(topicId)) } catch(e:any){ push({type:'error', msg:e.message}) }
+    try { setItems(await listMaterials(topicId)) } catch(e: unknown){ 
+      const msg = e instanceof Error ? e.message : 'Failed to load materials'
+      push({type:'error', msg})
+    }
   }
   useEffect(()=>{ load() }, [topicId])
 
@@ -53,7 +56,10 @@ export default function MaterialsTab({ topicId }:{ topicId?:string }){
       setUploadedFile(null)
       resetUpload()
       await load()
-    } catch(e:any){ push({type:'error', msg:e.message}) }
+    } catch(e: unknown){ 
+      const msg = e instanceof Error ? e.message : 'Failed to create material'
+      push({type:'error', msg})
+    }
   }
 
   const showFileUpload = form.type === 'pdf' || form.type === 'video'
@@ -73,7 +79,7 @@ export default function MaterialsTab({ topicId }:{ topicId?:string }){
             <input value={form.title||''} onChange={e=>setForm(s=>({...s, title:e.target.value}))} className="w-full mb-3"/>
 
             <label className="block text-sm mb-1">{t('editor.label.type')}</label>
-            <select value={form.type||'link'} onChange={e=>setForm(s=>({...s, type: e.target.value as any}))} className="w-full mb-3">
+            <select value={form.type||'link'} onChange={e=>setForm(s=>({...s, type: e.currentTarget.value as Material['type']}))} className="w-full mb-3">
               <option value="pdf">{t('materials.type.pdf')}</option>
               <option value="video">{t('materials.type.video')}</option>
               <option value="link">{t('materials.type.link')}</option>
@@ -81,7 +87,7 @@ export default function MaterialsTab({ topicId }:{ topicId?:string }){
             </select>
 
             <label className="block text-sm mb-1">{t('editor.label.language')}</label>
-            <select value={form.lang||'UA'} onChange={e=>setForm(s=>({...s, lang: e.target.value as any}))} className="w-full mb-3">
+            <select value={form.lang||'UA'} onChange={e=>setForm(s=>({...s, lang: e.currentTarget.value as 'UA'|'PL'|'EN'}))} className="w-full mb-3">
               <option>UA</option><option>PL</option><option>EN</option>
             </select>
 

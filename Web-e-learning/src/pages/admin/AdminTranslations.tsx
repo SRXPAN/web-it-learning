@@ -41,6 +41,7 @@ export default function AdminTranslations() {
   const [newKey, setNewKey] = useState('')
   const [newValues, setNewValues] = useState({ UA: '', PL: '', EN: '' })
   const [saving, setSaving] = useState(false)
+  const [saveError, setSaveError] = useState<string | null>(null)
 
   const startEdit = (tr: { id: string; key: string; translations: Record<string, string> }) => {
     setEditingId(tr.id)
@@ -59,11 +60,13 @@ export default function AdminTranslations() {
   const saveEdit = async () => {
     if (!editingId) return
     setSaving(true)
+    setSaveError(null)
     try {
       await updateTranslation(editingId, editValues)
       cancelEdit()
     } catch (err) {
       console.error('Failed to save:', err)
+      setSaveError(err instanceof Error ? err.message : 'Failed to save translation')
     } finally {
       setSaving(false)
     }
@@ -71,7 +74,27 @@ export default function AdminTranslations() {
 
   const handleCreate = async () => {
     if (!newKey.trim()) return
+    
+    // Validate key format (namespace.key)
+    if (!newKey.includes('.')) {
+      setSaveError('Key must include namespace (e.g., common.save)')
+      return
+    }
+    
+    const namespace = newKey.split('.')[0]
+    if (!NAMESPACES.includes(namespace)) {
+      setSaveError(`Namespace must be one of: ${NAMESPACES.join(', ')}`)
+      return
+    }
+    
+    // Require at least one translation
+    if (!newValues.UA && !newValues.PL && !newValues.EN) {
+      setSaveError('At least one translation is required')
+      return
+    }
+    
     setSaving(true)
+    setSaveError(null)
     try {
       await createTranslation({ key: newKey, translations: newValues })
       setShowCreate(false)
@@ -79,6 +102,7 @@ export default function AdminTranslations() {
       setNewValues({ UA: '', PL: '', EN: '' })
     } catch (err) {
       console.error('Failed to create:', err)
+      setSaveError(err instanceof Error ? err.message : 'Failed to create translation')
     } finally {
       setSaving(false)
     }
@@ -170,6 +194,13 @@ export default function AdminTranslations() {
           {error}
         </div>
       )}
+      
+      {/* Save Error */}
+      {saveError && (
+        <div className="p-4 bg-yellow-50 dark:bg-yellow-900/20 border border-yellow-200 dark:border-yellow-800 rounded-lg text-yellow-600 dark:text-yellow-400">
+          {saveError}
+        </div>
+      )}
 
       {/* Create Modal */}
       {showCreate && (
@@ -178,6 +209,11 @@ export default function AdminTranslations() {
             <h2 className="text-lg font-semibold text-gray-900 dark:text-white mb-4">
               Add Translation Key
             </h2>
+            {saveError && (
+              <div className="mb-4 p-3 bg-yellow-50 dark:bg-yellow-900/20 border border-yellow-200 dark:border-yellow-800 rounded-lg text-sm text-yellow-600 dark:text-yellow-400">
+                {saveError}
+              </div>
+            )}
             <div className="space-y-4">
               <div>
                 <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">

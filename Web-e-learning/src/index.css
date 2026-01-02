@@ -1,5 +1,6 @@
 @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Poppins:wght@500;600;700&display=swap');
 
+
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
@@ -11,10 +12,18 @@
 
   body {
     @apply bg-neutral-50 text-neutral-900 transition-colors duration-300;
+    background-image: radial-gradient(circle at 20% 20%, rgba(59,130,246,0.06), transparent 35%),
+      radial-gradient(circle at 80% 0%, rgba(236,72,153,0.05), transparent 30%),
+      linear-gradient(180deg, rgba(0,0,0,0.02), transparent 60%);
+    background-attachment: fixed;
   }
 
   .dark body {
     @apply bg-neutral-950 text-neutral-50;
+    background-image: radial-gradient(circle at 20% 20%, rgba(59,130,246,0.12), transparent 35%),
+      radial-gradient(circle at 80% 0%, rgba(236,72,153,0.1), transparent 30%),
+      linear-gradient(180deg, rgba(255,255,255,0.04), transparent 60%);
+    background-attachment: fixed;
   }
 
   h1, h2, h3, h4, h5, h6 {

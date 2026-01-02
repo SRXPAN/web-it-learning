@@ -8,6 +8,16 @@ export interface LocalizedString {
   EN?: string
 }
 
+/**
+ * Тип для мультимовних JSON полів у базі даних
+ * Використовується для nameJson, descJson, etc.
+ */
+export interface LocalizedObject {
+  UA: string
+  PL: string
+  EN: string
+}
+
 // ============================================
 // USER & AUTH TYPES
 // ============================================
@@ -56,6 +66,7 @@ export interface Material {
   titleJson?: LocalizedString
   type: MaterialType
   url?: string
+  fileId?: string
   content?: string
   contentJson?: LocalizedString
   lang?: Lang

@@ -17,6 +17,7 @@ import {
   ChevronDown,
   Loader2,
   Globe,
+  Search,
 } from 'lucide-react'
 import { Loading } from '@/components/Loading'
 import { PageHeader } from '@/components/admin/PageHeader'
@@ -46,6 +47,8 @@ export default function AdminTopics() {
   const [deleteConfirm, setDeleteConfirm] = useState<AdminTopic | null>(null)
   const [showCreateModal, setShowCreateModal] = useState(false)
   const [activeTab, setActiveTab] = useState<'UA' | 'PL' | 'EN'>('UA')
+  const [searchTerm, setSearchTerm] = useState('')
+  const [categoryFilter, setCategoryFilter] = useState('')
 
   // Build tree structure
   const buildTree = (items: AdminTopic[]): TopicWithChildren[] => {
@@ -178,7 +181,24 @@ export default function AdminTopics() {
     return <Loading />
   }
 
-  const tree = buildTree(topics || [])
+  // Filter topics
+  const filteredTopics = (topics || []).filter(topic => {
+    const matchesSearch = !searchTerm || 
+      topic.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      topic.slug.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      (topic.nameJson?.UA && topic.nameJson.UA.toLowerCase().includes(searchTerm.toLowerCase()))
+    
+    const matchesCategory = !categoryFilter || topic.category === categoryFilter
+    
+    return matchesSearch && matchesCategory
+  })
+
+  // Limit to prevent rendering too many items
+  const MAX_VISIBLE = 100
+  const limitedTopics = filteredTopics.slice(0, MAX_VISIBLE)
+  const hasMore = filteredTopics.length > MAX_VISIBLE
+
+  const tree = buildTree(limitedTopics)
 
   return (
     <div className="space-y-6">
@@ -187,7 +207,7 @@ export default function AdminTopics() {
         icon={BookOpen}
         title={t('editor.tab.topics')}
         description="Управління темами курсів"
-        stats={`${topics?.length || 0} ${t('common.total')}`}
+        stats={`${filteredTopics.length} / ${topics?.length || 0} ${t('common.total')}`}
         actions={
           <button
             onClick={() => setShowCreateModal(true)}
@@ -199,6 +219,30 @@ export default function AdminTopics() {
         }
       />
 
+      {/* Filters */}
+      <div className="flex gap-4">
+        <div className="flex-1 relative">
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400" />
+          <input
+            type="text"
+            placeholder="Search topics..."
+            value={searchTerm}
+            onChange={(e) => setSearchTerm(e.target.value)}
+            className="w-full pl-10 pr-4 py-2 border border-gray-200 dark:border-gray-700 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-white"
+          />
+        </div>
+        <select
+          value={categoryFilter}
+          onChange={(e) => setCategoryFilter(e.target.value)}
+          className="px-4 py-2 border border-gray-200 dark:border-gray-700 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-white"
+        >
+          <option value="">All Categories</option>
+          {CATEGORIES.map(cat => (
+            <option key={cat} value={cat}>{cat}</option>
+          ))}
+        </select>
+      </div>
+
       {/* Error */}
       {error && (
         <div className="p-4 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-lg text-red-600 dark:text-red-400">
@@ -208,7 +252,12 @@ export default function AdminTopics() {
 
       {/* Topics Tree */}
       <div className="bg-white dark:bg-gray-900 rounded-lg border border-gray-200 dark:border-gray-800">
-        {(!topics || topics.length === 0) && !loading ? (
+        {hasMore && (
+          <div className="px-4 py-2 bg-yellow-50 dark:bg-yellow-900/20 border-b border-yellow-200 dark:border-yellow-800 text-sm text-yellow-600 dark:text-yellow-400">
+            Showing {MAX_VISIBLE} of {filteredTopics.length} topics. Use filters to narrow down.
+          </div>
+        )}
+        {(!limitedTopics || limitedTopics.length === 0) && !loading ? (
           <div className="text-center py-12 text-gray-500 dark:text-gray-400">
             {t('editor.empty.noTopics')}
           </div>

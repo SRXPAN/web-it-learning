@@ -24,6 +24,7 @@ model User {
   topicsCreated    Topic[]        @relation("TopicCreator")
   materialsCreated Material[]     @relation("MaterialCreator")
   quizzesCreated   Quiz[]         @relation("QuizCreator")
+  quizAttempts     QuizAttempt[]
   refreshTokens    RefreshToken[]
   filesUploaded    File[]         @relation("FileUploader")
   auditLogs        AuditLog[]
@@ -60,10 +61,14 @@ enum Status {
 model Topic {
   id          String     @id @default(cuid())
   slug        String     @unique
-  name        String // Fallback name (EN)
-  nameJson    Json? // {"UA": "...", "PL": "...", "EN": "..."}
+  name        String // Fallback name (EN) - kept for backward compat
+  nameJson    Json? // {"UA": "...", "PL": "...", "EN": "..."} - legacy, use titleKey
+  titleKeyId  String?    // Reference to I18nKey for localized title
+  titleKey    I18nKey?   @relation("TopicTitle", fields: [titleKeyId], references: [id])
   description String
-  descJson    Json? // {"UA": "...", "PL": "...", "EN": "..."}
+  descJson    Json? // {"UA": "...", "PL": "...", "EN": "..."} - legacy, use descKey
+  descKeyId   String?    // Reference to I18nKey for localized description
+  descKey     I18nKey?   @relation("TopicDesc", fields: [descKeyId], references: [id])
   category    Category   @default(Programming)
   parentId    String?
   parent      Topic?     @relation("TopicTree", fields: [parentId], references: [id])
@@ -79,30 +84,38 @@ model Topic {
 
   @@index([category])
   @@index([parentId])
+  @@index([titleKeyId])
+  @@index([descKeyId])
 }
 
 model Material {
-  id          String       @id @default(cuid())
-  title       String // Fallback title (EN)
-  titleJson   Json? // {"UA": "...", "PL": "...", "EN": "..."}
-  type        MaterialType
-  url         String?
-  fileId      String?      // Reference to File for pdf/video/image
-  file        File?        @relation(fields: [fileId], references: [id])
-  content     String?
-  contentJson Json? // {"UA": "...", "PL": "...", "EN": "..."} for text materials
-  lang        Lang         @default(EN) // Primary language of material
-  topic       Topic        @relation(fields: [topicId], references: [id])
-  topicId     String
-  views       Int          @default(0)
-  status      Status       @default(Draft)
-  publishedAt DateTime?
-  createdById String?
-  createdBy   User?        @relation("MaterialCreator", fields: [createdById], references: [id], onDelete: SetNull)
-  createdAt   DateTime     @default(now())
-  updatedAt   DateTime     @default(now()) @updatedAt
+  id            String       @id @default(cuid())
+  title         String // Fallback title (EN)
+  titleJson     Json? // {"UA": "...", "PL": "...", "EN": "..."} - legacy, use titleKey
+  titleKeyId    String?      // Reference to I18nKey for localized title
+  titleKey      I18nKey?     @relation("MaterialTitle", fields: [titleKeyId], references: [id])
+  type          MaterialType
+  url           String?
+  fileId        String?      // Reference to File for pdf/video/image
+  file          File?        @relation(fields: [fileId], references: [id])
+  content       String?
+  contentJson   Json? // {"UA": "...", "PL": "...", "EN": "..."} - legacy, use contentKey
+  contentKeyId  String?      // Reference to I18nKey for localized content
+  contentKey    I18nKey?     @relation("MaterialContent", fields: [contentKeyId], references: [id])
+  lang          Lang         @default(EN) // Primary language of material
+  topic         Topic        @relation(fields: [topicId], references: [id])
+  topicId       String
+  views         Int          @default(0)
+  status        Status       @default(Draft)
+  publishedAt   DateTime?
+  createdById   String?
+  createdBy     User?        @relation("MaterialCreator", fields: [createdById], references: [id], onDelete: SetNull)
+  createdAt     DateTime     @default(now())
+  updatedAt     DateTime     @default(now()) @updatedAt
 
   @@index([topicId])
+  @@index([titleKeyId])
+  @@index([contentKeyId])
 }
 
 enum Lang {
@@ -119,49 +132,62 @@ enum MaterialType {
 }
 
 model Quiz {
-  id          String     @id @default(cuid())
-  title       String // Fallback title (EN)
-  titleJson   Json? // {"UA": "...", "PL": "...", "EN": "..."}
-  durationSec Int        @default(60)
-  topicId     String
-  topic       Topic      @relation(fields: [topicId], references: [id], onDelete: Cascade)
-  questions   Question[]
-  status      Status     @default(Draft)
-  publishedAt DateTime?
-  createdById String?
-  createdBy   User?      @relation("QuizCreator", fields: [createdById], references: [id], onDelete: SetNull)
-  createdAt   DateTime   @default(now())
-  updatedAt   DateTime   @default(now()) @updatedAt
+  id            String        @id @default(cuid())
+  title         String // Fallback title (EN)
+  titleJson     Json? // {"UA": "...", "PL": "...", "EN": "..."} - legacy, use titleKey
+  titleKeyId    String?       // Reference to I18nKey for localized title
+  titleKey      I18nKey?      @relation("QuizTitle", fields: [titleKeyId], references: [id])
+  durationSec   Int           @default(60)
+  topicId       String
+  topic         Topic         @relation(fields: [topicId], references: [id], onDelete: Cascade)
+  questions     Question[]
+  attempts      QuizAttempt[]
+  status        Status        @default(Draft)
+  publishedAt   DateTime?
+  createdById   String?
+  createdBy     User?         @relation("QuizCreator", fields: [createdById], references: [id], onDelete: SetNull)
+  createdAt     DateTime      @default(now())
+  updatedAt     DateTime      @default(now()) @updatedAt
 
   @@index([topicId])
+  @@index([titleKeyId])
 }
 
 model Question {
-  id              String     @id @default(cuid())
-  text            String // Fallback text (EN)
-  textJson        Json? // {"UA": "...", "PL": "...", "EN": "..."}
-  explanation     String?
-  explanationJson Json? // {"UA": "...", "PL": "...", "EN": "..."}
-  tags            String[]
-  difficulty      Difficulty
-  quizId          String
-  quiz            Quiz       @relation(fields: [quizId], references: [id])
-  options         Option[]
-  answers         Answer[]
+  id                 String     @id @default(cuid())
+  text               String // Fallback text (EN)
+  textJson           Json? // {"UA": "...", "PL": "...", "EN": "..."} - legacy, use textKey
+  textKeyId          String?    // Reference to I18nKey for localized question text
+  textKey            I18nKey?   @relation("QuestionText", fields: [textKeyId], references: [id])
+  explanation        String?
+  explanationJson    Json? // {"UA": "...", "PL": "...", "EN": "..."} - legacy, use explanationKey
+  explanationKeyId   String?    // Reference to I18nKey for localized explanation
+  explanationKey     I18nKey?   @relation("QuestionExplanation", fields: [explanationKeyId], references: [id])
+  tags               String[]
+  difficulty         Difficulty
+  quizId             String
+  quiz               Quiz       @relation(fields: [quizId], references: [id])
+  options            Option[]
+  answers            Answer[]
 
   @@index([quizId])
+  @@index([textKeyId])
+  @@index([explanationKeyId])
 }
 
 model Option {
-  id         String   @id @default(cuid())
-  text       String // Fallback text (EN)
-  textJson   Json? // {"UA": "...", "PL": "...", "EN": "..."}
-  correct    Boolean  @default(false)
-  questionId String
-  question   Question @relation(fields: [questionId], references: [id])
-  answers    Answer[]
+  id           String   @id @default(cuid())
+  text         String // Fallback text (EN)
+  textJson     Json? // {"UA": "...", "PL": "...", "EN": "..."} - legacy, use textKey
+  textKeyId    String?  // Reference to I18nKey for localized option text
+  textKey      I18nKey? @relation("OptionText", fields: [textKeyId], references: [id])
+  correct      Boolean  @default(false)
+  questionId   String
+  question     Question @relation(fields: [questionId], references: [id])
+  answers      Answer[]
 
   @@index([questionId])
+  @@index([textKeyId])
 }
 
 model Answer {
@@ -174,11 +200,31 @@ model Answer {
   option     Option?  @relation(fields: [optionId], references: [id])
   isCorrect  Boolean
   createdAt  DateTime @default(now())
+  attemptId  String?
+  attempt    QuizAttempt? @relation(fields: [attemptId], references: [id])
 
   @@index([userId])
   @@index([questionId])
   @@index([userId, questionId]) // Композитний індекс для швидкого пошуку відповідей користувача
   @@index([createdAt]) // Індекс для сортування за датою
+  @@index([attemptId])
+}
+
+model QuizAttempt {
+  id        String   @id @default(cuid())
+  userId    String
+  user      User     @relation(fields: [userId], references: [id])
+  quizId    String
+  quiz      Quiz     @relation(fields: [quizId], references: [id])
+  score     Int      // correct answers count
+  total     Int      // total questions
+  xpEarned  Int      @default(0)
+  createdAt DateTime @default(now())
+  answers   Answer[]
+
+  @@index([userId])
+  @@index([quizId])
+  @@index([userId, createdAt])
 }
 
 enum Difficulty {
@@ -312,6 +358,49 @@ model UiTranslation {
 
   @@index([key])
   @@index([namespace])
+}
+
+// ============================================
+// NORMALIZED I18N TABLES
+// ============================================
+
+// Ключі перекладів (нормалізована структура)
+model I18nKey {
+  id                   String       @id @default(cuid())
+  key                  String       // "nav.dashboard", "quiz.title"
+  namespace            String       @default("common") // common, auth, quiz, nav, etc.
+  description          String?      // Опис для редактора перекладів
+  values               I18nValue[]
+  // Relations for content localization
+  topicTitles          Topic[]      @relation("TopicTitle")
+  topicDescs           Topic[]      @relation("TopicDesc")
+  materialTitles       Material[]   @relation("MaterialTitle")
+  materialContents     Material[]   @relation("MaterialContent")
+  quizTitles           Quiz[]       @relation("QuizTitle")
+  questionTexts        Question[]   @relation("QuestionText")
+  questionExplanations Question[]   @relation("QuestionExplanation")
+  optionTexts          Option[]     @relation("OptionText")
+  createdAt            DateTime     @default(now())
+  updatedAt            DateTime     @default(now()) @updatedAt
+
+  @@unique([namespace, key])
+  @@index([namespace])
+  @@index([key])
+}
+
+// Значення перекладів по мовах
+model I18nValue {
+  id        String   @id @default(cuid())
+  keyId     String
+  key       I18nKey  @relation(fields: [keyId], references: [id], onDelete: Cascade)
+  lang      Lang     // UA, PL, EN
+  value     String   @db.Text
+  createdAt DateTime @default(now())
+  updatedAt DateTime @default(now()) @updatedAt
+
+  @@unique([keyId, lang])
+  @@index([keyId])
+  @@index([lang])
 }
 
 // Щоденні цілі з перекладами

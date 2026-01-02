@@ -19,6 +19,11 @@ export default function AdminDashboard() {
   const { stats, loading, error, refresh } = useAdminStats()
   const { t } = useTranslation()
 
+  // Debug logs
+  console.log('AdminDashboard stats:', stats)
+  console.log('AdminDashboard loading:', loading)
+  console.log('AdminDashboard error:', error)
+
   if (loading) {
     return <Loading />
   }
@@ -40,25 +45,25 @@ export default function AdminDashboard() {
   const statCards = [
     {
       label: t('admin.totalUsers'),
-      value: stats?.users?.total || 0,
+      value: stats.users?.total ?? 0,
       icon: Users,
       color: 'blue',
     },
     {
       label: t('admin.totalTopics'),
-      value: stats?.content?.topics || 0,
+      value: stats.content?.topics ?? 0,
       icon: BookOpen,
       color: 'green',
     },
     {
       label: t('admin.totalMaterials'),
-      value: stats?.content?.materials || 0,
+      value: stats.content?.materials ?? 0,
       icon: FileQuestion,
       color: 'purple',
     },
     {
       label: t('admin.totalFiles'),
-      value: stats?.content?.files || 0,
+      value: stats.content?.files ?? 0,
       icon: FolderOpen,
       color: 'orange',
     },
@@ -93,11 +98,11 @@ export default function AdminDashboard() {
       </div>
 
       {/* Stats Grid */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+      <div className="grid grid-cols-12 gap-6 lg:gap-8">
         {statCards.map(({ label, value, icon: Icon, color }) => (
           <div
             key={label}
-            className="bg-white dark:bg-gray-800 rounded-xl p-6 border border-gray-200 dark:border-gray-700"
+            className="col-span-12 md:col-span-6 xl:col-span-3 bg-white dark:bg-gray-800 rounded-2xl p-6 lg:p-7 border border-gray-200 dark:border-gray-700 shadow-sm"
           >
             <div className="flex items-center">
               <div className={`p-3 rounded-lg ${colorClasses[color]}`}>

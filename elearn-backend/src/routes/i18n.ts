@@ -9,6 +9,20 @@ import { logger } from '../utils/logger.js'
 const router = Router()
 
 // ============================================
+// CACHE MANAGEMENT
+// ============================================
+
+// In-memory cache with TTL (5 seconds)
+interface CacheEntry {
+  bundle: Record<string, string>
+  version: string
+  timestamp: number
+}
+
+const CACHE_TTL = 5000 // 5 seconds in milliseconds
+const bundleCache = new Map<string, CacheEntry>()
+
+// ============================================
 // SCHEMAS
 // ============================================
 
@@ -21,6 +35,22 @@ const missingKeysSchema = z.object({
   keys: z.array(z.string()).max(100),
   lang: z.enum(['UA', 'PL', 'EN']).optional(),
 })
+
+// ============================================
+// CACHE HELPERS
+// ============================================
+
+/**
+ * Очищає весь кеш перекладів
+ */
+export function clearTranslationCache(): void {
+  bundleCache.clear()
+  logger.info('[i18n] Cache cleared')
+}
+
+function getCacheKey(lang: string, namespaces: string[]): string {
+  return `${lang}:${namespaces.sort().join(',')}`
+}
 
 // ============================================
 // HELPERS
@@ -39,6 +69,7 @@ function generateETag(lang: string, versions: { namespace: string; version: numb
  * GET /api/i18n/bundle?lang=UA&ns=common,auth,quiz
  * 
  * Повертає всі UI переклади для вказаної мови.
+ * Читає з нормалізованих таблиць I18nKey + I18nValue
  * Підтримує:
  * - ETag кешування (304 Not Modified)
  * - Namespace фільтрацію
@@ -53,52 +84,62 @@ router.get('/bundle', async (req, res) => {
     
     const { lang, ns } = parsed.data
     const namespaces = ns?.split(',').map(s => s.trim()).filter(Boolean) || []
+    const cacheKey = getCacheKey(lang as string, namespaces)
     
-    // Отримуємо версії для ETag
-    const versions = await prisma.translationVersion.findMany({
-      where: namespaces.length ? { namespace: { in: namespaces } } : {},
-      select: { namespace: true, version: true },
-    })
-    
-    // Якщо версій немає - створюємо дефолтну
-    if (versions.length === 0) {
-      versions.push({ namespace: 'common', version: 1 })
+    // Перевіряємо кеш
+    const cached = bundleCache.get(cacheKey)
+    if (cached && Date.now() - cached.timestamp < CACHE_TTL) {
+      logger.info(`[i18n] Using memory-cached bundle for ${lang} (${Object.keys(cached.bundle).length} keys)`)
+      res.setHeader('ETag', `"${cached.version}"`)
+      res.setHeader('Cache-Control', 'public, max-age=5, stale-while-revalidate=5')
+      res.setHeader('X-Cache', 'HIT')
+      return res.json({
+        lang,
+        version: cached.version,
+        count: Object.keys(cached.bundle).length,
+        namespaces: namespaces.length ? namespaces : ['all'],
+        bundle: cached.bundle,
+      })
     }
     
-    const etag = `"${generateETag(lang, versions)}"`
+    // ============================================
+    // QUERY FROM UiTranslation (single source of truth)
+    // ============================================
     
-    // Перевіряємо If-None-Match для кешування
-    const clientEtag = req.headers['if-none-match']
-    if (clientEtag === etag) {
-      return res.status(304).end()
-    }
-    
-    // Отримуємо переклади
-    const where = namespaces.length ? { namespace: { in: namespaces } } : {}
-    const translations = await prisma.uiTranslation.findMany({
-      where,
+    const uiTranslations = await prisma.uiTranslation.findMany({
       select: { key: true, translations: true },
     })
     
-    // Формуємо bundle з fallback на EN
-    const bundle = translations.reduce((acc, t) => {
-      const trans = t.translations as Record<string, string>
-      // Пріоритет: запитана мова → EN → ключ
-      acc[t.key] = trans?.[lang] || trans?.['EN'] || t.key
-      return acc
-    }, {} as Record<string, string>)
+    // Build bundle with fallback to EN
+    const bundle: Record<string, string> = {}
     
-    // Встановлюємо кеш заголовки
-    res.setHeader('ETag', etag)
-    res.setHeader('Cache-Control', 'public, max-age=300, stale-while-revalidate=60') // 5 хв кеш
+    for (const t of uiTranslations) {
+      const trans = t.translations as Record<string, string>
+      bundle[t.key] = trans?.[lang] || trans?.['EN'] || t.key
+    }
+    
+    // Generate version hash from bundle
+    const version = crypto.createHash('md5').update(JSON.stringify(bundle)).digest('hex').slice(0, 12)
+    
+    // Зберігаємо в кеш
+    bundleCache.set(cacheKey, {
+      bundle,
+      version,
+      timestamp: Date.now(),
+    })
+    
+    // Встановлюємо кеш заголовки (5 сек TTL)
+    res.setHeader('ETag', `"${version}"`)
+    res.setHeader('Cache-Control', 'public, max-age=5, stale-while-revalidate=5')
     res.setHeader('Vary', 'Accept-Language')
+    res.setHeader('X-Cache', 'MISS')
     
     res.json({
       lang,
-      version: etag.replace(/"/g, ''),
+      version,
       count: Object.keys(bundle).length,
       namespaces: namespaces.length ? namespaces : ['all'],
-      translations: bundle,
+      bundle,
     })
   } catch (err) {
     logger.error('Failed to get i18n bundle', err as Error)
@@ -116,10 +157,16 @@ router.get('/version', async (req, res) => {
     const ns = req.query.ns as string | undefined
     const namespaces = ns?.split(',').map(s => s.trim()).filter(Boolean) || []
     
-    const versions = await prisma.translationVersion.findMany({
-      where: namespaces.length ? { namespace: { in: namespaces } } : {},
-      select: { namespace: true, version: true, updatedAt: true },
-    })
+    let versions: { namespace: string; version: number; updatedAt: Date }[] = []
+    try {
+      versions = await prisma.translationVersion.findMany({
+        where: namespaces.length ? { namespace: { in: namespaces } } : {},
+        select: { namespace: true, version: true, updatedAt: true },
+      })
+    } catch (e) {
+      // Table might not exist yet
+      logger.warn('TranslationVersion query failed', e as Error)
+    }
     
     const result = versions.reduce((acc, v) => {
       acc[v.namespace] = { version: v.version, updatedAt: v.updatedAt }
@@ -170,12 +217,23 @@ router.post('/missing', async (req, res) => {
  */
 router.get('/keys', async (_req, res) => {
   try {
-    const keys = await prisma.uiTranslation.findMany({
+    // Try new normalized tables first
+    const keys = await prisma.i18nKey.findMany({
       select: { key: true, namespace: true, description: true },
       orderBy: { key: 'asc' },
     })
     
-    res.json(keys)
+    if (keys.length > 0) {
+      return res.json(keys)
+    }
+    
+    // Fallback to old table
+    const oldKeys = await prisma.uiTranslation.findMany({
+      select: { key: true, namespace: true, description: true },
+      orderBy: { key: 'asc' },
+    })
+    
+    res.json(oldKeys)
   } catch (err) {
     logger.error('Failed to get i18n keys', err as Error)
     res.status(500).json({ error: 'Failed to load keys' })

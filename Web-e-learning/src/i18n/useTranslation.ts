@@ -60,14 +60,16 @@ export const useTranslationsStore = create<TranslationsState>((set, get) => ({
     // Skip if already loaded for this language AND has content
     const existingBundle = state.bundles[lang]
     if (existingBundle && Object.keys(existingBundle).length > 0) {
-      console.log(`[i18n] Using memory-cached bundle for ${lang} (${Object.keys(existingBundle).length} keys)`)
+      // ✅ Видалено спам: не логуємо при кожному використанні кешу
       return
     }
     
     // Try localStorage cache first
     const cachedBundle = loadCachedBundle(lang)
     if (cachedBundle && Object.keys(cachedBundle).length > 0) {
-      console.log(`[i18n] Using localStorage-cached bundle for ${lang} (${Object.keys(cachedBundle).length} keys)`)
+      if (import.meta.env.DEV) {
+        console.log(`[i18n] 💾 Loaded from localStorage: ${lang} (${Object.keys(cachedBundle).length} keys)`)
+      }
       set(s => ({
         bundles: { ...s.bundles, [lang]: cachedBundle },
         initialized: true
@@ -79,14 +81,19 @@ export const useTranslationsStore = create<TranslationsState>((set, get) => ({
     
     set({ loading: true, error: null })
     try {
-      console.log(`[i18n] Fetching translations for lang: ${lang}`)
+      if (import.meta.env.DEV) {
+        console.log(`[i18n] 🌐 Fetching translations from API: ${lang}`)
+      }
       const response = await apiGet<BundleResponse>(`/i18n/bundle?lang=${lang}`)
-      console.log(`[i18n] API response count: ${response.count}, version: ${response.version}`)
       
       const bundle = response.bundle || {}
       
       // Save to localStorage
       saveBundleToCache(lang, bundle, response.version)
+      
+      if (import.meta.env.DEV) {
+        console.log(`[i18n] ✅ Loaded ${response.count} keys, version: ${response.version}`)
+      }
       
       set(s => ({
         bundles: { ...s.bundles, [lang]: bundle },
@@ -95,7 +102,7 @@ export const useTranslationsStore = create<TranslationsState>((set, get) => ({
         initialized: true
       }))
     } catch (err) {
-      console.error('Failed to load translations from API:', err)
+      console.error('[i18n] ❌ Failed to load translations:', err)
       
       // Try localStorage as last resort (already checked above, but recheck)
       const fallbackCached = loadCachedBundle(lang) || loadCachedBundle('EN')

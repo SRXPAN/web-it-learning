@@ -2,9 +2,12 @@
  * Admin Content Management Page  
  * Edit Topics, Materials, Quizzes with translations
  */
-import { useState, useCallback } from 'react'
+import { useState, useCallback, useMemo, useEffect } from 'react'
 import { useTranslation } from '@/i18n/useTranslation'
+import { type TranslationKey } from '@/i18n/translations'
 import { useAdminContent } from '@/hooks/useAdmin'
+import MaterialsTab from '@/pages/editor/MaterialsTab'
+import QuizzesTab from '@/pages/editor/QuizzesTab'
 import {
   BookOpen,
   FolderTree,
@@ -47,8 +50,13 @@ type ContentTab = 'topics' | 'materials' | 'quizzes'
 
 export default function AdminContent() {
   const { t, lang } = useTranslation()
+  const tx = (key: TranslationKey, fallback: string) => {
+    const val = t(key)
+    return val === key ? fallback : val
+  }
   const [activeTab, setActiveTab] = useState<ContentTab>('topics')
   const [expandedIds, setExpandedIds] = useState<Set<string>>(new Set())
+  const [selectedTopicId, setSelectedTopicId] = useState<string>('')
   
   // Use admin content hook
   const {
@@ -67,6 +75,29 @@ export default function AdminContent() {
   const [editingTopic, setEditingTopic] = useState<Topic | null>(null)
   const [showCreateTopic, setShowCreateTopic] = useState(false)
   const [deleteConfirm, setDeleteConfirm] = useState<Topic | null>(null)
+
+  const flattenedTopics = useMemo(() => {
+    const result: Array<{ id: string; label: string }> = []
+    const walk = (items?: Topic[], prefix = '') => {
+      if (!items) return
+      for (const item of items) {
+        const label = prefix ? `${prefix} / ${item.name}` : item.name
+        result.push({ id: item.id, label })
+        if (item.children?.length) {
+          walk(item.children, label)
+        }
+      }
+    }
+    const roots = (topics || []).filter(t => !t.parentId)
+    walk(roots)
+    return result
+  }, [topics])
+
+  useEffect(() => {
+    if (!selectedTopicId && flattenedTopics.length) {
+      setSelectedTopicId(flattenedTopics[0].id)
+    }
+  }, [flattenedTopics, selectedTopicId])
 
   const toggleExpand = (id: string) => {
     setExpandedIds(prev => {
@@ -210,31 +241,33 @@ export default function AdminContent() {
   return (
     <div className="space-y-6">
       {/* Header */}
-      <div className="flex items-center justify-between">
+      <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
         <div>
-          <h1 className="text-2xl font-bold text-gray-900 dark:text-white flex items-center">
-            <BookOpen className="w-7 h-7 mr-3" />
-            Content Management
+          <h1 className="text-2xl font-bold text-gray-900 dark:text-white flex items-center gap-3">
+            <BookOpen className="w-7 h-7" />
+            {tx('admin.content', 'Контент')}
           </h1>
           <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">
-            Manage topics, materials, and quizzes
+            {tx('admin.contentDescription', 'Керування темами, матеріалами та вікторинами')}
           </p>
         </div>
-        <button
-          onClick={() => setShowCreateTopic(true)}
-          className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 flex items-center"
-        >
-          <Plus className="w-4 h-4 mr-2" />
-          Add Topic
-        </button>
+        <div className="flex flex-wrap gap-2 justify-end">
+          <button
+            onClick={() => setShowCreateTopic(true)}
+            className="px-4 py-2 min-h-[40px] bg-blue-600 text-white rounded-lg hover:bg-blue-700 flex items-center gap-2 shadow-sm"
+          >
+            <Plus className="w-4 h-4" />
+            {tx('admin.createTopic', 'Створити тему')}
+          </button>
+        </div>
       </div>
 
       {/* Tabs */}
-      <div className="flex gap-1 border-b border-gray-200 dark:border-gray-700">
+      <div className="flex gap-1 border-b border-gray-200 dark:border-gray-700 overflow-x-auto">
         {([
-          { id: 'topics', icon: FolderTree, label: 'Topics' },
-          { id: 'materials', icon: FileText, label: 'Materials' },
-          { id: 'quizzes', icon: HelpCircle, label: 'Quizzes' },
+          { id: 'topics', icon: FolderTree, label: tx('admin.topicsTab', 'Topics') },
+          { id: 'materials', icon: FileText, label: tx('admin.materialsTab', 'Materials') },
+          { id: 'quizzes', icon: HelpCircle, label: tx('admin.quizzesTab', 'Quizzes') },
         ] as const).map(tab => (
           <button
             key={tab.id}
@@ -260,14 +293,24 @@ export default function AdminContent() {
 
       {/* Topics Tree */}
       {activeTab === 'topics' && (
-        <div className="bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700 overflow-hidden">
-          <div className="px-4 py-3 bg-gray-50 dark:bg-gray-700 border-b border-gray-200 dark:border-gray-600">
-            <h3 className="font-medium text-gray-700 dark:text-gray-300">Topic Hierarchy</h3>
+        <div className="bg-white dark:bg-gray-800 rounded-2xl border border-gray-200 dark:border-gray-700 overflow-hidden shadow-sm">
+          <div className="px-4 py-3 bg-gray-50 dark:bg-gray-700 border-b border-gray-200 dark:border-gray-600 flex items-center justify-between gap-3">
+            <div>
+              <h3 className="font-medium text-gray-700 dark:text-gray-300">{tx('admin.topicHierarchy', 'Ієрархія тем')}</h3>
+              <p className="text-xs text-gray-500 dark:text-gray-400">{tx('admin.topicHierarchyHint', 'Розгортай, редагуй, публікуй теми')}</p>
+            </div>
+            <button
+              onClick={fetchTopics}
+              className="inline-flex items-center gap-2 px-3 py-2 text-sm border border-gray-200 dark:border-gray-600 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700"
+            >
+              <RefreshCw className="w-4 h-4" />
+              {t('common.refresh')}
+            </button>
           </div>
           
           {!topics || topics.length === 0 ? (
             <div className="text-center py-12 text-gray-500">
-              No topics yet. Create your first topic!
+              {tx('admin.noTopics', 'Ще немає тем. Створи першу тему!')}
             </div>
           ) : (
             <div className="divide-y divide-gray-100 dark:divide-gray-700/50">
@@ -279,19 +322,77 @@ export default function AdminContent() {
 
       {/* Materials Tab */}
       {activeTab === 'materials' && (
-        <div className="bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700 p-6">
-          <p className="text-gray-500 dark:text-gray-400">
-            Select a topic to manage its materials, or use the Editor page for full material editing.
-          </p>
+        <div className="bg-white dark:bg-gray-800 rounded-2xl border border-gray-200 dark:border-gray-700 p-6 shadow-sm space-y-4">
+          <div className="flex flex-wrap gap-3 items-center">
+            <label className="text-sm font-medium text-gray-700 dark:text-gray-300 flex items-center gap-2">
+              <FolderTree className="w-4 h-4" />
+              {tx('admin.materialsHint', 'Оберіть тему для матеріалів')}
+            </label>
+            <select
+              value={selectedTopicId}
+              onChange={(e) => setSelectedTopicId(e.target.value)}
+              className="min-w-[220px] px-3 py-2 border border-gray-200 dark:border-gray-700 rounded-lg bg-white dark:bg-gray-900"
+            >
+              {!selectedTopicId && <option value="">{tx('admin.selectTopic', 'Виберіть тему')}</option>}
+              {flattenedTopics.map((t) => (
+                <option key={t.id} value={t.id}>{t.label}</option>
+              ))}
+            </select>
+            <button
+              onClick={fetchTopics}
+              className="px-3 py-2 text-sm border border-gray-200 dark:border-gray-600 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700 flex items-center gap-2"
+            >
+              <RefreshCw className="w-4 h-4" />
+              {t('common.refresh')}
+            </button>
+            <button
+              onClick={() => setActiveTab('topics')}
+              className="px-3 py-2 text-sm bg-gray-100 dark:bg-gray-700 text-gray-800 dark:text-gray-200 rounded-lg hover:bg-gray-200 dark:hover:bg-gray-600 flex items-center gap-2"
+            >
+              <FolderTree className="w-4 h-4" />
+              {tx('admin.openTopics', 'Відкрити теми')}
+            </button>
+          </div>
+
+          <MaterialsTab topicId={selectedTopicId || undefined} />
         </div>
       )}
 
       {/* Quizzes Tab */}
       {activeTab === 'quizzes' && (
-        <div className="bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700 p-6">
-          <p className="text-gray-500 dark:text-gray-400">
-            Select a topic to manage its quizzes, or use the Editor page for full quiz editing.
-          </p>
+        <div className="bg-white dark:bg-gray-800 rounded-2xl border border-gray-200 dark:border-gray-700 p-6 shadow-sm space-y-4">
+          <div className="flex flex-wrap gap-3 items-center">
+            <label className="text-sm font-medium text-gray-700 dark:text-gray-300 flex items-center gap-2">
+              <HelpCircle className="w-4 h-4" />
+              {tx('admin.quizzesHint', 'Оберіть тему для вікторин')}
+            </label>
+            <select
+              value={selectedTopicId}
+              onChange={(e) => setSelectedTopicId(e.target.value)}
+              className="min-w-[220px] px-3 py-2 border border-gray-200 dark:border-gray-700 rounded-lg bg-white dark:bg-gray-900"
+            >
+              {!selectedTopicId && <option value="">{tx('admin.selectTopic', 'Виберіть тему')}</option>}
+              {flattenedTopics.map((t) => (
+                <option key={t.id} value={t.id}>{t.label}</option>
+              ))}
+            </select>
+            <button
+              onClick={fetchTopics}
+              className="px-3 py-2 text-sm border border-gray-200 dark:border-gray-600 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700 flex items-center gap-2"
+            >
+              <RefreshCw className="w-4 h-4" />
+              {t('common.refresh')}
+            </button>
+            <button
+              onClick={() => setActiveTab('topics')}
+              className="px-3 py-2 text-sm bg-gray-100 dark:bg-gray-700 text-gray-800 dark:text-gray-200 rounded-lg hover:bg-gray-200 dark:hover:bg-gray-600 flex items-center gap-2"
+            >
+              <FolderTree className="w-4 h-4" />
+              {tx('admin.openTopics', 'Відкрити теми')}
+            </button>
+          </div>
+
+          <QuizzesTab topicId={selectedTopicId || undefined} />
         </div>
       )}
 

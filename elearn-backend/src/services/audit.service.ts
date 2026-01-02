@@ -6,6 +6,47 @@ import { PrismaClient } from '@prisma/client'
 
 const prisma = new PrismaClient()
 
+// Sensitive fields to redact from audit logs
+const SENSITIVE_FIELDS = [
+  'password',
+  'passwordHash',
+  'token',
+  'refreshToken',
+  'apiKey',
+  'secret',
+  'privateKey',
+  'creditCard',
+  'ssn',
+  'otp',
+  'totpSecret',
+]
+
+/**
+ * Санітизує sensitive поля з об'єкта
+ */
+function sanitizeMetadata(obj: any): Record<string, any> {
+  if (!obj || typeof obj !== 'object') return {}
+  
+  const sanitized: Record<string, any> = {}
+  
+  for (const [key, value] of Object.entries(obj)) {
+    // Перевіримо, чи ключ sensitive
+    const lowerKey = key.toLowerCase()
+    const isSensitive = SENSITIVE_FIELDS.some(field => lowerKey.includes(field))
+    
+    if (isSensitive) {
+      sanitized[key] = '[REDACTED]'
+    } else if (typeof value === 'object' && value !== null) {
+      // Рекурсивна обробка вкладених об'єктів
+      sanitized[key] = sanitizeMetadata(value)
+    } else {
+      sanitized[key] = value
+    }
+  }
+  
+  return sanitized
+}
+
 export interface AuditLogEntry {
   userId?: string
   action: string // CREATE, UPDATE, DELETE, LOGIN, LOGOUT, VIEW
@@ -18,13 +59,16 @@ export interface AuditLogEntry {
 
 export async function auditLog(entry: AuditLogEntry): Promise<void> {
   try {
+    // Санітизуємо metadata перед збереженням
+    const sanitizedMetadata = entry.metadata ? sanitizeMetadata(entry.metadata) : {}
+    
     await prisma.auditLog.create({
       data: {
         userId: entry.userId,
         action: entry.action,
         resource: entry.resource,
         resourceId: entry.resourceId,
-        metadata: entry.metadata || {},
+        metadata: sanitizedMetadata,
         ip: entry.ip?.replace('::ffff:', ''), // Remove IPv4-mapped prefix
         userAgent: entry.userAgent?.slice(0, 500), // Limit length
       },

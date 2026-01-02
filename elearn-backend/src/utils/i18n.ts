@@ -3,6 +3,42 @@ import type { Lang } from '@elearn/shared'
 
 type TranslationsJson = Record<string, string> | null | undefined
 
+// Type for I18nKey with values from Prisma include
+export type I18nKeyWithValues = {
+  id: string
+  key: string
+  namespace: string
+  values: { lang: string; value: string }[]
+} | null
+
+/**
+ * Отримує переклад з I18nKey.values масиву
+ * @param i18nKey - Об'єкт I18nKey з включеними values
+ * @param lang - Мова користувача
+ * @param fallback - Значення за замовчуванням
+ */
+export function getI18nKeyTranslation(
+  i18nKey: I18nKeyWithValues,
+  lang: Lang,
+  fallback: string
+): string {
+  if (!i18nKey?.values?.length) return fallback
+  
+  // Find translation for requested language
+  const requestedLang = i18nKey.values.find(v => v.lang === lang)
+  if (requestedLang?.value) return requestedLang.value
+  
+  // Fallback to EN
+  const enLang = i18nKey.values.find(v => v.lang === 'EN')
+  if (enLang?.value) return enLang.value
+  
+  // Return first available
+  const firstAvailable = i18nKey.values[0]
+  if (firstAvailable?.value) return firstAvailable.value
+  
+  return fallback
+}
+
 /**
  * Отримує переклад з JSON поля або fallback значення
  * @param json - JSON об'єкт з перекладами {"UA": "...", "PL": "...", "EN": "..."}

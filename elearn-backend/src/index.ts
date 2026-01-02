@@ -12,6 +12,7 @@ import billingRouter, { stripeWebhookHandler } from './routes/billing.js'
 import inviteRouter from './routes/invite.js'
 import editorRouter from './routes/editor.js'
 import topicsRouter from './routes/topics.js'
+import lessonsRouter from './routes/lessons.js'
 import translationsRouter from './routes/translations.js'
 import progressRouter from './routes/progress.js'
 import i18nRouter from './routes/i18n.js'
@@ -19,7 +20,7 @@ import filesRouter from './routes/files.js'
 import adminRouter from './routes/admin.js'
 
 import { generalLimiter, authLimiter, webhookLimiter } from './middleware/rateLimit.js'
-import { validateCsrfSoft } from './middleware/csrf.js'
+import { validateCsrfSoft, validateCsrf } from './middleware/csrf.js'
 import { sanitize } from './middleware/sanitize.js'
 
 const app = express()
@@ -97,13 +98,21 @@ app.use('/api/billing', authLimiter, billingRouter)
 
 // --- Інші модулі ---
 app.use('/api/topics', topicsRouter)
+app.use('/api/lessons', lessonsRouter)
 app.use('/api/quiz', quizRouter)
 app.use('/api/editor', editorRouter)
 app.use('/api/translations', translationsRouter)
 app.use('/api/progress', progressRouter)
 app.use('/api/i18n', i18nRouter) // Публічний, без auth
 app.use('/api/files', filesRouter) // File uploads
-app.use('/api/admin', adminRouter) // Admin panel
+
+// --- ADMIN: hard CSRF для POST/PUT/DELETE операцій ---
+app.use('/api/admin', (req, res, next) => {
+  if (['POST', 'PUT', 'PATCH', 'DELETE'].includes(req.method)) {
+    return validateCsrf(req, res, next)
+  }
+  next()
+}, adminRouter)
 
 // --- 404 JSON ---
 app.use((req, res) => {

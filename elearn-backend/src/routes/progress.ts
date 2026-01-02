@@ -229,4 +229,126 @@ router.get('/recent-topics', requireAuth, async (req, res, next) => {
   } catch (e) { next(e) }
 })
 
+// ============================================
+// SYNC ENDPOINTS
+// ============================================
+
+// POST /api/progress/push — push local progress to server
+const pushSchema = z.object({
+  seenMaterials: z.array(z.string()).optional(),
+  activity: z.array(z.object({
+    date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
+    timeSpent: z.number().int().min(0),
+    quizAttempts: z.number().int().min(0),
+    materialsViewed: z.number().int().min(0),
+    goalsMet: z.number().int().min(0),
+  })).optional(),
+})
+
+router.post('/push', requireAuth, async (req, res, next) => {
+  try {
+    const parsed = pushSchema.safeParse(req.body)
+    if (!parsed.success) {
+      return res.status(400).json({ error: parsed.error.flatten() })
+    }
+
+    const { seenMaterials, activity } = parsed.data
+    const userId = req.user!.id
+
+    // Sync seen materials
+    if (seenMaterials && seenMaterials.length > 0) {
+      await prisma.materialView.createMany({
+        data: seenMaterials.map(materialId => ({ userId, materialId })),
+        skipDuplicates: true,
+      })
+    }
+
+    // Sync activity data
+    if (activity && activity.length > 0) {
+      for (const log of activity) {
+        const date = new Date(log.date)
+        date.setHours(0, 0, 0, 0)
+        
+        await prisma.userActivity.upsert({
+          where: { userId_date: { userId, date } },
+          create: {
+            userId,
+            date,
+            timeSpent: log.timeSpent,
+            quizAttempts: log.quizAttempts,
+            materialsViewed: log.materialsViewed,
+            goalsCompleted: log.goalsMet,
+          },
+          update: {
+            // Take maximum values (merge local and server)
+            timeSpent: { increment: 0 }, // Use raw query below
+          },
+        })
+
+        // Update with max values
+        await prisma.$executeRaw`
+          UPDATE "UserActivity" 
+          SET 
+            "timeSpent" = GREATEST("timeSpent", ${log.timeSpent}),
+            "quizAttempts" = GREATEST("quizAttempts", ${log.quizAttempts}),
+            "materialsViewed" = GREATEST("materialsViewed", ${log.materialsViewed}),
+            "goalsCompleted" = GREATEST("goalsCompleted", ${log.goalsMet})
+          WHERE "userId" = ${userId} AND "date" = ${date}
+        `
+      }
+    }
+
+    res.json({ ok: true, synced: Date.now() })
+  } catch (e) { next(e) }
+})
+
+// GET /api/progress/pull — pull all progress from server
+router.get('/pull', requireAuth, async (req, res, next) => {
+  try {
+    const userId = req.user!.id
+
+    // Get all viewed materials
+    const views = await prisma.materialView.findMany({
+      where: { userId },
+      select: { materialId: true },
+    })
+    const seenMaterials = views.map(v => v.materialId)
+
+    // Get activity for last 30 days
+    const thirtyDaysAgo = new Date()
+    thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30)
+    thirtyDaysAgo.setHours(0, 0, 0, 0)
+
+    const activities = await prisma.userActivity.findMany({
+      where: {
+        userId,
+        date: { gte: thirtyDaysAgo },
+      },
+      orderBy: { date: 'desc' },
+    })
+
+    const activity = activities.map(a => ({
+      date: a.date.toISOString().split('T')[0],
+      timeSpent: a.timeSpent,
+      quizAttempts: a.quizAttempts,
+      materialsViewed: a.materialsViewed,
+      goalsMet: a.goalsCompleted,
+    }))
+
+    // Get streak info
+    const streak = await calculateStreak(userId)
+
+    res.json({
+      seenMaterials,
+      activity,
+      streak: {
+        current: streak.current,
+        longest: streak.longest,
+        lastActiveDate: streak.lastActiveDate?.toISOString().split('T')[0] || null,
+      },
+      synced: Date.now(),
+    })
+  } catch (e) { next(e) }
+})
+
 export default router

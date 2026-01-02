@@ -192,6 +192,39 @@ router.get('/:id', requireAuth, async (req: Request, res: Response) => {
 })
 
 /**
+ * GET /files/:id/download
+ * Get presigned download URL only (for direct downloads)
+ */
+router.get('/:id/download', requireAuth, async (req: Request, res: Response) => {
+  try {
+    const { id } = req.params
+
+    const file = await prisma.file.findUnique({
+      where: { id },
+    })
+
+    if (!file || !file.confirmed) {
+      return notFound(res, 'File not found')
+    }
+
+    // Check access for private files
+    if (file.visibility === 'PRIVATE') {
+      if (file.uploadedById !== req.user!.id && !['EDITOR', 'ADMIN'].includes(req.user!.role)) {
+        return forbidden(res, 'Not authorized')
+      }
+    }
+
+    // Generate download URL (always signed for security)
+    const url = await getPresignedDownloadUrl(file.key, 300) // 5 min expiry
+
+    return ok(res, { url, filename: file.originalName })
+  } catch (err) {
+    console.error('Get download URL error:', err)
+    return serverError(res, 'Failed to get download URL')
+  }
+})
+
+/**
  * DELETE /files/:id
  * Delete file from storage and database
  */

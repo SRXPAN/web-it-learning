@@ -103,6 +103,16 @@ async function handle<T>(res: Response, retry?: () => Promise<T>): Promise<T> {
   
   const text = await res.text()
   const data = text ? JSON.parse(text) : null
+
+  // Handle standardized API wrapper { success, data, error }
+  if (data && typeof data === 'object' && 'success' in data) {
+    const api = data as { success: boolean; data?: T; error?: { message?: string } }
+    if (!api.success) {
+      throw new Error(api.error?.message || 'Request failed')
+    }
+    return api.data as T
+  }
+
   if (!res.ok) throw new Error(typeof data === 'object' && data?.error ? data.error : (text || 'Request failed'))
   return data as T
 }
@@ -133,13 +143,14 @@ export async function api<T>(path: string, init: RequestInit = {}): Promise<T> {
   return makeRequest()
 }
 
-export const apiGet = <T>(path: string): Promise<T> => api<T>(path)
-export const apiPost = <T, B = unknown>(path: string, body: B): Promise<T> => 
-  api<T>(path, { method: 'POST', body: JSON.stringify(body) })
-export const apiPut = <T, B = unknown>(path: string, body: B): Promise<T> => 
-  api<T>(path, { method: 'PUT', body: JSON.stringify(body) })
-export const apiDelete = <T>(path: string): Promise<T> => 
-  api<T>(path, { method: 'DELETE' })
+export const apiGet = <T>(path: string, signal?: AbortSignal): Promise<T> => 
+  api<T>(path, { ...(signal && { signal }) })
+export const apiPost = <T, B = unknown>(path: string, body: B, signal?: AbortSignal): Promise<T> => 
+  api<T>(path, { method: 'POST', body: JSON.stringify(body), ...(signal && { signal }) })
+export const apiPut = <T, B = unknown>(path: string, body: B, signal?: AbortSignal): Promise<T> => 
+  api<T>(path, { method: 'PUT', body: JSON.stringify(body), ...(signal && { signal }) })
+export const apiDelete = <T>(path: string, signal?: AbortSignal): Promise<T> => 
+  api<T>(path, { method: 'DELETE', ...(signal && { signal }) })
 
 // http object for more ergonomic usage
 export const http = {

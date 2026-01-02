@@ -1556,20 +1556,78 @@ async function main() {
   const existingUi = await prisma.uiTranslation.count()
   if (existingUi === 0) {
     const uiKeys = [
+      // Common
       { key: 'common.loading', translations: { UA: 'Завантаження...', PL: 'Ładowanie...', EN: 'Loading...' } },
       { key: 'common.save', translations: { UA: 'Зберегти', PL: 'Zapisz', EN: 'Save' } },
       { key: 'common.cancel', translations: { UA: 'Скасувати', PL: 'Anuluj', EN: 'Cancel' } },
       { key: 'common.delete', translations: { UA: 'Видалити', PL: 'Usuń', EN: 'Delete' } },
+      { key: 'common.edit', translations: { UA: 'Редагувати', PL: 'Edytuj', EN: 'Edit' } },
+      { key: 'common.create', translations: { UA: 'Створити', PL: 'Utwórz', EN: 'Create' } },
+      { key: 'common.search', translations: { UA: 'Пошук', PL: 'Szukaj', EN: 'Search' } },
+      { key: 'common.refresh', translations: { UA: 'Оновити', PL: 'Odśwież', EN: 'Refresh' } },
+      { key: 'common.actions', translations: { UA: 'Дії', PL: 'Akcje', EN: 'Actions' } },
+      { key: 'common.status', translations: { UA: 'Статус', PL: 'Status', EN: 'Status' } },
+      { key: 'common.name', translations: { UA: 'Назва', PL: 'Nazwa', EN: 'Name' } },
+      { key: 'common.email', translations: { UA: 'Email', PL: 'Email', EN: 'Email' } },
+      { key: 'common.role', translations: { UA: 'Роль', PL: 'Rola', EN: 'Role' } },
+      { key: 'common.total', translations: { UA: 'Всього', PL: 'Łącznie', EN: 'Total' } },
+      { key: 'common.page', translations: { UA: 'Сторінка', PL: 'Strona', EN: 'Page' } },
+      { key: 'common.of', translations: { UA: 'з', PL: 'z', EN: 'of' } },
+      
+      // Nav
       { key: 'nav.dashboard', translations: { UA: 'Дашборд', PL: 'Panel', EN: 'Dashboard' } },
       { key: 'nav.materials', translations: { UA: 'Матеріали', PL: 'Materiały', EN: 'Materials' } },
       { key: 'nav.quiz', translations: { UA: 'Квізи', PL: 'Quiz', EN: 'Quiz' } },
       { key: 'nav.leaderboard', translations: { UA: 'Рейтинг', PL: 'Ranking', EN: 'Leaderboard' } },
       { key: 'nav.profile', translations: { UA: 'Профіль', PL: 'Profil', EN: 'Profile' } },
+      { key: 'nav.admin', translations: { UA: 'Адмін', PL: 'Admin', EN: 'Admin' } },
+      { key: 'nav.logout', translations: { UA: 'Вийти', PL: 'Wyloguj', EN: 'Logout' } },
+      
+      // Quiz
       { key: 'quiz.title', translations: { UA: 'Квізи', PL: 'Quiz', EN: 'Quizzes' } },
       { key: 'quiz.completed', translations: { UA: 'Квіз завершено!', PL: 'Quiz ukończony!', EN: 'Quiz completed!' } },
+      
+      // Materials
       { key: 'materials.title', translations: { UA: 'Матеріали', PL: 'Materiały', EN: 'Materials' } },
+      
+      // Auth
       { key: 'auth.login', translations: { UA: 'Вхід', PL: 'Logowanie', EN: 'Login' } },
       { key: 'auth.register', translations: { UA: 'Реєстрація', PL: 'Rejestracja', EN: 'Register' } },
+      
+      // Admin Panel
+      { key: 'admin.panel', translations: { UA: 'Панель адміністратора', PL: 'Panel administracyjny', EN: 'Admin Panel' } },
+      { key: 'admin.dashboard', translations: { UA: 'Дашборд', PL: 'Tablica', EN: 'Dashboard' } },
+      { key: 'admin.dashboardDescription', translations: { UA: 'Огляд системи та статистика', PL: 'Przegląd systemu i statystyki', EN: 'System overview and statistics' } },
+      { key: 'admin.users', translations: { UA: 'Користувачі', PL: 'Użytkownicy', EN: 'Users' } },
+      { key: 'admin.usersDescription', translations: { UA: 'Керування обліковими записами', PL: 'Zarządzanie kontami', EN: 'Manage user accounts' } },
+      { key: 'admin.content', translations: { UA: 'Контент', PL: 'Treści', EN: 'Content' } },
+      { key: 'admin.contentDescription', translations: { UA: 'Теми, матеріали та квізи', PL: 'Tematy, materiały i quizy', EN: 'Topics, materials and quizzes' } },
+      { key: 'admin.files', translations: { UA: 'Файли', PL: 'Pliki', EN: 'Files' } },
+      { key: 'admin.filesDescription', translations: { UA: 'Медіафайли та документи', PL: 'Pliki multimedialne i dokumenty', EN: 'Media files and documents' } },
+      { key: 'admin.translations', translations: { UA: 'Переклади', PL: 'Tłumaczenia', EN: 'Translations' } },
+      { key: 'admin.auditLogs', translations: { UA: 'Журнал дій', PL: 'Dziennik działań', EN: 'Audit Logs' } },
+      { key: 'admin.auditLogsDescription', translations: { UA: 'Історія системних дій', PL: 'Historia działań systemowych', EN: 'System activity history' } },
+      { key: 'admin.settings', translations: { UA: 'Налаштування', PL: 'Ustawienia', EN: 'Settings' } },
+      { key: 'admin.totalUsers', translations: { UA: 'Всього користувачів', PL: 'Łącznie użytkowników', EN: 'Total Users' } },
+      { key: 'admin.totalTopics', translations: { UA: 'Всього тем', PL: 'Łącznie tematów', EN: 'Total Topics' } },
+      { key: 'admin.totalMaterials', translations: { UA: 'Всього матеріалів', PL: 'Łącznie materiałów', EN: 'Total Materials' } },
+      { key: 'admin.totalFiles', translations: { UA: 'Всього файлів', PL: 'Łącznie plików', EN: 'Total Files' } },
+      { key: 'admin.usersByRole', translations: { UA: 'Користувачі за ролями', PL: 'Użytkownicy według ról', EN: 'Users by Role' } },
+      { key: 'admin.recentActivity', translations: { UA: 'Остання активність', PL: 'Ostatnia aktywność', EN: 'Recent Activity' } },
+      { key: 'admin.searchUsers', translations: { UA: 'Пошук користувачів...', PL: 'Szukaj użytkowników...', EN: 'Search users...' } },
+      { key: 'admin.createUser', translations: { UA: 'Створити користувача', PL: 'Utwórz użytkownika', EN: 'Create User' } },
+      { key: 'admin.allRoles', translations: { UA: 'Всі ролі', PL: 'Wszystkie role', EN: 'All Roles' } },
+      { key: 'admin.changeRole', translations: { UA: 'Змінити роль', PL: 'Zmień rolę', EN: 'Change Role' } },
+      { key: 'admin.deleteUser', translations: { UA: 'Видалити користувача', PL: 'Usuń użytkownika', EN: 'Delete User' } },
+      { key: 'admin.deleteUserConfirm', translations: { UA: 'Ви впевнені, що хочете видалити цього користувача?', PL: 'Czy na pewno chcesz usunąć tego użytkownika?', EN: 'Are you sure you want to delete this user?' } },
+      { key: 'admin.noUsersFound', translations: { UA: 'Користувачів не знайдено', PL: 'Nie znaleziono użytkowników', EN: 'No users found' } },
+      { key: 'admin.verified', translations: { UA: 'Підтверджений', PL: 'Zweryfikowany', EN: 'Verified' } },
+      { key: 'admin.unverified', translations: { UA: 'Не підтверджений', PL: 'Niezweryfikowany', EN: 'Unverified' } },
+      { key: 'admin.deleteFile', translations: { UA: 'Видалити файл', PL: 'Usuń plik', EN: 'Delete File' } },
+      { key: 'admin.deleteFileConfirm', translations: { UA: 'Ви впевнені, що хочете видалити цей файл?', PL: 'Czy na pewno chcesz usunąć ten plik?', EN: 'Are you sure you want to delete this file?' } },
+      { key: 'admin.noFilesFound', translations: { UA: 'Файлів не знайдено', PL: 'Nie znaleziono plików', EN: 'No files found' } },
+      { key: 'admin.noLogsFound', translations: { UA: 'Записів не знайдено', PL: 'Nie znaleziono wpisów', EN: 'No logs found' } },
+      { key: 'admin.viewDetails', translations: { UA: 'Детальніше', PL: 'Szczegóły', EN: 'View Details' } },
     ]
     await prisma.uiTranslation.createMany({ data: uiKeys })
     console.log('  ✓ UI translations (basic set)')

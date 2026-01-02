@@ -5,27 +5,14 @@ import { requireAuth } from '../middleware/auth.js'
 import { requireRole } from '../middleware/roles.js'
 import { z } from 'zod'
 import type { Lang } from '@elearn/shared'
+import { clearTranslationCache } from './i18n.js'
 
 const router = Router()
 
-// GET /api/translations/ui?lang=UA
-// Отримати всі UI переклади для мови (з JSON поля translations)
-router.get('/ui', async (req, res) => {
-  const lang = (req.query.lang as Lang) || 'EN'
-  
-  const translations = await prisma.uiTranslation.findMany({
-    select: { key: true, translations: true }
-  })
-  
-  // Конвертуємо в об'єкт {key: value}
-  const result = translations.reduce((acc, t) => {
-    const trans = t.translations as Record<string, string>
-    acc[t.key] = trans?.[lang] || trans?.['EN'] || t.key
-    return acc
-  }, {} as Record<string, string>)
-  
-  res.json(result)
-})
+// ============================================
+// PUBLIC ENDPOINTS для отримання локалізацій
+// (з обов'язковою мовою в запиті)
+// ============================================
 
 // GET /api/translations/daily-goals?lang=UA
 // Отримати всі шаблони щоденних цілей
@@ -120,57 +107,106 @@ router.get('/categories', async (req, res) => {
 const uiTranslationSchema = z.object({
   key: z.string().min(1),
   translations: z.object({
-    UA: z.string(),
-    PL: z.string(),
-    EN: z.string(),
+    UA: z.string().optional(),
+    PL: z.string().optional(),
+    EN: z.string().optional(),
   })
 })
 
-// POST /api/translations/ui - створити/оновити UI переклад
-router.post('/ui', requireAuth, requireRole(['ADMIN', 'EDITOR']), async (req, res) => {
+// GET /api/i18n/translations - list all translations with pagination
+router.get('/translations', requireAuth, requireRole(['ADMIN', 'EDITOR']), async (req, res) => {
+  const { page = '1', limit = '30', search, namespace } = req.query
+  
+  const where: any = {}
+  
+  if (search) {
+    where.OR = [
+      { key: { contains: search as string, mode: 'insensitive' } },
+    ]
+  }
+  
+  if (namespace) {
+    where.key = { startsWith: `${namespace}.` }
+  }
+  
+  const [translations, total] = await Promise.all([
+    prisma.uiTranslation.findMany({
+      where,
+      orderBy: { key: 'asc' },
+      skip: (parseInt(page as string) - 1) * parseInt(limit as string),
+      take: parseInt(limit as string),
+    }),
+    prisma.uiTranslation.count({ where }),
+  ])
+  
+  // Extract namespace from key
+  const withNamespace = translations.map(t => ({
+    ...t,
+    namespace: t.key.split('.')[0] || 'common',
+  }))
+  
+  res.json({
+    translations: withNamespace,
+    pagination: {
+      page: parseInt(page as string),
+      limit: parseInt(limit as string),
+      total,
+      pages: Math.ceil(total / parseInt(limit as string)),
+    },
+  })
+})
+
+// PUT /api/i18n/translations/:id - update translation
+router.put('/translations/:id', requireAuth, requireRole(['ADMIN', 'EDITOR']), async (req, res) => {
+  const { id } = req.params
+  const { translations } = req.body
+  
+  const updated = await prisma.uiTranslation.update({
+    where: { id },
+    data: { translations },
+  })
+  
+  // Очищаємо кеш переклавів
+  clearTranslationCache()
+  
+  res.json(updated)
+})
+
+// POST /api/i18n/translations - create translation
+router.post('/translations', requireAuth, requireRole(['ADMIN', 'EDITOR']), async (req, res) => {
   const parsed = uiTranslationSchema.safeParse(req.body)
   if (!parsed.success) return res.status(400).json({ error: parsed.error.flatten() })
   
   const { key, translations } = parsed.data
   
-  const translation = await prisma.uiTranslation.upsert({
-    where: { key },
-    update: { translations },
-    create: { key, translations }
+  // Check if exists
+  const existing = await prisma.uiTranslation.findFirst({ where: { key } })
+  if (existing) {
+    return res.status(400).json({ error: 'Key already exists' })
+  }
+  
+  const created = await prisma.uiTranslation.create({
+    data: { key, translations },
   })
   
-  res.json(translation)
+  // Очищаємо кеш перекладів
+  clearTranslationCache()
+  
+  res.status(201).json(created)
 })
 
-// POST /api/translations/ui/bulk - масове створення перекладів
-router.post('/ui/bulk', requireAuth, requireRole(['ADMIN']), async (req, res) => {
-  const schema = z.object({
-    translations: z.array(uiTranslationSchema)
+// DELETE /api/translations/translations/:id - delete translation
+router.delete('/translations/:id', requireAuth, requireRole(['ADMIN', 'EDITOR']), async (req, res) => {
+  const { id } = req.params
+  
+  await prisma.uiTranslation.delete({
+    where: { id }
   })
   
-  const parsed = schema.safeParse(req.body)
-  if (!parsed.success) return res.status(400).json({ error: parsed.error.flatten() })
-  
-  const results = await Promise.all(
-    parsed.data.translations.map(t =>
-      prisma.uiTranslation.upsert({
-        where: { key: t.key },
-        update: { translations: t.translations },
-        create: { key: t.key, translations: t.translations }
-      })
-    )
-  )
-  
-  res.json({ created: results.length })
-})
-
-// DELETE /api/translations/ui/:key - видалити всі переклади по ключу
-router.delete('/ui/:key', requireAuth, requireRole(['ADMIN']), async (req, res) => {
-  await prisma.uiTranslation.deleteMany({
-    where: { key: req.params.key }
-  })
+  // Очищаємо кеш перекладів
+  clearTranslationCache()
   
   res.json({ success: true })
 })
-
+export const translationsRouter = router
 export default router
