@@ -50,5 +50,5 @@ EXPOSE 4000
 
 # Запускаємо міграції та сервер
 # Увага: в проді краще виносити міграції в окремий процес, але для простоти залишимо тут
-CMD npx prisma migrate deploy && node dist/index.js
+CMD ["sh", "-c", "npx prisma migrate deploy && node dist/index.js"]
 

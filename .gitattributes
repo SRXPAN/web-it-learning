@@ -1,1 +1,15 @@
 * text=auto eol=lf
+# Cloudflare & Netlify configuration files (explicitly as text)
+_headers text eol=lf
+_redirects text eol=lf
+wrangler.json text eol=lf
+
+# Binary files
+*.png binary
+*.jpg binary
+*.jpeg binary
+*.gif binary
+*.ico binary
+*.ttf binary
+*.woff binary
+*.woff2 binary

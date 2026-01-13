@@ -10,6 +10,7 @@
     "dev": "vite",
     "build": "tsc -b --excludeFiles '**/__tests__/**' '**/*.test.*' && vite build",
     "build:production": "vite build",
+    "build:cloudflare": "npm run build && cp _redirects dist/ && cp public/_headers dist/",
     "preview": "vite preview",
     "test": "vitest run",
     "test:ui": "vitest --ui",

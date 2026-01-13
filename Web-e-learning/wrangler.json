@@ -1,0 +1,34 @@
+{
+  "name": "elearn-frontend",
+  "type": "javascript",
+  "main": "src/index.ts",
+  "env": {
+    "production": {
+      "routes": [
+        {
+          "pattern": "elearn.yoursite.com",
+          "zone_name": "yoursite.com"
+        }
+      ],
+      "vars": {
+        "ENVIRONMENT": "production"
+      }
+    },
+    "staging": {
+      "routes": [
+        {
+          "pattern": "staging-elearn.yoursite.com",
+          "zone_name": "yoursite.com"
+        }
+      ],
+      "vars": {
+        "ENVIRONMENT": "staging"
+      }
+    }
+  },
+  "build": {
+    "command": "npm run build",
+    "cwd": "./",
+    "root": "dist"
+  }
+}

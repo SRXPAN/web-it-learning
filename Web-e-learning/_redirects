@@ -1,0 +1,9 @@
+/*
+  Rewrite all routes to index.html for SPA (Single Page Application)
+  This allows React Router to handle all routing
+*/
+
+[[redirects]]
+from = "/*"
+to = "/index.html"
+status = 200
