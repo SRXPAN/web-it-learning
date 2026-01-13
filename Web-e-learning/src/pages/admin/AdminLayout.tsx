@@ -18,7 +18,7 @@ import {
   LogOut,
   BookOpen,
 } from 'lucide-react'
-import { type TranslationKey } from '@/i18n/translations'
+import { type TranslationKey } from '@/i18n/types'
 
 type NavItem = {
   path: string

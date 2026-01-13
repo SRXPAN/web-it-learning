@@ -1,5 +1,5 @@
 import { useI18n } from '@/store/i18n'
-import { type TranslationKey } from './translations'
+import { type TranslationKey } from './types'
 import { create } from 'zustand'
 import { useEffect } from 'react'
 import { apiGet } from '@/lib/http'

@@ -2,7 +2,7 @@
  * Translation Keys Type Definition
  * 
  * This file contains ONLY the TypeScript type definition for all translation keys.
- * Actual translations are loaded dynamically from the API.
+ * Actual translations are loaded dynamically from JSON files.
  * 
  * @description Types-only file - no runtime code, no translation values
  */
@@ -44,6 +44,7 @@ export type TranslationKey =
   | 'nav.register'
   | 'nav.logout'
   | 'nav.admin'
+  | 'nav.home'
 
   // ============================================
   // DASHBOARD (47 keys)
@@ -95,6 +96,7 @@ export type TranslationKey =
   | 'dashboard.weekday.fri'
   | 'dashboard.weekday.sat'
   | 'dashboard.weekday.sun'
+  | 'dashboard.recentActivities'
 
   // ============================================
   // MATERIALS (45 keys)
@@ -215,7 +217,7 @@ export type TranslationKey =
   | 'quiz.error.historyLoadFailed'
 
   // ============================================
-  // LESSON (26 keys)
+  // LESSON (30 keys)
   // ============================================
   | 'lesson.breadcrumb.algorithms'
   | 'lesson.breadcrumb.search'
@@ -485,7 +487,7 @@ export type TranslationKey =
   | 'editor.loading.questions'
 
   // ============================================
-  // ADMIN PANEL (50+ keys)
+  // ADMIN PANEL (70+ keys)
   // ============================================
   | 'admin.panel'
   | 'admin.dashboard'
@@ -545,7 +547,6 @@ export type TranslationKey =
   | 'admin.error.passwordWeak'
   | 'admin.error.cannotDeleteSelf'
   | 'admin.error.verifyFailed'
-  | 'admin.contentDescription'
   | 'admin.createTopic'
   | 'admin.topicHierarchy'
   | 'admin.topicHierarchyHint'
@@ -561,6 +562,8 @@ export type TranslationKey =
   | 'admin.quizzesManageAction'
   | 'admin.materialsManageNote'
   | 'admin.quizzesManageNote'
+  | 'admin.managingTopics'
+  | 'admin.common.minutes'
 
   // ============================================
   // COMMON ADDITIONS
@@ -585,4 +588,5 @@ export type TranslationKey =
   | 'common.minutes'
   | 'common.download'
   | 'common.refresh'
-  | 'common.retry';
+  | 'common.retry'
+  | 'common.optional';

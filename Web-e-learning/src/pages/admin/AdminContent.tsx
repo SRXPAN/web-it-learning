@@ -4,7 +4,7 @@
  */
 import { useState, useCallback, useMemo, useEffect } from 'react'
 import { useTranslation } from '@/i18n/useTranslation'
-import { type TranslationKey } from '@/i18n/translations'
+import { type TranslationKey } from '@/i18n/types'
 import { useAdminContent } from '@/hooks/useAdmin'
 import MaterialsTab from '@/pages/editor/MaterialsTab'
 import QuizzesTab from '@/pages/editor/QuizzesTab'

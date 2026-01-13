@@ -9,7 +9,7 @@
  * when users only need one language.
  */
 
-import type { TranslationKey } from './translations'
+import type { TranslationKey } from './types'
 
 // Type for loaded bundle
 export type TranslationBundle = Record<TranslationKey | string, string>
