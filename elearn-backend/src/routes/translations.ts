@@ -1,5 +1,6 @@
 // src/routes/translations.ts
 import { Router } from 'express'
+import { Prisma } from '@prisma/client'
 import { prisma } from '../db.js'
 import { requireAuth } from '../middleware/auth.js'
 import { requireRole } from '../middleware/roles.js'
@@ -117,7 +118,7 @@ const uiTranslationSchema = z.object({
 router.get('/translations', requireAuth, requireRole(['ADMIN', 'EDITOR']), async (req, res) => {
   const { page = '1', limit = '30', search, namespace } = req.query
   
-  const where: any = {}
+  const where: Prisma.UiTranslationWhereInput = {}
   
   if (search) {
     where.OR = [

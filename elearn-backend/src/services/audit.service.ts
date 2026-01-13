@@ -2,9 +2,7 @@
  * Audit Log Service
  * Tracks all important actions in the system
  */
-import { PrismaClient } from '@prisma/client'
-
-const prisma = new PrismaClient()
+import { prisma } from '../db.js'
 
 // Sensitive fields to redact from audit logs
 const SENSITIVE_FIELDS = [

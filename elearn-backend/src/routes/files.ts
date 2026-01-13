@@ -3,7 +3,8 @@
  * Handles file uploads with S3/R2 presigned URLs
  */
 import { Router, Request, Response } from 'express'
-import { PrismaClient } from '@prisma/client'
+import { Prisma } from '@prisma/client'
+import { prisma } from '../db.js'
 import { requireAuth } from '../middleware/auth'
 import { requireRole } from '../middleware/roles'
 import {
@@ -17,8 +18,6 @@ import {
 } from '../services/storage.service'
 import { ok, created, badRequest, notFound, forbidden, serverError } from '../utils/response'
 import { auditLog } from '../services/audit.service'
-
-const prisma = new PrismaClient()
 const router = Router()
 
 /**
@@ -279,7 +278,7 @@ router.get('/', requireAuth, requireRole(['ADMIN']), async (req: Request, res: R
   try {
     const { page = '1', limit = '20', category, mimeType } = req.query
 
-    const where: any = { confirmed: true }
+    const where: Prisma.FileWhereInput = { confirmed: true }
     
     if (category) {
       where.key = { startsWith: category as string }

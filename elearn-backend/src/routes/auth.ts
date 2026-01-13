@@ -1,5 +1,5 @@
 // src/routes/auth.ts
-import { Router } from 'express'
+import { Router, Request, Response } from 'express'
 import { prisma } from '../db.js'
 import { requireAuth, COOKIE_NAME, REFRESH_COOKIE_NAME } from '../middleware/auth.js'
 import { authLimiter } from '../middleware/rateLimit.js'
@@ -46,20 +46,25 @@ const router = Router()
 // UTILITY FUNCTIONS
 // ============================================
 
-function setAuthCookies(res: any, accessToken: string, refreshToken: string): void {
+function setAuthCookies(res: Response, accessToken: string, refreshToken: string): void {
   res.cookie(COOKIE_NAME, accessToken, getAccessCookieOptions())
   res.cookie(REFRESH_COOKIE_NAME, refreshToken, getRefreshCookieOptions())
 }
 
-function clearAuthCookies(res: any): void {
+function clearAuthCookies(res: Response): void {
   res.clearCookie(COOKIE_NAME, getClearCookieOptions())
   res.clearCookie(REFRESH_COOKIE_NAME, getClearRefreshCookieOptions())
 }
 
-function getClientInfo(req: any): { userAgent?: string; ip?: string } {
+function getClientInfo(req: Request): { userAgent?: string; ip?: string } {
+  const forwardedFor = req.headers['x-forwarded-for']
+  const forwardedIp = Array.isArray(forwardedFor) 
+    ? forwardedFor[0] 
+    : forwardedFor?.split(',')[0]
+  
   return {
     userAgent: req.headers['user-agent'],
-    ip: req.ip || req.headers['x-forwarded-for']?.split(',')[0],
+    ip: req.ip || forwardedIp,
   }
 }
 
@@ -120,8 +125,8 @@ router.post('/register', authLimiter, async (req, res, next) => {
       user: result.user,
       message: 'Registration successful. Please verify your email.',
     })
-  } catch (e: any) {
-    if (e.message === 'User with this email already exists') {
+  } catch (e) {
+    if (e instanceof Error && e.message === 'User with this email already exists') {
       return res.status(400).json({ error: 'Registration failed. Please try again.' })
     }
     next(e)
@@ -143,8 +148,8 @@ router.post('/login', authLimiter, async (req, res, next) => {
     setAuthCookies(res, result.tokens.accessToken, result.tokens.refreshToken)
     
     res.json({ user: result.user })
-  } catch (e: any) {
-    if (e.message === 'Invalid credentials') {
+  } catch (e) {
+    if (e instanceof Error && e.message === 'Invalid credentials') {
       return res.status(401).json({ error: 'Invalid credentials' })
     }
     next(e)
@@ -215,8 +220,8 @@ router.put('/password', requireAuth, async (req, res, next) => {
     await changePassword(req.user!.id, parsed.data.currentPassword, parsed.data.newPassword)
     
     res.json({ ok: true, message: 'Password changed successfully' })
-  } catch (e: any) {
-    if (e.message === 'Current password is incorrect') {
+  } catch (e) {
+    if (e instanceof Error && e.message === 'Current password is incorrect') {
       return res.status(400).json({ error: 'Incorrect current password' })
     }
     next(e)

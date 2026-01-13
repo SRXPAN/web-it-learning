@@ -4,16 +4,15 @@
  * Requires ADMIN role
  */
 import { Router, Request, Response } from 'express'
-import { PrismaClient, Role } from '@prisma/client'
+import { Role, Prisma } from '@prisma/client'
 import bcrypt from 'bcryptjs'
+import { prisma } from '../db.js'
 import { requireAuth } from '../middleware/auth'
 import { requireRole } from '../middleware/roles'
 import { ok, created, badRequest, notFound, forbidden, serverError, conflict } from '../utils/response'
 import { auditLog, AuditActions, AuditResources } from '../services/audit.service'
 import { z } from 'zod'
 import { emailSchema, nameSchema, passwordSchemaSimple } from '../utils/validation'
-
-const prisma = new PrismaClient()
 const router = Router()
 
 // All admin routes require auth
@@ -161,7 +160,7 @@ router.get('/users', async (req: Request, res: Response) => {
 
     const { page, limit, role, search, sortBy, sortOrder } = parsed.data
 
-    const where: any = {}
+    const where: Prisma.UserWhereInput = {}
     if (role) where.role = role
     if (search) {
       where.OR = [

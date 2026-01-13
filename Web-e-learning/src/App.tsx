@@ -1,35 +1,41 @@
-import { useCallback, useState } from 'react'
+import { useCallback, useState, lazy, Suspense } from 'react'
 import RequireAuth from './components/RequireAuth'
 import { RequireRole } from './components/RequireRole'
 import ErrorBoundary from './components/ErrorBoundary'
 import { Routes, Route, NavLink, useNavigate, useLocation } from 'react-router-dom'
 import { LayoutDashboard, BookOpen, Trophy, User, LogIn, LogOut, LucideIcon, Menu, X, Shield } from 'lucide-react'
-import Dashboard from './pages/Dashboard'
-import Materials from './pages/Materials'
-import Leaderboard from './pages/Leaderboard'
-import Profile from './pages/Profile'
-import Login from './pages/Login'
-import Register from './pages/Register'
-import Quiz from './pages/Quiz'
-import NotFound from './pages/NotFound'
 import { useAuth } from './auth/AuthContext'
 import { useTranslation } from './i18n/useTranslation'
 import Toasts from '@/components/Toast'
-import LessonView from './pages/LessonView'
-// Admin Panel
-import AdminLayout from './pages/admin/AdminLayout'
-import AdminDashboard from './pages/admin/AdminDashboard'
-import AdminUsers from './pages/admin/AdminUsers'
-import AdminFiles from './pages/admin/AdminFiles'
-import AdminAuditLogs from './pages/admin/AdminAuditLogs'
-import AdminTranslations from './pages/admin/AdminTranslations'
-import AdminContent from './pages/admin/AdminContent'
-import AdminSettings from './pages/admin/AdminSettings'
-import AdminTopics from './pages/admin/AdminTopics'
-import AdminMaterials from './pages/admin/AdminMaterials'
-import AdminQuizzes from './pages/admin/AdminQuizzes'
-import AdminUserDetails from './pages/admin/AdminUserDetails'
-import EditorLayout from './pages/editor/EditorLayout'
+import { Loading } from '@/components/Loading'
+
+// Eager loading for critical pages (fast initial load)
+import Login from './pages/Login'
+import Register from './pages/Register'
+import Dashboard from './pages/Dashboard'
+
+// Lazy loading for less critical pages (code splitting)
+const Materials = lazy(() => import('./pages/Materials'))
+const Leaderboard = lazy(() => import('./pages/Leaderboard'))
+const Profile = lazy(() => import('./pages/Profile'))
+const Quiz = lazy(() => import('./pages/Quiz'))
+const NotFound = lazy(() => import('./pages/NotFound'))
+const LessonView = lazy(() => import('./pages/LessonView'))
+
+// Admin Panel - lazy loaded as most users don't need it
+const AdminLayout = lazy(() => import('./pages/admin/AdminLayout'))
+const AdminDashboard = lazy(() => import('./pages/admin/AdminDashboard'))
+const AdminUsers = lazy(() => import('./pages/admin/AdminUsers'))
+const AdminFiles = lazy(() => import('./pages/admin/AdminFiles'))
+const AdminAuditLogs = lazy(() => import('./pages/admin/AdminAuditLogs'))
+const AdminTranslations = lazy(() => import('./pages/admin/AdminTranslations'))
+const AdminContent = lazy(() => import('./pages/admin/AdminContent'))
+const AdminSettings = lazy(() => import('./pages/admin/AdminSettings'))
+const AdminTopics = lazy(() => import('./pages/admin/AdminTopics'))
+const AdminMaterials = lazy(() => import('./pages/admin/AdminMaterials'))
+const AdminQuizzes = lazy(() => import('./pages/admin/AdminQuizzes'))
+const AdminUserDetails = lazy(() => import('./pages/admin/AdminUserDetails'))
+const EditorLayout = lazy(() => import('./pages/editor/EditorLayout'))
 
 interface NavItemProps {
   to: string
@@ -178,33 +184,35 @@ export default function App(){
 
       <main className="mx-auto max-w-7xl px-6 py-8">
         <ErrorBoundary>
-          <Routes>
-            <Route path="/" element={<RequireAuth><Dashboard/></RequireAuth>} />
-            <Route path="/lesson/:topicId/:lessonId" element={<RequireAuth><LessonView/></RequireAuth>} />
-            <Route path="/dashboard" element={<RequireAuth><Dashboard/></RequireAuth>} />
-            <Route path="/materials" element={<RequireAuth><Materials/></RequireAuth>} />
-            <Route path="/quiz" element={<RequireAuth><Quiz/></RequireAuth>} />
-            <Route path="/leaderboard" element={<RequireAuth><Leaderboard/></RequireAuth>} />
-            <Route path="/profile" element={<RequireAuth><Profile/></RequireAuth>} />
-            <Route path="/editor" element={<RequireAuth roles={['ADMIN','EDITOR']}><EditorLayout/></RequireAuth>} />
-            <Route path="/login" element={<Login/>} />
-            <Route path="/register" element={<Register/>} />
-            {/* Admin Panel - for ADMIN and EDITOR roles */}
-            <Route path="/admin" element={<RequireAuth roles={['ADMIN','EDITOR']}><AdminLayout /></RequireAuth>}>
-              <Route index element={<AdminDashboard />} />
-              <Route path="users" element={<RequireRole allowedRoles={['ADMIN']}><AdminUsers /></RequireRole>} />
-              <Route path="users/:id" element={<RequireRole allowedRoles={['ADMIN']}><AdminUserDetails /></RequireRole>} />
-              <Route path="files" element={<RequireRole allowedRoles={['ADMIN']}><AdminFiles /></RequireRole>} />
-              <Route path="audit" element={<RequireRole allowedRoles={['ADMIN']}><AdminAuditLogs /></RequireRole>} />
-              <Route path="translations" element={<RequireRole allowedRoles={['ADMIN']}><AdminTranslations /></RequireRole>} />
-              <Route path="content" element={<RequireRole allowedRoles={['ADMIN']}><AdminContent /></RequireRole>} />
-              <Route path="topics" element={<AdminTopics />} />
-              <Route path="materials" element={<AdminMaterials />} />
-              <Route path="quizzes" element={<AdminQuizzes />} />
-              <Route path="settings" element={<RequireRole allowedRoles={['ADMIN']}><AdminSettings /></RequireRole>} />
-            </Route>
-            <Route path="*" element={<NotFound/>} />
-          </Routes>
+          <Suspense fallback={<Loading />}>
+            <Routes>
+              <Route path="/" element={<RequireAuth><Dashboard/></RequireAuth>} />
+              <Route path="/lesson/:topicId/:lessonId" element={<RequireAuth><LessonView/></RequireAuth>} />
+              <Route path="/dashboard" element={<RequireAuth><Dashboard/></RequireAuth>} />
+              <Route path="/materials" element={<RequireAuth><Materials/></RequireAuth>} />
+              <Route path="/quiz" element={<RequireAuth><Quiz/></RequireAuth>} />
+              <Route path="/leaderboard" element={<RequireAuth><Leaderboard/></RequireAuth>} />
+              <Route path="/profile" element={<RequireAuth><Profile/></RequireAuth>} />
+              <Route path="/editor" element={<RequireAuth roles={['ADMIN','EDITOR']}><EditorLayout/></RequireAuth>} />
+              <Route path="/login" element={<Login/>} />
+              <Route path="/register" element={<Register/>} />
+              {/* Admin Panel - for ADMIN and EDITOR roles */}
+              <Route path="/admin" element={<RequireAuth roles={['ADMIN','EDITOR']}><AdminLayout /></RequireAuth>}>
+                <Route index element={<AdminDashboard />} />
+                <Route path="users" element={<RequireRole allowedRoles={['ADMIN']}><AdminUsers /></RequireRole>} />
+                <Route path="users/:id" element={<RequireRole allowedRoles={['ADMIN']}><AdminUserDetails /></RequireRole>} />
+                <Route path="files" element={<RequireRole allowedRoles={['ADMIN']}><AdminFiles /></RequireRole>} />
+                <Route path="audit" element={<RequireRole allowedRoles={['ADMIN']}><AdminAuditLogs /></RequireRole>} />
+                <Route path="translations" element={<RequireRole allowedRoles={['ADMIN']}><AdminTranslations /></RequireRole>} />
+                <Route path="content" element={<RequireRole allowedRoles={['ADMIN']}><AdminContent /></RequireRole>} />
+                <Route path="topics" element={<AdminTopics />} />
+                <Route path="materials" element={<AdminMaterials />} />
+                <Route path="quizzes" element={<AdminQuizzes />} />
+                <Route path="settings" element={<RequireRole allowedRoles={['ADMIN']}><AdminSettings /></RequireRole>} />
+              </Route>
+              <Route path="*" element={<NotFound/>} />
+            </Routes>
+          </Suspense>
         </ErrorBoundary>
       </main>
       <Toasts />

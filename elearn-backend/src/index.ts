@@ -22,8 +22,13 @@ import adminRouter from './routes/admin.js'
 import { generalLimiter, authLimiter, webhookLimiter } from './middleware/rateLimit.js'
 import { validateCsrfSoft, validateCsrf } from './middleware/csrf.js'
 import { sanitize } from './middleware/sanitize.js'
+import { errorHandler, notFoundHandler } from './middleware/errorHandler.js'
+import { requestIdMiddleware, requestLogger } from './middleware/requestId.js'
 
 const app = express()
+
+// --- Request ID tracking (should be first) ---
+app.use(requestIdMiddleware)
 
 // --- Security headers ---
 app.use(helmet({
@@ -58,6 +63,7 @@ app.use(cors({
 
 // --- Логи ---
 app.use(morgan(process.env.NODE_ENV === 'production' ? 'combined' : 'dev'))
+app.use(requestLogger) // Custom request logger with request ID
 app.use(cookieParser())
 
 // Stripe webhook повинен йти ДО json-парсера і з raw body
@@ -114,34 +120,11 @@ app.use('/api/admin', (req, res, next) => {
   next()
 }, adminRouter)
 
-// --- 404 JSON ---
-app.use((req, res) => {
-  res.status(404).json({ error: 'Not found' })
-})
+// --- 404 Handler ---
+app.use(notFoundHandler)
 
-// --- Глобальний JSON error handler ---
-interface HttpError extends Error {
-  status?: number
-  type?: string
-}
-
-app.use((err: HttpError, _req: express.Request, res: express.Response, _next: express.NextFunction) => {
-  if (err?.message === 'CORS not allowed') {
-    return res.status(403).json({ error: 'CORS blocked' })
-  }
-  if (err?.type === 'entity.too.large') {
-    return res.status(413).json({ error: 'Payload too large' })
-  }
-  if (err?.type === 'entity.parse.failed') {
-    return res.status(400).json({ error: 'Invalid JSON' })
-  }
-  const status = typeof err?.status === 'number' ? err.status : 500
-  const message = err?.message || 'Internal Server Error'
-  if (process.env.NODE_ENV !== 'production') {
-    console.error(err)
-  }
-  res.status(status).json({ error: message })
-})
+// --- Global Error Handler (must be last) ---
+app.use(errorHandler)
 
 // --- Server startup with graceful shutdown ---
 const port = Number(process.env.PORT ?? 4000)
