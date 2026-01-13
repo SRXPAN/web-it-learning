@@ -123,7 +123,7 @@ export async function updateQuizTranslation(
 
     await prisma.quiz.update({
       where: { id: quizId },
-      data: { titleCache: newCache },
+      data: { titleCache: newCache } as any,
     })
 
     if (keyId) {
@@ -223,7 +223,7 @@ export async function syncAllTranslationCaches() {
           data: {
             ...(Object.keys(titleCache).length > 0 && { titleCache }),
             ...(Object.keys(contentCache).length > 0 && { contentCache }),
-          },
+          } as any,
         })
       }
     }
@@ -249,7 +249,7 @@ export async function syncAllTranslationCaches() {
       if (Object.keys(titleCache).length > 0) {
         await prisma.quiz.update({
           where: { id: quiz.id },
-          data: { titleCache },
+          data: { titleCache } as any,
         })
       }
     }
@@ -258,6 +258,68 @@ export async function syncAllTranslationCaches() {
     logger.info('All translation caches synced successfully')
   } catch (error) {
     logger.error('Failed to sync translation caches:', error as Error)
+    throw error
+  }
+}
+
+/**
+ * Batch update material translations and caches
+ * 
+ * Accepts object like:
+ * {
+ *   titleUA: "Назва", titleEN: "Title",
+ *   contentUA: "Контент", contentEN: "Content",
+ *   urlUA: "s3://file_ua.pdf", urlEN: "s3://file_en.pdf"
+ * }
+ */
+export async function updateMaterialMultiLang(
+  materialId: string,
+  translations: Record<string, string>
+) {
+  try {
+    const material = await prisma.material.findUnique({
+      where: { id: materialId },
+    })
+    if (!material) throw new Error('Material not found')
+
+    // Build cache objects from flat key-value pairs
+    // Keys format: titleUA, titleEN, contentUA, contentEN, urlUA, urlEN
+    const titleCache: Record<string, string> = {}
+    const contentCache: Record<string, string> = {}
+    const urlCache: Record<string, string> = {}
+
+    for (const [key, value] of Object.entries(translations)) {
+      if (key.startsWith('title')) {
+        const lang = key.replace('title', '') as Lang
+        if (['UA', 'EN', 'PL'].includes(lang)) {
+          titleCache[lang] = value
+        }
+      } else if (key.startsWith('content')) {
+        const lang = key.replace('content', '') as Lang
+        if (['UA', 'EN', 'PL'].includes(lang)) {
+          contentCache[lang] = value
+        }
+      } else if (key.startsWith('url')) {
+        const lang = key.replace('url', '') as Lang
+        if (['UA', 'EN', 'PL'].includes(lang)) {
+          urlCache[lang] = value
+        }
+      }
+    }
+
+    // Update material with all caches
+    await prisma.material.update({
+      where: { id: materialId },
+      data: {
+        ...(Object.keys(titleCache).length > 0 && { titleCache }),
+        ...(Object.keys(contentCache).length > 0 && { contentCache }),
+        ...(Object.keys(urlCache).length > 0 && { urlCache }),
+      } as any,
+    })
+
+    logger.info('Material multi-language translations updated', { materialId })
+  } catch (error) {
+    logger.error('Failed to update material multi-language translations:', error as Error)
     throw error
   }
 }

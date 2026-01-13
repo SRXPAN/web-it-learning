@@ -3,6 +3,7 @@ import { ChevronRight, Play, FileText, Video, Link as LinkIcon, Code, CheckCircl
 import { useTranslation } from '@/i18n/useTranslation'
 import { useParams, useNavigate } from 'react-router-dom'
 import { fetchLesson, type Lesson } from '@/services/lessons'
+import { getLocalizedContent } from '@/utils/materialHelpers'
 
 type ContentType = 'notes' | 'video' | 'quiz' | 'code'
 type Mode = 'practice' | 'exam'
@@ -76,7 +77,7 @@ export default function LessonView() {
   const breadcrumbs = [
     { label: t('lesson.breadcrumb.algorithms'), onClick: () => nav('/materials') },
     { label: lesson?.topic?.name || topicId || t('lesson.breadcrumb.search'), onClick: () => nav('/materials'), current: !lessonId },
-    { label: lesson?.title || lessonId || t('lesson.breadcrumb.binarySearch'), current: true },
+    { label: lesson ? getLocalizedContent(lesson, lang).title : lessonId || t('lesson.breadcrumb.binarySearch'), current: true },
   ]
   
   if (loading) {
@@ -400,7 +401,7 @@ export default function LessonView() {
             <div className="space-y-6">
               {/* Lesson Title */}
               <h2 className="text-2xl font-display font-bold text-neutral-900 dark:text-white">
-                {lesson?.title || t('lesson.placeholder')}
+                {lesson ? getLocalizedContent(lesson, lang).title : t('lesson.placeholder')}
               </h2>
               
               {/* Lesson Content */}
@@ -408,7 +409,7 @@ export default function LessonView() {
                 <div className="prose prose-neutral dark:prose-invert max-w-none">
                   <div 
                     className="whitespace-pre-wrap text-neutral-700 dark:text-neutral-300"
-                    dangerouslySetInnerHTML={{ __html: lesson.content }}
+                    dangerouslySetInnerHTML={{ __html: getLocalizedContent(lesson, lang).content || lesson.content || '' }}
                   />
                 </div>
               ) : lesson?.url ? (
@@ -417,7 +418,7 @@ export default function LessonView() {
                     <>
                       <FileText size={48} className="text-primary-600 dark:text-primary-400" />
                       <a 
-                        href={lesson.url} 
+                        href={getLocalizedContent(lesson, lang).url || lesson.url || ''} 
                         target="_blank" 
                         rel="noopener noreferrer"
                         className="btn"
@@ -429,7 +430,7 @@ export default function LessonView() {
                     <>
                       <LinkIcon size={48} className="text-primary-600 dark:text-primary-400" />
                       <a 
-                        href={lesson.url} 
+                        href={getLocalizedContent(lesson, lang).url || lesson.url || ''} 
                         target="_blank" 
                         rel="noopener noreferrer"
                         className="btn"

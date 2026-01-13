@@ -64,11 +64,14 @@ export interface Material {
   id: string
   title: string
   titleJson?: LocalizedString
+  titleCache?: Record<string, string> | null
   type: MaterialType
   url?: string
+  urlCache?: Record<string, string> | null
   fileId?: string
   content?: string
   contentJson?: LocalizedString
+  contentCache?: Record<string, string> | null
   lang?: Lang
   status?: Status
   tags?: string[]

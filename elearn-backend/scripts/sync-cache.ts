@@ -81,13 +81,16 @@ async function syncTopicCache() {
     }
     
     // Update topic with cache
-    await prisma.topic.update({
-      where: { id: topic.id },
-      data: {
-        titleCache: Object.keys(titleCache).length > 0 ? titleCache : null,
-        descCache: Object.keys(descCache).length > 0 ? descCache : null,
-      }
-    })
+    const updateData: any = {}
+    if (Object.keys(titleCache).length > 0) updateData.titleCache = titleCache
+    if (Object.keys(descCache).length > 0) updateData.descCache = descCache
+    
+    if (Object.keys(updateData).length > 0) {
+      await prisma.topic.update({
+        where: { id: topic.id },
+        data: updateData
+      })
+    }
     
     synced++
   }

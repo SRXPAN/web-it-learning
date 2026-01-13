@@ -467,6 +467,7 @@ export type TranslationKey =
   | 'editor.success.topicCreated'
   | 'editor.success.deleted'
   | 'editor.success.materialCreated'
+  | 'editor.success.materialUpdated'
   | 'editor.success.fileUploaded'
   | 'editor.success.quizUpdated'
   | 'editor.success.quizCreated'

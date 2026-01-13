@@ -7,6 +7,7 @@ import { z } from 'zod'
 import type { Category, Lang, Status, Difficulty } from '@elearn/shared'
 import type { Prisma } from '@prisma/client'
 import { logger } from '../utils/logger.js'
+import { updateMaterialMultiLang } from '../services/translation.service.js'
 
 const router = Router()
 
@@ -157,6 +158,66 @@ router.put('/topics/:topicId/materials/:id', requireAuth, requireRole(['EDITOR',
   const mat = await prisma.material.update({ where: { id }, data })
   logger.audit(req.user?.id ?? 'unknown', 'material.update', { id, topicId })
   res.json(mat)
+})
+
+// PUT /topics/:topicId/materials/:id/translations
+// Multi-language material update (titleUA, titleEN, contentUA, contentEN, urlUA, urlEN, etc.)
+router.put('/topics/:topicId/materials/:id/translations', requireAuth, requireRole(['EDITOR','ADMIN']), validateTopicAndId, async (req, res) => {
+  const { topicId, id } = req.params
+  
+  // Schema accepts flexible translations object
+  const schema = z.object({
+    titleUA: z.string().min(1).optional(),
+    titleEN: z.string().min(1).optional(),
+    titlePL: z.string().min(1).optional(),
+    contentUA: z.string().optional(),
+    contentEN: z.string().optional(),
+    contentPL: z.string().optional(),
+    urlUA: z.string().url().optional(),
+    urlEN: z.string().url().optional(),
+    urlPL: z.string().url().optional(),
+    type: z.enum(['pdf','video','link','text']).optional(),
+    publish: z.boolean().optional(),
+    status: z.enum(['Draft','Published']).optional(),
+  })
+  
+  const parsed = schema.safeParse(req.body)
+  if (!parsed.success) return res.status(400).json({ error: parsed.error.flatten() })
+
+  try {
+    // Extract translations for cache update
+    const translations: Record<string, string> = {}
+    for (const [key, value] of Object.entries(parsed.data)) {
+      if (value && (key.startsWith('title') || key.startsWith('content') || key.startsWith('url'))) {
+        translations[key] = value as string
+      }
+    }
+
+    // Update caches via translation service
+    if (Object.keys(translations).length > 0) {
+      await updateMaterialMultiLang(id, translations)
+    }
+
+    // Update type, status if provided
+    const updateData: Prisma.MaterialUpdateInput = {}
+    if (parsed.data.type) updateData.type = parsed.data.type
+    if (parsed.data.status) updateData.status = parsed.data.status
+    if (typeof parsed.data.publish === 'boolean') {
+      updateData.status = parsed.data.publish ? 'Published' : 'Draft'
+      updateData.publishedAt = parsed.data.publish ? new Date() : null
+    }
+
+    // Perform update if there are other fields to update
+    const mat = Object.keys(updateData).length > 0 
+      ? await prisma.material.update({ where: { id }, data: updateData })
+      : await prisma.material.findUnique({ where: { id } })
+
+    logger.audit(req.user?.id ?? 'unknown', 'material.translations.update', { id, topicId })
+    res.json(mat)
+  } catch (error) {
+    logger.error('Failed to update material translations:', error as Error)
+    res.status(500).json({ error: 'Failed to update material' })
+  }
 })
 
 router.delete('/topics/:topicId/materials/:id', requireAuth, requireRole(['EDITOR','ADMIN']), validateTopicAndId, async (req, res) => {
