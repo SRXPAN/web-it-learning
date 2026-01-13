@@ -94,11 +94,11 @@ export default function Materials() {
   const isDashboardView = !activeTopic
 
   const filteredMaterials = useCallback((list: Material[]) => {
-    const byLang = list.filter((m) => !m.lang || m.lang === lang)
-    const byTab = tab === 'ALL' ? byLang : byLang.filter((m) => m.type === tab)
+    // Не фільтруємо за lang, бо маємо мультимовну систему через titleCache/contentCache
+    const byTab = tab === 'ALL' ? list : list.filter((m) => m.type === tab)
     const q = query.trim().toLowerCase()
     return q ? byTab.filter((m) => m.title.toLowerCase().includes(q)) : byTab
-  }, [lang, tab, query])
+  }, [tab, query])
 
   // Відкриття матеріалу в модальному вікні
   const openMaterial = useCallback((m: Material) => {

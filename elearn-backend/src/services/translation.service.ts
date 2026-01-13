@@ -118,12 +118,12 @@ export async function updateQuizTranslation(
     if (!quiz) throw new Error('Quiz not found')
 
     // Quiz uses titleCache
-    const oldCache = (quiz.titleCache || {}) as Record<string, string>
+    const oldCache = (quiz.title || {}) as Record<string, string>
     const newCache = { ...oldCache, [lang]: value }
 
     await prisma.quiz.update({
       where: { id: quizId },
-      data: { titleCache: newCache } as any,
+      data: { title: newCache } as any,
     })
 
     if (keyId) {

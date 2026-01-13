@@ -52,7 +52,7 @@ router.get('/', optionalAuth, async (req, res) => {
     // Отримуємо загальну кількість для пагінації
     const total = await prisma.topic.count({ where: whereClause })
 
-    // Оптимізований запит: використовуємо select замість include
+    // Оптимізований запит: завантажуємо повне дерево для Materials page
     const topics = await prisma.topic.findMany({
       where: whereClause,
       orderBy: { createdAt: 'asc' },
@@ -70,18 +70,77 @@ router.get('/', optionalAuth, async (req, res) => {
         // [PERFORMANCE] Читаємо JSON кеш замість JOIN-ів
         titleCache: true,
         descCache: true,
-        // Агрегація для лічильників (набагато швидше за завантаження всіх дітей)
-        _count: {
-          select: { 
-            materials: true, 
-            quizzes: true,
-            children: true 
+        // Завантажуємо дочірні теми (підтеми)
+        children: {
+          where: isStaff ? {} : { status: 'Published' as const },
+          select: {
+            id: true,
+            slug: true,
+            name: true,
+            description: true,
+            titleCache: true,
+            descCache: true,
+            status: true,
+            parentId: true,
+            category: true,
+            // Матеріали підтеми
+            materials: {
+              where: isStaff ? {} : { status: 'Published' as const },
+              select: {
+                id: true,
+                title: true,
+                type: true,
+                url: true,
+                content: true,
+                lang: true,
+                titleCache: true,
+                contentCache: true,
+                urlCache: true,
+                status: true
+              }
+            },
+            // Квізи підтеми
+            quizzes: {
+              where: isStaff ? {} : { status: 'Published' as const },
+              select: {
+                id: true,
+                title: true,
+                durationSec: true,
+                titleCache: true
+              }
+            }
+          }
+        },
+        // Матеріали основної теми
+        materials: {
+          where: isStaff ? {} : { status: 'Published' as const },
+          select: {
+            id: true,
+            title: true,
+            type: true,
+            url: true,
+            content: true,
+            lang: true,
+            titleCache: true,
+            contentCache: true,
+            urlCache: true,
+            status: true
+          }
+        },
+        // Квізи основної теми
+        quizzes: {
+          where: isStaff ? {} : { status: 'Published' as const },
+          select: {
+            id: true,
+            title: true,
+            durationSec: true,
+            titleCache: true
           }
         }
       }
     })
 
-    // Маппинг даних: вибираємо правильну мову з кешу
+    // Маппинг даних: вибираємо правильну мову з кешу та будуємо дерево
     const mappedTopics = topics.map(t => ({
       id: t.id,
       slug: t.slug,
@@ -91,11 +150,56 @@ router.get('/', optionalAuth, async (req, res) => {
       // Миттєвий вибір мови
       title: getLocalizedText(t.titleCache, lang, t.name),
       description: getLocalizedText(t.descCache, lang, t.description),
-      stats: {
-        materials: t._count.materials,
-        quizzes: t._count.quizzes,
-        subtopics: t._count.children
-      }
+      name: t.name, // Додаємо для сумісності
+      // Дочірні теми з локалізацією
+      children: (t.children || []).map(child => ({
+        id: child.id,
+        slug: child.slug,
+        category: child.category,
+        parentId: child.parentId,
+        status: child.status,
+        title: getLocalizedText(child.titleCache, lang, child.name),
+        description: getLocalizedText(child.descCache, lang, child.description),
+        name: child.name,
+        // Матеріали підтеми
+        materials: (child.materials || []).map(m => ({
+          id: m.id,
+          type: m.type,
+          url: m.url,
+          content: m.content,
+          lang: m.lang,
+          status: m.status,
+          title: getLocalizedText((m as any).titleCache, lang, m.title),
+          titleCache: (m as any).titleCache,
+          contentCache: (m as any).contentCache,
+          urlCache: (m as any).urlCache
+        })),
+        // Квізи підтеми
+        quizzes: (child.quizzes || []).map(q => ({
+          id: q.id,
+          durationSec: q.durationSec,
+          title: getLocalizedText((q as any).titleCache, lang, q.title)
+        }))
+      })),
+      // Матеріали основної теми
+      materials: (t.materials || []).map(m => ({
+        id: m.id,
+        type: m.type,
+        url: m.url,
+        content: m.content,
+        lang: m.lang,
+        status: m.status,
+        title: getLocalizedText((m as any).titleCache, lang, m.title),
+        titleCache: (m as any).titleCache,
+        contentCache: (m as any).contentCache,
+        urlCache: (m as any).urlCache
+      })),
+      // Квізи основної теми
+      quizzes: (t.quizzes || []).map(q => ({
+        id: q.id,
+        durationSec: q.durationSec,
+        title: getLocalizedText((q as any).titleCache, lang, q.title)
+      }))
     }))
 
     res.json({
