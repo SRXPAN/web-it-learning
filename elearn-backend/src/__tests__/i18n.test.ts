@@ -1,4 +1,8 @@
 // src/__tests__/i18n.test.ts
+// NOTE: i18n route has been removed as part of migration to JSON-based localization
+// This test file is kept for reference but is disabled
+
+/*
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 
 // Mock Prisma
@@ -25,7 +29,6 @@ vi.mock('../utils/logger.js', () => ({
 
 import express from 'express'
 import request from 'supertest'
-import i18nRouter from '../routes/i18n.js'
 
 const app = express()
 app.use(express.json())
@@ -142,3 +145,4 @@ describe('GET /i18n/bundle', () => {
     expect(res.headers['vary']).toBe('Accept-Language')
   })
 })
+*/
