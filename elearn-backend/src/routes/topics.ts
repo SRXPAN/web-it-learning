@@ -1,8 +1,14 @@
-import { Router } from 'express'
-import { prisma } from '../db.js'
+/**
+ * Topics API Routes
+ * Public endpoints for browsing topics and materials
+ */
+import { Router, Request } from 'express'
+import { AppError, asyncHandler } from '../middleware/errorHandler.js'
 import { requireAuth, optionalAuth } from '../middleware/auth.js'
-import { z } from 'zod'
+import { validateResource } from '../middleware/validateResource.js'
+import { topicSchemas } from '../schemas/topic.schema.js'
 import { getTopics, getTopicByIdOrSlug } from '../services/topics.service.js'
+import { ok } from '../utils/response.js'
 
 const router = Router()
 
@@ -11,61 +17,57 @@ function getParam(param: string | string[]): string {
   return Array.isArray(param) ? param[0] : param
 }
 
-// Схема для валідації query параметрів
-const paginationSchema = z.object({
-  page: z.coerce.number().int().min(1).default(1),
-  limit: z.coerce.number().int().min(1).max(50).default(20),
-  category: z.enum(['Programming', 'Mathematics', 'Databases', 'Networks', 'WebDevelopment', 'MobileDevelopment', 'MachineLearning', 'Security', 'DevOps', 'OperatingSystems']).optional(),
-  lang: z.string().toUpperCase().optional().default('EN'),
-})
+/**
+ * GET /api/topics
+ * List all topics with pagination, filtering, and localization
+ */
+router.get(
+  '/',
+  optionalAuth,
+  validateResource(topicSchemas.pagination, 'query'),
+  asyncHandler(async (req: Request, res) => {
+    const { page, limit, category, lang, search } = req.query as any
 
-// GET /api/topics - Список тем (оптимізований)
-router.get('/', optionalAuth, async (req, res) => {
-  try {
-    // Валідація параметрів
-    const parsed = paginationSchema.safeParse(req.query)
-    if (!parsed.success) {
-      return res.status(400).json({ error: 'Invalid query params' })
-    }
-    
-    const { page, limit, category, lang } = parsed.data
-    
-    // Перевіряємо права доступу
+    // Check if user is staff (ADMIN or EDITOR)
     const isStaff = req.user?.role === 'ADMIN' || req.user?.role === 'EDITOR'
-    
+
+    // Call service with validated parameters
     const result = await getTopics({
-      page,
-      limit,
-      category,
-      lang,
-      isStaff
+      page: parseInt(page) || 1,
+      limit: parseInt(limit) || 20,
+      category: category as any,
+      lang: (lang as string).toUpperCase(),
+      isStaff,
     })
 
-    res.json(result)
-  } catch (e) {
-    console.error('Error fetching topics:', e)
-    res.status(500).json({ error: 'Internal server error' })
-  }
-})
+    return ok(res, result)
+  })
+)
 
-// GET /api/topics/:slug - Деталі теми (оптимізований)
-router.get('/:slug', optionalAuth, async (req, res) => {
-  try {
-    const lang = (req.query.lang as string || 'EN').toUpperCase()
+/**
+ * GET /api/topics/:slug
+ * Get topic details with nested materials and quizzes
+ */
+router.get(
+  '/:slug',
+  optionalAuth,
+  validateResource(topicSchemas.pagination, 'query'),
+  asyncHandler(async (req: Request, res) => {
     const slug = getParam(req.params.slug)
+    const lang = ((req.query.lang as string) || 'EN').toUpperCase()
+
+    // Check if user is staff
     const isStaff = req.user?.role === 'ADMIN' || req.user?.role === 'EDITOR'
 
+    // Get topic with validation
     const topic = await getTopicByIdOrSlug(slug, lang, isStaff)
 
     if (!topic) {
-      return res.status(404).json({ error: 'Topic not found' })
+      throw AppError.notFound(`Topic '${slug}' not found`)
     }
 
-    res.json(topic)
-  } catch (e) {
-    console.error('Error fetching topic details:', e)
-    res.status(500).json({ error: 'Failed to fetch topic' })
-  }
-})
+    return ok(res, topic)
+  })
+)
 
 export default router
