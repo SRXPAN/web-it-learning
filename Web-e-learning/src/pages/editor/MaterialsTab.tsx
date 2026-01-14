@@ -4,6 +4,19 @@ import { http as api } from '../../lib/http'
 
 type Lang = 'EN' | 'UA' | 'PL'
 
+interface MaterialDTO {
+  id: string
+  title: string
+  type: 'VIDEO' | 'TEXT' | 'video' | 'text' | 'pdf' | 'link'
+  url?: string | null
+  content?: string | null
+  titleCache?: Record<string, string> | null
+  urlCache?: Record<string, string> | null
+  contentCache?: Record<string, string> | null
+  status?: string
+  lang?: string
+}
+
 interface MaterialFormState {
   EN: { title: string; url: string; content: string }
   UA: { title: string; url: string; content: string }
@@ -11,8 +24,14 @@ interface MaterialFormState {
   type: 'VIDEO' | 'TEXT'
 }
 
+const ERROR_MESSAGES = {
+  invalidUrl: (lang: Lang, url: string) => `Invalid URL for ${lang}: ${url}`,
+  saveFailed: 'Failed to save material. Please try again.',
+  loadFailed: 'Failed to load materials'
+} as const
+
 export default function MaterialsTab({ topicId }: { topicId?: string }) {
-  const [materials, setMaterials] = useState<any[]>([])
+  const [materials, setMaterials] = useState<MaterialDTO[]>([])
   const [editingId, setEditingId] = useState<string | null>(null)
 
   // Active tab state
@@ -30,10 +49,10 @@ export default function MaterialsTab({ topicId }: { topicId?: string }) {
   const fetchMaterials = async () => {
     if (!topicId) return
     try {
-      const res = await api.get<any[]>(`/editor/topics/${topicId}/materials`)
+      const res = await api.get<MaterialDTO[]>(`/editor/topics/${topicId}/materials`)
       setMaterials(res ?? [])
     } catch (e) {
-      console.error('Failed to load materials', e)
+      console.error(ERROR_MESSAGES.loadFailed, e)
     }
   }
 
@@ -42,7 +61,7 @@ export default function MaterialsTab({ topicId }: { topicId?: string }) {
   }, [topicId])
 
   // Start Editing: Unpack API data (Cache -> Form State)
-  const handleEdit = (m: any) => {
+  const handleEdit = (m: MaterialDTO) => {
     setEditingId(m.id)
     setFormData({
       EN: {
@@ -60,7 +79,9 @@ export default function MaterialsTab({ topicId }: { topicId?: string }) {
         url: m.urlCache?.PL || '',
         content: m.contentCache?.PL || ''
       },
-      type: m.type as 'VIDEO' | 'TEXT'
+      type: (m.type?.toUpperCase() === 'VIDEO' || m.type?.toUpperCase() === 'TEXT') 
+        ? m.type.toUpperCase() as 'VIDEO' | 'TEXT'
+        : 'VIDEO'
     })
   }
 
@@ -84,7 +105,7 @@ export default function MaterialsTab({ topicId }: { topicId?: string }) {
     for (const lang of langs) {
       const url = formData[lang].url
       if (url && !isValidUrl(url)) {
-        alert(`Invalid URL for ${lang}: ${url}`)
+        alert(ERROR_MESSAGES.invalidUrl(lang, url))
         return
       }
     }
@@ -111,7 +132,7 @@ export default function MaterialsTab({ topicId }: { topicId?: string }) {
       setEditingId(null)
       fetchMaterials() // Refresh list
     } catch (e) {
-      alert('Failed to save material')
+      alert(ERROR_MESSAGES.saveFailed)
       console.error(e)
     }
   }
