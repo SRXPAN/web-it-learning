@@ -10,7 +10,7 @@ type MaterialForm = {
   type: string
 }
 
-export default function MaterialsTab({ topicId }: { topicId: string }) {
+export default function MaterialsTab({ topicId }: { topicId?: string }) {
   const [materials, setMaterials] = useState<any[]>([])
   const [editingId, setEditingId] = useState<string | null>(null)
   const [activeLang, setActiveLang] = useState<Lang>('EN')
@@ -23,7 +23,7 @@ export default function MaterialsTab({ topicId }: { topicId: string }) {
 
   useEffect(() => {
     if (!topicId) return
-    api.get(`/editor/topics/${topicId}/materials`).then((res: any) => setMaterials(res || [])).catch(() => {})
+    api.get<any[]>(`/editor/topics/${topicId}/materials`).then(res => setMaterials(res ?? [])).catch(() => {})
   }, [topicId])
 
   const handleEdit = (m: any) => {
@@ -46,8 +46,8 @@ export default function MaterialsTab({ topicId }: { topicId: string }) {
     }
     await api.put(`/editor/materials/${editingId}`, payload)
     setEditingId(null)
-    const res = await api.get(`/editor/topics/${topicId}/materials`)
-    setMaterials(res || [])
+    const res = await api.get<any[]>(`/editor/topics/${topicId}/materials`)
+    setMaterials(res ?? [])
   }
 
   return (
