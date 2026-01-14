@@ -343,38 +343,12 @@ model UiTranslation {
 }
 
 // ============================================
-// NORMALIZED I18N TABLES
+// I18N TABLES REMOVED - Using JSON Cache Fields
 // ============================================
-
-// Ключі перекладів (нормалізована структура)
-model I18nKey {
-  id                   String       @id @default(cuid())
-  key                  String       // "nav.dashboard", "quiz.title"
-  namespace            String       @default("common") // common, auth, quiz, nav, etc.
-  description          String?      // Опис для редактора перекладів
-  values               I18nValue[]
-  createdAt            DateTime     @default(now())
-  updatedAt            DateTime     @default(now()) @updatedAt
-
-  @@unique([namespace, key])
-  @@index([namespace])
-  @@index([key])
-}
-
-// Значення перекладів по мовах
-model I18nValue {
-  id        String   @id @default(cuid())
-  keyId     String
-  key       I18nKey  @relation(fields: [keyId], references: [id], onDelete: Cascade)
-  lang      Lang     // UA, PL, EN
-  value     String   @db.Text
-  createdAt DateTime @default(now())
-  updatedAt DateTime @default(now()) @updatedAt
-
-  @@unique([keyId, lang])
-  @@index([keyId])
-  @@index([lang])
-}
+// The normalized I18nKey/I18nValue tables have been removed.
+// Localization now uses JSON cache fields directly in Topic/Material/Quiz:
+// - titleCache: {"UA": "...", "EN": "...", "PL": "..."}
+// - urlCache, contentCache, descCache (similar structure)
 
 // Щоденні цілі з перекладами
 model DailyGoalTemplate {

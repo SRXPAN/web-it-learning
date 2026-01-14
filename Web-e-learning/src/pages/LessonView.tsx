@@ -30,6 +30,11 @@ const mockTests: TestCase[] = [
 
 export default function LessonView() {
   const { t, lang } = useTranslation()
+  const currentLang = (lang || 'EN').toUpperCase()
+
+  const getLocalizedUrl = (material: { url?: string | null; urlCache?: Record<string, string> | null }) => {
+    return material.urlCache?.[currentLang] || material.urlCache?.['EN'] || material.url || ''
+  }
 
   const mockQuestion: Question = {
     id: 'q1',
@@ -418,7 +423,7 @@ export default function LessonView() {
                     <>
                       <FileText size={48} className="text-primary-600 dark:text-primary-400" />
                       <a 
-                        href={getLocalizedContent(lesson, lang).url || lesson.url || ''} 
+                        href={getLocalizedUrl(lesson) || lesson.url || ''} 
                         target="_blank" 
                         rel="noopener noreferrer"
                         className="btn"
@@ -430,7 +435,7 @@ export default function LessonView() {
                     <>
                       <LinkIcon size={48} className="text-primary-600 dark:text-primary-400" />
                       <a 
-                        href={getLocalizedContent(lesson, lang).url || lesson.url || ''} 
+                        href={getLocalizedUrl(lesson) || lesson.url || ''} 
                         target="_blank" 
                         rel="noopener noreferrer"
                         className="btn"
@@ -460,10 +465,10 @@ export default function LessonView() {
               </h2>
               
               {/* Video Player */}
-              {lesson && getLocalizedContent(lesson, lang).url && lesson.type === 'video' ? (
+              {lesson && getLocalizedUrl(lesson) && lesson.type === 'video' ? (
                 <div className="aspect-video rounded-2xl overflow-hidden bg-neutral-900">
                   {(() => {
-                    const videoUrl = getLocalizedContent(lesson, lang).url || ''
+                    const videoUrl = getLocalizedUrl(lesson) || ''
                     if (videoUrl.includes('youtube.com') || videoUrl.includes('youtu.be')) {
                       return (
                         <iframe

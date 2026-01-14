@@ -3,6 +3,7 @@ import { Router } from 'express'
 import { prisma } from '../db'
 import { requireAuth, requireRole } from '../middleware/auth'
 import { validateId, validateTopicId, validateTopicAndId } from '../middleware/validateParams.js'
+import { requireEditor } from '../middleware/requireEditor.js'
 import { z } from 'zod'
 import type { Category, Lang, Status, Difficulty } from '@elearn/shared'
 import type { Prisma } from '@prisma/client'
@@ -27,139 +28,38 @@ router.get('/topics', requireAuth, requireRole(['EDITOR','ADMIN']), async (_req,
   res.json(topics)
 })
 
-router.post('/topics', requireAuth, requireRole(['EDITOR','ADMIN']), async (req, res) => {
-  const schema = z.object({
-    name: z.string().min(2),
-    slug: z.string().min(2),
-    description: z.string().optional(),
-    parentId: z.string().optional(),
-    category: z.enum(['Programming','Mathematics','Databases','Networks']).default('Programming'),
-  })
-  const parsed = schema.safeParse(req.body)
-  if (!parsed.success) return res.status(400).json({ error: parsed.error.flatten() })
-
-  const topic = await prisma.topic.create({
-    data: {
-      name: parsed.data.name,
-      slug: parsed.data.slug,
-      description: parsed.data.description || '',
-      parentId: parsed.data.parentId || null,
-      category: parsed.data.category,
-      createdById: req.user?.id,
-      status: 'Draft'
-    }
-  })
-  logger.audit(req.user?.id ?? 'unknown', 'topic.create', { id: topic.id })
-  res.json(topic)
-})
-
-router.put('/topics/:id', requireAuth, requireRole(['EDITOR','ADMIN']), validateId, async (req, res) => {
+// Manual localization update: accepts flattened EN/UA/PL fields
+router.put('/materials/:id', requireEditor, async (req, res) => {
   const { id } = req.params
-  const schema = z.object({
-    name: z.string().optional(),
-    slug: z.string().optional(),
-    description: z.string().optional(),
-    parentId: z.string().nullable().optional(),
-    category: z.enum(['Programming','Mathematics','Databases','Networks']).optional(),
-    publish: z.boolean().optional()
-  })
-  const parsed = schema.safeParse(req.body)
-  if (!parsed.success) return res.status(400).json({ error: parsed.error.flatten() })
+  const { 
+    type, 
+    titleEN, titleUA, titlePL,
+    linkEN, linkUA, linkPL,
+    contentEN, contentUA, contentPL
+  } = req.body
 
-  const data: Prisma.TopicUpdateInput = { ...parsed.data }
-  if (typeof parsed.data.publish === 'boolean') {
-    data.status = parsed.data.publish ? 'Published' : 'Draft'
-    data.publishedAt = parsed.data.publish ? new Date() : null
-    delete (data as Record<string, unknown>).publish
+  try {
+    await prisma.material.update({
+      where: { id },
+      data: {
+        type,
+        // Legacy fields (Fallback to EN)
+        title: titleEN || 'Untitled',
+        url: linkEN,
+        content: contentEN,
+
+        // JSON Cache fields (The real localization)
+        titleCache: { EN: titleEN, UA: titleUA, PL: titlePL },
+        urlCache:   { EN: linkEN,  UA: linkUA,  PL: linkPL },
+        contentCache: { EN: contentEN, UA: contentUA, PL: contentPL }
+      }
+    })
+    res.json({ success: true })
+  } catch (e) {
+    console.error(e)
+    res.status(500).json({ error: 'Update failed' })
   }
-
-  const topic = await prisma.topic.update({
-    where: { id },
-    data,
-  })
-  logger.audit(req.user?.id ?? 'unknown', 'topic.update', { id })
-  res.json(topic)
 })
-
-router.delete('/topics/:id', requireAuth, requireRole(['EDITOR','ADMIN']), validateId, async (req, res) => {
-  const { id } = req.params
-  await prisma.topic.delete({ where: { id } })
-  logger.audit(req.user?.id ?? 'unknown', 'topic.delete', { id })
-  res.json({ ok: true })
-})
-
-// ==================== MATERIALS ====================
-
-router.get('/topics/:topicId/materials', requireAuth, requireRole(['EDITOR','ADMIN']), validateTopicId, async (req, res) => {
-  const { topicId } = req.params
-  const mats = await prisma.material.findMany({
-    where: { topicId },
-    orderBy: { updatedAt: 'desc' },
-    select: {
-      id: true, title: true, type: true, url: true, content: true,
-      lang: true, status: true, updatedAt: true, publishedAt: true
-    }
-  })
-  res.json(mats)
-})
-
-router.post('/topics/:topicId/materials', requireAuth, requireRole(['EDITOR','ADMIN']), validateTopicId, async (req, res) => {
-  const { topicId } = req.params
-  const schema = z.object({
-    // Support both single-language (legacy) and multi-language creation
-    title: z.string().min(2).optional(),
-    titleUA: z.string().min(2).optional(),
-    titleEN: z.string().min(2).optional(),
-    titlePL: z.string().min(2).optional(),
-    
-    type: z.enum(['pdf','video','link','text']),
-    
-    url: z.string().url().optional(),
-    urlUA: z.string().url().optional(),
-    urlEN: z.string().url().optional(),
-    urlPL: z.string().url().optional(),
-    
-    content: z.string().optional(),
-    contentUA: z.string().optional(),
-    contentEN: z.string().optional(),
-    contentPL: z.string().optional(),
-    
-    lang: z.enum(['UA','PL','EN']).default('UA'),
-    publish: z.boolean().optional()
-  })
-  const parsed = schema.safeParse(req.body)
-  if (!parsed.success) return res.status(400).json({ error: parsed.error.flatten() })
-
-  // Determine primary title and url (fallback to EN if not provided)
-  const primaryTitle = parsed.data.titleEN || parsed.data.titleUA || parsed.data.titlePL || parsed.data.title || 'Untitled'
-  const primaryUrl = parsed.data.urlEN || parsed.data.urlUA || parsed.data.urlPL || parsed.data.url
-
-  // Build caches if multi-lang provided
-  const titleCache = {
-    ...(parsed.data.titleEN && { EN: parsed.data.titleEN }),
-    ...(parsed.data.titleUA && { UA: parsed.data.titleUA }),
-    ...(parsed.data.titlePL && { PL: parsed.data.titlePL }),
-  }
-  
-  const urlCache = {
-    ...(parsed.data.urlEN && { EN: parsed.data.urlEN }),
-    ...(parsed.data.urlUA && { UA: parsed.data.urlUA }),
-    ...(parsed.data.urlPL && { PL: parsed.data.urlPL }),
-  }
-  
-  const contentCache = {
-    ...(parsed.data.contentEN && { EN: parsed.data.contentEN }),
-    ...(parsed.data.contentUA && { UA: parsed.data.contentUA }),
-    ...(parsed.data.contentPL && { PL: parsed.data.contentPL }),
-  }
-
-  const data: Prisma.MaterialCreateInput = {
-    title: primaryTitle,
-    type: parsed.data.type,
-    url: primaryUrl,
-    content: parsed.data.contentEN || parsed.data.contentUA || parsed.data.contentPL || parsed.data.content,
-    lang: parsed.data.lang,
-    topic: { connect: { id: topicId } },
     createdBy: req.user?.id ? { connect: { id: req.user.id } } : undefined,
     status: parsed.data.publish ? 'Published' : 'Draft',
     publishedAt: parsed.data.publish ? new Date() : null,
@@ -176,59 +76,47 @@ router.post('/topics/:topicId/materials', requireAuth, requireRole(['EDITOR','AD
 
 router.put('/topics/:topicId/materials/:id', requireAuth, requireRole(['EDITOR','ADMIN']), validateTopicAndId, async (req, res) => {
   const { topicId, id } = req.params
+
+  // Manual localization payload: titleEN/UA/PL and linkEN/UA/PL
   const schema = z.object({
-    // Single language fields (legacy)
-    title: z.string().min(2).optional(),
-    type: z.enum(['pdf','video','link','text']).optional(),
-    url: z.string().url().optional(),
-    content: z.string().optional(),
-    lang: z.enum(['UA','PL','EN']).optional(),
-    
-    // Multi-language fields
-    titleUA: z.string().min(1).optional(),
     titleEN: z.string().min(1).optional(),
+    titleUA: z.string().min(1).optional(),
     titlePL: z.string().min(1).optional(),
-    urlUA: z.string().url().optional(),
-    urlEN: z.string().url().optional(),
-    urlPL: z.string().url().optional(),
-    contentUA: z.string().optional(),
-    contentEN: z.string().optional(),
-    contentPL: z.string().optional(),
-    
+
+    linkEN: z.string().url().optional(),
+    linkUA: z.string().url().optional(),
+    linkPL: z.string().url().optional(),
+
+    type: z.enum(['pdf','video','link','text']).optional(),
     publish: z.boolean().optional(),
     status: z.enum(['Draft','Published']).optional(),
   })
+
   const parsed = schema.safeParse(req.body)
   if (!parsed.success) return res.status(400).json({ error: parsed.error.flatten() })
 
   const data: Prisma.MaterialUpdateInput = {}
-  
-  // Add simple fields
-  if (parsed.data.title) data.title = parsed.data.title
+
+  // Legacy fields mirror EN version for backward compatibility
+  if (parsed.data.titleEN) data.title = parsed.data.titleEN
+  if (parsed.data.linkEN) data.url = parsed.data.linkEN
   if (parsed.data.type) data.type = parsed.data.type
-  if (parsed.data.url) data.url = parsed.data.url
-  if (parsed.data.content) data.content = parsed.data.content
-  if (parsed.data.lang) data.lang = parsed.data.lang
-  
-  // Handle multi-language caches
+
+  // Build caches
   const titleCache: Record<string, string> = {}
   const urlCache: Record<string, string> = {}
-  const contentCache: Record<string, string> = {}
-  
-  if (parsed.data.titleUA) titleCache.UA = parsed.data.titleUA
+
   if (parsed.data.titleEN) titleCache.EN = parsed.data.titleEN
+  if (parsed.data.titleUA) titleCache.UA = parsed.data.titleUA
   if (parsed.data.titlePL) titleCache.PL = parsed.data.titlePL
-  if (parsed.data.urlUA) urlCache.UA = parsed.data.urlUA
-  if (parsed.data.urlEN) urlCache.EN = parsed.data.urlEN
-  if (parsed.data.urlPL) urlCache.PL = parsed.data.urlPL
-  if (parsed.data.contentUA) contentCache.UA = parsed.data.contentUA
-  if (parsed.data.contentEN) contentCache.EN = parsed.data.contentEN
-  if (parsed.data.contentPL) contentCache.PL = parsed.data.contentPL
-  
+
+  if (parsed.data.linkEN) urlCache.EN = parsed.data.linkEN
+  if (parsed.data.linkUA) urlCache.UA = parsed.data.linkUA
+  if (parsed.data.linkPL) urlCache.PL = parsed.data.linkPL
+
   if (Object.keys(titleCache).length > 0) data.titleCache = titleCache
   if (Object.keys(urlCache).length > 0) data.urlCache = urlCache
-  if (Object.keys(contentCache).length > 0) data.contentCache = contentCache
-  
+
   if (typeof parsed.data.publish === 'boolean') {
     data.status = parsed.data.publish ? 'Published' : 'Draft'
     data.publishedAt = parsed.data.publish ? new Date() : null
