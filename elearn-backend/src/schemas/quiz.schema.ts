@@ -9,7 +9,7 @@ import { commonSchemas } from './common.schema.js'
  * Question option schema (strict validation)
  */
 const questionOptionSchema = z.object({
-  id: z.string().uuid().optional(),
+  id: z.string().cuid().optional(),
   text: z.string().min(1, 'Option text required').max(1000),
   textJson: z.record(z.string()).optional(),
   isCorrect: z.boolean().default(false),
@@ -21,7 +21,7 @@ export type QuestionOption = z.infer<typeof questionOptionSchema>
  * Create question schema
  */
 export const createQuestionSchema = z.object({
-  quizId: z.string().uuid('Invalid quiz ID'),
+  quizId: z.string().cuid('Invalid quiz ID'),
   text: z.string().min(5, 'Question must be at least 5 characters').max(1000),
   textJson: z.record(z.string()).optional(),
   type: z.enum(['single', 'multiple']).default('single'),
@@ -46,7 +46,7 @@ export type UpdateQuestionInput = z.infer<typeof updateQuestionSchema>
  * Create quiz schema
  */
 export const createQuizSchema = z.object({
-  topicId: z.string().uuid('Invalid topic ID'),
+  topicId: z.string().cuid('Invalid topic ID'),
   title: z.string().min(3, 'Title must be at least 3 characters').max(255),
   titleJson: z.record(z.string()).optional(),
   description: z.string().max(2000).optional(),
@@ -78,9 +78,9 @@ export type UpdateQuizInput = z.infer<typeof updateQuizSchema>
  * Quiz answer submission schema
  */
 export const quizAnswerSchema = z.object({
-  questionId: z.string().uuid('Invalid question ID'),
-  optionId: z.string().uuid().optional(),
-  selectedOptions: z.array(z.string().uuid()).optional(),
+  questionId: z.string().cuid('Invalid question ID'),
+  optionId: z.string().cuid().optional(),
+  selectedOptions: z.array(z.string().cuid()).optional(),
 })
 
 export type QuizAnswer = z.infer<typeof quizAnswerSchema>
@@ -103,7 +103,7 @@ export type SubmitQuizInput = z.infer<typeof submitQuizSchema>
  * Quiz ID parameter schema
  */
 export const quizIdParamSchema = z.object({
-  id: z.string().uuid('Invalid quiz ID'),
+  id: z.string().cuid('Invalid quiz ID'),
 })
 
 export type QuizIdParam = z.infer<typeof quizIdParamSchema>
@@ -114,7 +114,7 @@ export type QuizIdParam = z.infer<typeof quizIdParamSchema>
 export const quizPaginationSchema = z.object({
   page: z.coerce.number().int().positive().default(1),
   limit: z.coerce.number().int().positive().max(100).default(20),
-  topicId: z.string().uuid().optional(),
+  topicId: z.string().cuid().optional(),
   type: z.enum(['PRACTICE', 'EXAM']).optional(),
   lang: commonSchemas.lang.optional(),
 })

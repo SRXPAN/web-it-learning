@@ -112,7 +112,11 @@ export function TopicQuizSection({
     }))
 
     try {
-      const result = await submitQuizAttempt(quiz.id, { answers: answerArray, lang })
+      const result = await submitQuizAttempt(quiz.id, { 
+        answers: answerArray, 
+        lang,
+        token: quiz.token 
+      })
       setScore(result.correct)
       setCorrectIds(result.correctMap || {})
       setShowResults(true)

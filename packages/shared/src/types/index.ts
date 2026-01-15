@@ -135,6 +135,7 @@ export interface Quiz {
   durationSec: number
   topicId: string
   status?: Status
+  token?: string
   questions: Question[]
 }
 

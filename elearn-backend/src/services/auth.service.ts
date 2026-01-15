@@ -15,6 +15,7 @@ import {
   sendPasswordResetEmail, 
   sendPasswordChangedEmail 
 } from './email.service.js'
+import { AppError } from '../utils/AppError.js'
 import { auditLog, AuditActions, AuditResources } from './audit.service.js'
 import type { Role } from '@elearn/shared'
 
@@ -58,7 +59,7 @@ export async function registerUser(
   // Перевірка на існуючого користувача
   const exists = await prisma.user.findUnique({ where: { email } })
   if (exists) {
-    throw new Error('User with this email already exists')
+    throw AppError.conflict('User with this email already exists', { field: 'email' })
   }
   
   // Хешуємо пароль

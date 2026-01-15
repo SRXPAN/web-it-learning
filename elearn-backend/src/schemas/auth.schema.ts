@@ -38,16 +38,10 @@ export type RefreshTokenInput = z.infer<typeof refreshTokenSchema>
 /**
  * Change password schema
  */
-export const changePasswordSchema = z
-  .object({
-    currentPassword: z.string().min(1, 'Current password required'),
-    newPassword: commonSchemas.password,
-    confirmPassword: z.string(),
-  })
-  .refine((data) => data.newPassword === data.confirmPassword, {
-    message: 'Passwords do not match',
-    path: ['confirmPassword'],
-  })
+export const changePasswordSchema = z.object({
+  currentPassword: z.string().min(1, 'Current password required'),
+  newPassword: commonSchemas.password,
+})
 
 export type ChangePasswordInput = z.infer<typeof changePasswordSchema>
 

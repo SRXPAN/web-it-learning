@@ -33,7 +33,8 @@ export default function QuizHistory() {
       try {
         setLoading(true)
         const data = await http.get<QuizHistoryResponse>(`/quiz/user/history?limit=5&lang=${lang}`)
-        setHistory(data.data)
+        const list = Array.isArray(data?.data) ? data.data : []
+        setHistory(list)
       } catch (e) {
         setError(t('quiz.error.historyLoadFailed'))
         console.error(e)
@@ -88,7 +89,7 @@ export default function QuizHistory() {
     )
   }
 
-  if (history.length === 0) {
+  if (!history || history.length === 0) {
     return (
       <div className="card">
         <div className="flex items-center gap-2 mb-4">

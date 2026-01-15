@@ -49,13 +49,23 @@ export async function fetchTopicsTree(params?: { page?: number; limit?: number; 
   const url = queryString ? `/topics?${queryString}` : '/topics'
   
   // Handle both old (array) and new (paginated) response format
-  const response = await apiGet<TopicTree[] | PaginatedResponse<TopicApiResponse>>(url)
+  const response = await apiGet<TopicTree[] | PaginatedResponse<TopicApiResponse> | { topics?: TopicApiResponse[] }>(url)
   
-  // Check if it's paginated response
-  if (response && 'data' in response && 'pagination' in response) {
-    return (response.data || []).map(normalizeTopic)
+  // Shape: { topics, total, ... } (current backend)
+  if (response && typeof response === 'object' && 'topics' in response) {
+    const list = Array.isArray((response as any).topics) ? (response as any).topics : []
+    return list.map(normalizeTopic)
+  }
+
+  // Paginated response: { data, pagination }
+  if (response && typeof response === 'object' && 'data' in response && 'pagination' in response) {
+    const list = Array.isArray((response as PaginatedResponse<TopicApiResponse>).data)
+      ? (response as PaginatedResponse<TopicApiResponse>).data
+      : []
+    return list.map(normalizeTopic)
   }
   
   // Legacy array response
-  return ((response as TopicTree[]) || []).map(normalizeTopic)
+  if (Array.isArray(response)) return response.map(normalizeTopic)
+  return []
 }

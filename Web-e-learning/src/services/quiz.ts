@@ -13,5 +13,5 @@ export const fetchQuiz = (id: string, lang?: Lang) => {
   const url = lang ? `/quiz/${id}?lang=${lang}` : `/quiz/${id}`
   return apiGet<Quiz>(url)
 }
-export const submitQuizAttempt = (id: string, body: { answers: QuizAnswer[]; lang?: Lang }) =>
+export const submitQuizAttempt = (id: string, body: { answers: QuizAnswer[]; lang?: Lang; token?: string }) =>
   apiPost<SubmitResult>(`/quiz/${id}/submit`, body)

@@ -31,6 +31,10 @@ export default function Register() {
       setErr(t('auth.passwordMinLength'))
       return
     }
+    if (!/[!@#$%^&*]/.test(password)) {
+      setErr(t('auth.passwordSpecial' as any))
+      return
+    }
     
     setLoading(true)
     try {

@@ -99,7 +99,7 @@ export const materialPaginationSchema = z.object({
   limit: z.coerce.number().int().positive().max(100).default(20),
   type: materialTypeEnum.optional(),
   status: z.enum(['DRAFT', 'PUBLISHED']).optional(),
-  topicId: z.string().uuid().optional(),
+  topicId: z.string().cuid().optional(),
   lang: commonSchemas.lang.optional(),
 })
 

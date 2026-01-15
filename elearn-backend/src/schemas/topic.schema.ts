@@ -65,7 +65,7 @@ export const createTopicSchema = z.object({
     'DevOps',
     'OperatingSystems',
   ]),
-  parentId: z.string().uuid().optional().nullable(),
+  parentId: z.string().cuid().optional().nullable(),
   status: z.enum(['DRAFT', 'PUBLISHED']).default('DRAFT'),
 })
 
@@ -82,7 +82,7 @@ export type UpdateTopicInput = z.infer<typeof updateTopicSchema>
  * Topic ID parameter schema
  */
 export const topicIdParamSchema = z.object({
-  id: z.string().uuid('Invalid topic ID'),
+  id: z.string().cuid('Invalid topic ID'),
 })
 
 export type TopicIdParam = z.infer<typeof topicIdParamSchema>
@@ -100,7 +100,7 @@ export type TopicSlugParam = z.infer<typeof topicSlugParamSchema>
  * Bulk status update schema
  */
 export const bulkStatusUpdateSchema = z.object({
-  topicIds: z.array(z.string().uuid()).min(1),
+  topicIds: z.array(z.string().cuid()).min(1),
   status: z.enum(['DRAFT', 'PUBLISHED']),
 })
 

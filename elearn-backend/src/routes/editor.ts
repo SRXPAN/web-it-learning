@@ -121,7 +121,7 @@ router.get(
   '/topics/:topicId/materials',
   requireAuth,
   requireRole(['EDITOR', 'ADMIN']),
-  validateResource(z.object({ topicId: z.string().uuid() }), 'params'),
+  validateResource(z.object({ topicId: z.string().cuid() }), 'params'),
   asyncHandler(async (req: Request, res: Response) => {
     const topicId = getParam(req.params.topicId)
     const mats = await prisma.material.findMany({
@@ -136,7 +136,7 @@ router.post(
   '/topics/:topicId/materials',
   requireAuth,
   requireRole(['EDITOR', 'ADMIN']),
-  validateResource(z.object({ topicId: z.string().uuid() }), 'params'),
+  validateResource(z.object({ topicId: z.string().cuid() }), 'params'),
   validateResource(
     z.object({
       title: z.string().min(2),
@@ -287,7 +287,7 @@ router.delete(
   '/topics/:topicId/materials/:id',
   requireAuth,
   requireRole(['EDITOR', 'ADMIN']),
-  validateResource(z.object({ topicId: z.string().uuid(), id: z.string().uuid() }), 'params'),
+  validateResource(z.object({ topicId: z.string().cuid(), id: z.string().cuid() }), 'params'),
   asyncHandler(async (req: Request, res: Response) => {
     const topicId = getParam(req.params.topicId)
     const id = getParam(req.params.id)
@@ -311,7 +311,7 @@ router.get(
   '/topics/:topicId/quizzes',
   requireAuth,
   requireRole(['EDITOR', 'ADMIN']),
-  validateResource(z.object({ topicId: z.string().uuid() }), 'params'),
+  validateResource(z.object({ topicId: z.string().cuid() }), 'params'),
   asyncHandler(async (req: Request, res: Response) => {
     const topicId = getParam(req.params.topicId)
     const quizzes = await prisma.quiz.findMany({
@@ -327,7 +327,7 @@ router.post(
   '/topics/:topicId/quizzes',
   requireAuth,
   requireRole(['EDITOR', 'ADMIN']),
-  validateResource(z.object({ topicId: z.string().uuid() }), 'params'),
+  validateResource(z.object({ topicId: z.string().cuid() }), 'params'),
   validateResource(
     z.object({
       title: z.string().min(2),
@@ -365,7 +365,7 @@ router.put(
   '/topics/:topicId/quizzes/:id',
   requireAuth,
   requireRole(['EDITOR', 'ADMIN']),
-  validateResource(z.object({ topicId: z.string().uuid(), id: z.string().uuid() }), 'params'),
+  validateResource(z.object({ topicId: z.string().cuid(), id: z.string().cuid() }), 'params'),
   validateResource(
     z.object({
       title: z.string().min(2).optional(),
@@ -403,7 +403,7 @@ router.delete(
   '/topics/:topicId/quizzes/:id',
   requireAuth,
   requireRole(['EDITOR', 'ADMIN']),
-  validateResource(z.object({ topicId: z.string().uuid(), id: z.string().uuid() }), 'params'),
+  validateResource(z.object({ topicId: z.string().cuid(), id: z.string().cuid() }), 'params'),
   asyncHandler(async (req: Request, res: Response) => {
     const topicId = getParam(req.params.topicId)
     const id = getParam(req.params.id)
@@ -428,7 +428,7 @@ router.get(
   '/quizzes/:quizId/questions',
   requireAuth,
   requireRole(['EDITOR', 'ADMIN']),
-  validateResource(z.object({ quizId: z.string().uuid() }), 'params'),
+  validateResource(z.object({ quizId: z.string().cuid() }), 'params'),
   asyncHandler(async (req: Request, res: Response) => {
     const quizId = getParam(req.params.quizId)
     const questions = await prisma.question.findMany({
@@ -450,7 +450,7 @@ router.post(
   '/quizzes/:quizId/questions',
   requireAuth,
   requireRole(['EDITOR', 'ADMIN']),
-  validateResource(z.object({ quizId: z.string().uuid() }), 'params'),
+  validateResource(z.object({ quizId: z.string().cuid() }), 'params'),
   validateResource(
     z.object({
       text: z.string().min(5),
@@ -517,7 +517,7 @@ router.put(
   '/quizzes/:quizId/questions/:id',
   requireAuth,
   requireRole(['EDITOR', 'ADMIN']),
-  validateResource(z.object({ quizId: z.string().uuid(), id: z.string().uuid() }), 'params'),
+  validateResource(z.object({ quizId: z.string().cuid(), id: z.string().cuid() }), 'params'),
   validateResource(
     z.object({
       text: z.string().min(5).optional(),
@@ -594,7 +594,7 @@ router.delete(
   '/quizzes/:quizId/questions/:id',
   requireAuth,
   requireRole(['EDITOR', 'ADMIN']),
-  validateResource(z.object({ quizId: z.string().uuid(), id: z.string().uuid() }), 'params'),
+  validateResource(z.object({ quizId: z.string().cuid(), id: z.string().cuid() }), 'params'),
   asyncHandler(async (req: Request, res: Response) => {
     const quizId = getParam(req.params.quizId)
     const id = getParam(req.params.id)

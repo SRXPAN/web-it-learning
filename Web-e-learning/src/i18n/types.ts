@@ -287,7 +287,7 @@ export type TranslationKey =
   | 'profile.success.passwordChanged'
 
   // ============================================
-  // AUTH (14 keys)
+  // AUTH (15 keys)
   // ============================================
   | 'auth.login'
   | 'auth.register'
@@ -299,6 +299,7 @@ export type TranslationKey =
   | 'auth.confirmPassword'
   | 'auth.passwordsNotMatch'
   | 'auth.passwordMinLength'
+  | 'auth.passwordSpecial'
   | 'auth.namePlaceholder'
   | 'auth.error.loginFailed'
   | 'auth.error.registrationFailed'

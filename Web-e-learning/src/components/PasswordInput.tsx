@@ -13,9 +13,10 @@ const PASSWORD_RULES = [
   { id: 'upper', label: 'Велика літера (A-Z)', test: (p: string) => /[A-Z]/.test(p) },
   { id: 'lower', label: 'Мала літера (a-z)', test: (p: string) => /[a-z]/.test(p) },
   { id: 'number', label: 'Цифра (0-9)', test: (p: string) => /\d/.test(p) },
+  { id: 'special', label: 'Спецсимвол (!@#$%^&*)', test: (p: string) => /[!@#$%^&*]/.test(p) },
 ] as const
 
-/** Calculate password strength (0-4) */
+/** Calculate password strength (0-5) */
 function getPasswordStrength(password: string): number {
   return PASSWORD_RULES.filter(rule => rule.test(password)).length
 }
@@ -31,6 +32,7 @@ function getStrengthInfo(strength: number): { label: string; color: string; bgCo
     case 3:
       return { label: 'Добрий', color: 'text-blue-500', bgColor: 'bg-blue-500' }
     case 4:
+    case 5:
       return { label: 'Сильний', color: 'text-green-500', bgColor: 'bg-green-500' }
     default:
       return { label: '', color: '', bgColor: '' }
@@ -77,7 +79,7 @@ const PasswordInput = forwardRef<HTMLInputElement, PasswordInputProps>(
           <div className="mt-2 space-y-2">
             {/* Strength bar */}
             <div className="flex gap-1">
-              {[1, 2, 3, 4].map((level) => (
+              {[1, 2, 3, 4, 5].map((level) => (
                 <div
                   key={level}
                   className={`h-1.5 flex-1 rounded-full transition-all duration-300 ${
