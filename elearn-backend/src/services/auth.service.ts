@@ -15,7 +15,7 @@ import {
   sendPasswordResetEmail, 
   sendPasswordChangedEmail 
 } from './email.service.js'
-import { logger } from '../utils/logger.js'
+import { auditLog, AuditActions, AuditResources } from './audit.service.js'
 import type { Role } from '@elearn/shared'
 
 const BCRYPT_ROUNDS = 12
@@ -93,7 +93,15 @@ export async function registerUser(
     ip
   )
   
-  logger.audit(user.id, 'user.register', { email })
+  await auditLog({
+    userId: user.id,
+    action: AuditActions.CREATE,
+    resource: AuditResources.USER,
+    resourceId: user.id,
+    metadata: { email },
+    ip,
+    userAgent,
+  })
   
   return { user: { ...user, role: user.role as Role }, tokens }
 }
@@ -137,7 +145,15 @@ export async function loginUser(
     ip
   )
   
-  logger.audit(user.id, 'user.login', { email, ip })
+  await auditLog({
+    userId: user.id,
+    action: AuditActions.LOGIN,
+    resource: AuditResources.USER,
+    resourceId: user.id,
+    metadata: { email, ip },
+    ip,
+    userAgent,
+  })
   
   return { 
     user: { 
@@ -175,7 +191,12 @@ export async function logoutUser(refreshToken: string): Promise<void> {
  */
 export async function logoutAllDevices(userId: string): Promise<void> {
   await revokeAllUserTokens(userId)
-  logger.audit(userId, 'user.logout_all', {})
+  await auditLog({
+    userId,
+    action: AuditActions.LOGOUT,
+    resource: AuditResources.USER,
+    resourceId: userId,
+  })
 }
 
 /**
@@ -219,7 +240,12 @@ export async function verifyEmail(token: string): Promise<boolean> {
   // Видаляємо токен
   await prisma.emailVerificationToken.delete({ where: { id: record.id } })
   
-  logger.audit('system', 'user.email_verified', { email: record.email })
+  await auditLog({
+    userId: undefined,
+    action: AuditActions.UPDATE,
+    resource: AuditResources.USER,
+    metadata: { email: record.email },
+  })
   
   return true
 }
@@ -247,7 +273,13 @@ export async function requestPasswordReset(email: string): Promise<boolean> {
   
   await sendPasswordResetEmail(email, token)
   
-  logger.audit(user.id, 'user.password_reset_requested', { email })
+  await auditLog({
+    userId: user.id,
+    action: AuditActions.UPDATE,
+    resource: AuditResources.USER,
+    resourceId: user.id,
+    metadata: { email },
+  })
   
   return true
 }
@@ -290,7 +322,12 @@ export async function resetPassword(token: string, newPassword: string): Promise
   
   await sendPasswordChangedEmail(record.email)
   
-  logger.audit('system', 'user.password_reset_completed', { email: record.email })
+  await auditLog({
+    userId: undefined,
+    action: AuditActions.UPDATE,
+    resource: AuditResources.USER,
+    metadata: { email: record.email },
+  })
   
   return true
 }
@@ -326,7 +363,12 @@ export async function changePassword(
   
   await sendPasswordChangedEmail(user.email)
   
-  logger.audit(userId, 'user.password_changed', {})
+  await auditLog({
+    userId,
+    action: AuditActions.UPDATE,
+    resource: AuditResources.USER,
+    resourceId: userId,
+  })
   
   return true
 }

@@ -11,6 +11,7 @@ import { ok } from '../utils/response.js'
 import type { Category, Lang, Status, Difficulty } from '@elearn/shared'
 import type { Prisma } from '@prisma/client'
 import { logger } from '../utils/logger.js'
+import { auditLog, AuditActions, AuditResources } from '../services/audit.service.js'
 import { updateMaterialWithLocalization } from '../services/materials.service.js'
 
 const router = Router()
@@ -161,7 +162,15 @@ router.post(
     }
 
     const mat = await prisma.material.create({ data })
-    logger.audit(req.user?.id ?? 'unknown', 'material.create', { id: mat.id, topicId })
+    await auditLog({
+      userId: req.user!.id,
+      action: AuditActions.CREATE,
+      resource: AuditResources.MATERIAL,
+      resourceId: mat.id,
+      metadata: { topicId },
+      ip: req.ip,
+      userAgent: req.headers['user-agent'],
+    })
     return ok(res, mat)
   })
 )
@@ -261,7 +270,15 @@ router.put(
   asyncHandler(async (req: Request, res: Response) => {
     const id = getParam(req.params.id)
     const updated = await updateMaterialWithLocalization(id, req.body)
-    logger.audit(req.user?.id ?? 'unknown', 'material.update_localization', { id })
+    await auditLog({
+      userId: req.user!.id,
+      action: AuditActions.UPDATE,
+      resource: AuditResources.MATERIAL,
+      resourceId: id,
+      metadata: { localizationUpdated: true },
+      ip: req.ip,
+      userAgent: req.headers['user-agent'],
+    })
     return ok(res, { success: true, material: updated })
   })
 )
@@ -275,7 +292,15 @@ router.delete(
     const topicId = getParam(req.params.topicId)
     const id = getParam(req.params.id)
     await prisma.material.delete({ where: { id } })
-    logger.audit(req.user?.id ?? 'unknown', 'material.delete', { id, topicId })
+    await auditLog({
+      userId: req.user!.id,
+      action: AuditActions.DELETE,
+      resource: AuditResources.MATERIAL,
+      resourceId: id,
+      metadata: { topicId },
+      ip: req.ip,
+      userAgent: req.headers['user-agent'],
+    })
     return ok(res, { ok: true })
   })
 )
@@ -323,7 +348,15 @@ router.post(
     }
 
     const quiz = await prisma.quiz.create({ data })
-    logger.audit(req.user?.id ?? 'unknown', 'quiz.create', { id: quiz.id, topicId })
+    await auditLog({
+      userId: req.user!.id,
+      action: AuditActions.CREATE,
+      resource: AuditResources.QUIZ,
+      resourceId: quiz.id,
+      metadata: { topicId },
+      ip: req.ip,
+      userAgent: req.headers['user-agent'],
+    })
     return ok(res, quiz)
   })
 )
@@ -353,7 +386,15 @@ router.put(
     }
 
     const quiz = await prisma.quiz.update({ where: { id }, data })
-    logger.audit(req.user?.id ?? 'unknown', 'quiz.update', { id, topicId })
+    await auditLog({
+      userId: req.user!.id,
+      action: AuditActions.UPDATE,
+      resource: AuditResources.QUIZ,
+      resourceId: id,
+      metadata: { topicId },
+      ip: req.ip,
+      userAgent: req.headers['user-agent'],
+    })
     return ok(res, quiz)
   })
 )
@@ -367,7 +408,15 @@ router.delete(
     const topicId = getParam(req.params.topicId)
     const id = getParam(req.params.id)
     await prisma.quiz.delete({ where: { id } })
-    logger.audit(req.user?.id ?? 'unknown', 'quiz.delete', { id, topicId })
+    await auditLog({
+      userId: req.user?.id,
+      action: AuditActions.DELETE,
+      resource: AuditResources.QUIZ,
+      resourceId: id,
+      metadata: { topicId },
+      ip: req.ip,
+      userAgent: req.headers['user-agent'],
+    })
     return ok(res, { ok: true })
   })
 )
@@ -450,7 +499,15 @@ router.post(
       include: { options: true },
     })
 
-    logger.audit(req.user?.id ?? 'unknown', 'question.create', { id: question.id, quizId })
+    await auditLog({
+      userId: req.user?.id,
+      action: AuditActions.CREATE,
+      resource: AuditResources.QUESTION,
+      resourceId: question.id,
+      metadata: { quizId },
+      ip: req.ip,
+      userAgent: req.headers['user-agent'],
+    })
     return ok(res, question)
   })
 )
@@ -519,7 +576,15 @@ router.put(
       include: { options: true },
     })
 
-    logger.audit(req.user?.id ?? 'unknown', 'question.update', { id, quizId })
+    await auditLog({
+      userId: req.user?.id,
+      action: AuditActions.UPDATE,
+      resource: AuditResources.QUESTION,
+      resourceId: id,
+      metadata: { quizId },
+      ip: req.ip,
+      userAgent: req.headers['user-agent'],
+    })
     return ok(res, question)
   })
 )
@@ -534,7 +599,15 @@ router.delete(
     const quizId = getParam(req.params.quizId)
     const id = getParam(req.params.id)
     await prisma.question.delete({ where: { id } })
-    logger.audit(req.user?.id ?? 'unknown', 'question.delete', { id, quizId })
+    await auditLog({
+      userId: req.user?.id,
+      action: AuditActions.DELETE,
+      resource: AuditResources.QUESTION,
+      resourceId: id,
+      metadata: { quizId },
+      ip: req.ip,
+      userAgent: req.headers['user-agent'],
+    })
     return ok(res, { ok: true })
   })
 )

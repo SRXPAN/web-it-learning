@@ -1,9 +1,29 @@
+import { useToast } from '@/components/Toast'
+
 // src/lib/http.ts
 const base = (import.meta.env.VITE_API_URL ?? '').replace(/\/$/, '')
 const API_URL = `${base}/api`
 
 const CSRF_COOKIE = 'csrf_token'
 const CSRF_HEADER = 'x-csrf-token'
+
+const toast = {
+  error: (msg: string) => {
+    const safeMessage = typeof msg === 'string' && msg.trim() ? msg : 'Something went wrong'
+    useToast.getState().push({ type: 'error', msg: safeMessage })
+  },
+}
+
+function extractErrorMessage(data: any, fallback = 'Something went wrong'): string {
+  if (!data) return fallback
+  const message = data.message ?? data.error ?? fallback
+  if (typeof message === 'string' && message.trim()) return message
+  if (data.error && typeof data.error === 'object') {
+    const nested = data.error.message ?? data.error.error
+    if (typeof nested === 'string' && nested.trim()) return nested
+  }
+  return fallback
+}
 
 // Флаг для запобігання множинним refresh запитам
 let isRefreshing = false
@@ -71,15 +91,17 @@ async function handle<T>(res: Response, retry?: () => Promise<T>): Promise<T> {
   if (res.status === 429) {
     const retryAfter = res.headers.get('retry-after')
     const waitTime = retryAfter ? parseInt(retryAfter, 10) : 60
-    throw new Error(`Too many requests. Please wait ${waitTime} seconds.`)
+    const message = `Too many requests. Please wait ${waitTime} seconds.`
+    toast.error(message)
+    throw new Error(message)
   }
 
   if (res.status === 401) {
     const data = await res.json().catch(() => ({}))
-    // Новий формат: { success: false, error: { code, message } }
-    const code = data?.error?.code
-    const message = data?.error?.message
-    // Якщо токен протермінований - спробуємо оновити (тільки один раз)
+    // New format: { success: false, error: { code, message } }
+    const code = data?.error?.code ?? data?.code
+    const message = extractErrorMessage(data, 'Unauthorized')
+    // If token expired - try to refresh (only once)
     if (code === 'TOKEN_EXPIRED' && retry) {
       const refreshed = await refreshTokens()
       if (refreshed) {
@@ -87,35 +109,67 @@ async function handle<T>(res: Response, retry?: () => Promise<T>): Promise<T> {
         return retry()
       }
     }
-    throw new Error(message || 'Unauthorized')
+    toast.error(message)
+    throw new Error(message)
   }
   
   if (res.status === 403) {
     const text = await res.text()
     const data = text ? JSON.parse(text) : null
-    const code = data?.error?.code
-    const message = data?.error?.message
-    // Якщо CSRF помилка - спробуємо оновити токен
+    const code = data?.error?.code ?? data?.code
+    const message = extractErrorMessage(data, 'Forbidden')
+    // If CSRF error - try to refresh token
     if (code === 'CSRF_INVALID') {
       await fetchCsrfToken()
-      throw new Error('CSRF token expired. Please try again.')
+      const csrfMessage = 'CSRF token expired. Please try again.'
+      toast.error(csrfMessage)
+      throw new Error(csrfMessage)
     }
-    throw new Error(message || 'Forbidden')
+    toast.error(message)
+    throw new Error(message)
   }
   
   const text = await res.text()
-  const data = text ? JSON.parse(text) : null
+  let data: any = null
+  try {
+    data = text ? JSON.parse(text) : null
+  } catch {
+    // If not JSON, just use text
+    if (!res.ok) {
+      const message = typeof text === 'string' && text.trim() ? text : 'Request failed'
+      toast.error(message)
+      throw new Error(message)
+    }
+    return text as T
+  }
 
-  // Handle standardized API wrapper { success, data, error }
+  // Handle standardized AppError format: { success: false, error: { code, message, details? } }
   if (data && typeof data === 'object' && 'success' in data) {
-    const api = data as { success: boolean; data?: T; error?: { message?: string } }
+    const api = data as { 
+      success: boolean
+      data?: T
+      error?: { 
+        code?: string
+        message?: string
+        details?: Record<string, any>
+      }
+    }
     if (!api.success) {
-      throw new Error(api.error?.message || 'Request failed')
+      // Extract message from new AppError format
+      const errorMessage = extractErrorMessage(api.error, 'Request failed')
+      toast.error(errorMessage)
+      throw new Error(errorMessage)
     }
     return api.data as T
   }
 
-  if (!res.ok) throw new Error(typeof data === 'object' && data?.error ? data.error : (text || 'Request failed'))
+  if (!res.ok) {
+    // Fallback for other error formats
+    const errorMessage = extractErrorMessage(data, 'Request failed')
+    toast.error(errorMessage)
+    throw new Error(errorMessage)
+  }
+  
   return data as T
 }
 

@@ -7,6 +7,7 @@ import { setCsrfToken } from '../middleware/csrf.js'
 import { AppError, asyncHandler } from '../middleware/errorHandler.js'
 import { validateResource } from '../middleware/validateResource.js'
 import { authSchemas } from '../schemas/auth.schema.js'
+import { auditLog, AuditActions, AuditResources } from '../services/audit.service.js'
 import {
   getAccessCookieOptions,
   getRefreshCookieOptions,
@@ -180,7 +181,7 @@ router.get('/me', requireAuth, async (req, res, next) => {
  *     tags:
  *       - Authentication
  *     summary: Register a new user
- *     description: Create a new student account with email verification
+ *     description: Create a new student account and receive initial tokens
  *     requestBody:
  *       required: true
  *       content:
@@ -195,17 +196,11 @@ router.get('/me', requireAuth, async (req, res, next) => {
  *               email:
  *                 type: string
  *                 format: email
- *                 example: student@example.com
  *               password:
  *                 type: string
  *                 format: password
- *                 minLength: 8
- *                 example: SecurePass123!
  *               name:
  *                 type: string
- *                 minLength: 2
- *                 maxLength: 100
- *                 example: John Doe
  *     responses:
  *       200:
  *         description: User registered successfully
@@ -229,9 +224,16 @@ router.get('/me', requireAuth, async (req, res, next) => {
  *         content:
  *           application/json:
  *             schema:
- *               oneOf:
- *                 - $ref: '#/components/schemas/Error'
- *                 - $ref: '#/components/schemas/ValidationError'
+ *               type: object
+ *               properties:
+ *                 status:
+ *                   type: string
+ *                   example: error
+ *                 message:
+ *                   type: string
+ *                 code:
+ *                   type: string
+ *                   nullable: true
  *       429:
  *         description: Too many registration attempts
  */
@@ -276,11 +278,9 @@ router.post(
  *               email:
  *                 type: string
  *                 format: email
- *                 example: student@example.com
  *               password:
  *                 type: string
  *                 format: password
- *                 example: SecurePass123!
  *     responses:
  *       200:
  *         description: Login successful
@@ -306,13 +306,31 @@ router.post(
  *         content:
  *           application/json:
  *             schema:
- *               $ref: '#/components/schemas/ValidationError'
+ *               type: object
+ *               properties:
+ *                 status:
+ *                   type: string
+ *                   example: error
+ *                 message:
+ *                   type: string
+ *                 code:
+ *                   type: string
+ *                   nullable: true
  *       401:
  *         description: Invalid credentials or unverified email
  *         content:
  *           application/json:
  *             schema:
- *               $ref: '#/components/schemas/Error'
+ *               type: object
+ *               properties:
+ *                 status:
+ *                   type: string
+ *                   example: error
+ *                 message:
+ *                   type: string
+ *                 code:
+ *                   type: string
+ *                   nullable: true
  *       429:
  *         description: Too many login attempts
  */
@@ -530,7 +548,16 @@ router.put(
     })
 
     await resendVerificationEmail(newEmail.toLowerCase())
-    logger.audit(userId, 'user.email_changed', { oldEmail: user.email, newEmail })
+
+    await auditLog({
+      userId,
+      action: AuditActions.UPDATE,
+      resource: AuditResources.USER,
+      resourceId: user.id,
+      metadata: { oldEmail: user.email, newEmail },
+      ip: req.ip,
+      userAgent: req.headers['user-agent'],
+    })
 
     return ok(res, {
       message: 'Email changed. Please verify your new email address.',

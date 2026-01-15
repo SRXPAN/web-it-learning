@@ -36,10 +36,10 @@ services:
       NODE_ENV: production
       PORT: 4000
       # Підключення до контейнера 'db'
-      DATABASE_URL: postgresql://${DB_USER?Error: Variable 'DB_USER' not set}:${DB_PASSWORD?Error: Variable 'DB_PASSWORD' not set}@db:5432/${DB_NAME?Error: Variable 'DB_NAME' not set}?schema=public
+      DATABASE_URL: 'postgresql://${DB_USER:?Variable DB_USER not set}:${DB_PASSWORD:?Variable DB_PASSWORD not set}@db:5432/${DB_NAME:?Variable DB_NAME not set}?schema=public'
       
       # Секрети (STRICT - вимагаються у production!)
-      JWT_SECRET: ${JWT_SECRET?Error: Variable 'JWT_SECRET' not set}
+      JWT_SECRET: ${JWT_SECRET:?Variable JWT_SECRET not set}
       COOKIE_NAME: access_token
       REFRESH_COOKIE_NAME: refresh_token
       
@@ -49,13 +49,13 @@ services:
       CORS_ORIGIN: ${CORS_ORIGIN:-http://localhost:5173}
       
       # Stripe & Mail (STRICT - required for payment processing)
-      STRIPE_SECRET_KEY: ${STRIPE_SECRET_KEY?Error: Variable 'STRIPE_SECRET_KEY' not set}
-      STRIPE_WEBHOOK_SECRET: ${STRIPE_WEBHOOK_SECRET?Error: Variable 'STRIPE_WEBHOOK_SECRET' not set}
-      STRIPE_PRICE_ID: ${STRIPE_PRICE_ID?Error: Variable 'STRIPE_PRICE_ID' not set}
-      SMTP_HOST: ${SMTP_HOST?Error: Variable 'SMTP_HOST' not set}
-      SMTP_PORT: ${SMTP_PORT?Error: Variable 'SMTP_PORT' not set}
-      SMTP_USER: ${SMTP_USER?Error: Variable 'SMTP_USER' not set}
-      SMTP_PASS: ${SMTP_PASS?Error: Variable 'SMTP_PASS' not set}
+      STRIPE_SECRET_KEY: ${STRIPE_SECRET_KEY:?Variable STRIPE_SECRET_KEY not set}
+      STRIPE_WEBHOOK_SECRET: ${STRIPE_WEBHOOK_SECRET:?Variable STRIPE_WEBHOOK_SECRET not set}
+      STRIPE_PRICE_ID: ${STRIPE_PRICE_ID:?Variable STRIPE_PRICE_ID not set}
+      SMTP_HOST: ${SMTP_HOST:?Variable SMTP_HOST not set}
+      SMTP_PORT: ${SMTP_PORT:?Variable SMTP_PORT not set}
+      SMTP_USER: ${SMTP_USER:?Variable SMTP_USER not set}
+      SMTP_PASS: ${SMTP_PASS:?Variable SMTP_PASS not set}
       SMTP_FROM: ${SMTP_FROM:-E-Learn <noreply@elearn.com>}
 
 volumes:
