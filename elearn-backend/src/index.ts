@@ -1,5 +1,14 @@
 // src/index.ts
-import 'dotenv/config'
+import { config } from 'dotenv'
+import { resolve } from 'path'
+import { fileURLToPath } from 'url'
+import { dirname } from 'path'
+
+// Load .env from monorepo root
+const __filename = fileURLToPath(import.meta.url)
+const __dirname = dirname(__filename)
+config({ path: resolve(__dirname, '../../.env') })
+
 import express from 'express'
 import cors from 'cors'
 import helmet from 'helmet'
@@ -9,7 +18,6 @@ import cookieParser from 'cookie-parser'
 
 import authRouter from './routes/auth.js'
 import quizRouter from './routes/quiz.js'
-import billingRouter, { stripeWebhookHandler } from './routes/billing.js'
 import inviteRouter from './routes/invite.js'
 import editorRouter from './routes/editor.js'
 import topicsRouter from './routes/topics.js'
@@ -61,20 +69,6 @@ app.use(cors({
 app.use(morgan(process.env.NODE_ENV === 'production' ? 'combined' : 'dev'))
 app.use(cookieParser())
 
-// Stripe webhook повинен йти ДО json-парсера і з raw body
-app.post('/billing/webhook',
-  express.raw({ type: 'application/json' }),
-  stripeWebhookHandler
-)
-
-// --- Webhook Stripe має бачити raw body ДО express.json ---
-app.post(
-  '/api/billing/webhook',
-  webhookLimiter,                          // лімітуємо навіть вебхуки
-  express.raw({ type: 'application/json' }),
-  stripeWebhookHandler
-)
-
 // --- Ліміт розміру JSON тіла + звичайний парсер ---
 app.use(express.json({ limit: '1mb' }))
 
@@ -102,9 +96,8 @@ app.get('/api-docs.json', (_req, res) => res.json(swaggerSpec))
 // --- Auth роути з селективним лімітом (5 спроб за 15 хв) ---
 app.use('/api/auth', authLimiter, authRouter)
 
-// --- Invite / Billing (чутливі) — додатковий authLimiter ---
+// --- Invite (чутливі) — додатковий authLimiter ---
 app.use('/api/invite', authLimiter, inviteRouter)
-app.use('/api/billing', authLimiter, billingRouter)
 
 // --- Інші модулі ---
 app.use('/api/topics', topicsRouter)

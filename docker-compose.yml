@@ -48,10 +48,7 @@ services:
       FRONTEND_URL: ${FRONTEND_URL:-http://localhost:5173}
       CORS_ORIGIN: ${CORS_ORIGIN:-http://localhost:5173}
       
-      # Stripe & Mail (STRICT - required for payment processing)
-      STRIPE_SECRET_KEY: ${STRIPE_SECRET_KEY:?Variable STRIPE_SECRET_KEY not set}
-      STRIPE_WEBHOOK_SECRET: ${STRIPE_WEBHOOK_SECRET:?Variable STRIPE_WEBHOOK_SECRET not set}
-      STRIPE_PRICE_ID: ${STRIPE_PRICE_ID:?Variable STRIPE_PRICE_ID not set}
+      # Mail (optional for dev)
       SMTP_HOST: ${SMTP_HOST:?Variable SMTP_HOST not set}
       SMTP_PORT: ${SMTP_PORT:?Variable SMTP_PORT not set}
       SMTP_USER: ${SMTP_USER:?Variable SMTP_USER not set}
