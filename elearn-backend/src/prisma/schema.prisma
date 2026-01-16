@@ -107,6 +107,7 @@ model Material {
   createdBy     User?        @relation("MaterialCreator", fields: [createdById], references: [id], onDelete: SetNull)
   createdAt     DateTime     @default(now())
   updatedAt     DateTime     @default(now()) @updatedAt
+  deletedAt     DateTime?
 
   @@index([topicId])
 }
@@ -140,6 +141,7 @@ model Quiz {
   createdBy     User?         @relation("QuizCreator", fields: [createdById], references: [id], onDelete: SetNull)
   createdAt     DateTime      @default(now())
   updatedAt     DateTime      @default(now()) @updatedAt
+  deletedAt     DateTime?
 
   @@index([topicId])
 }

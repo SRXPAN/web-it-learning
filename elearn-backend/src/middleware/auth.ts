@@ -43,7 +43,23 @@ export function requireAuth(req: Request, res: Response, next: NextFunction) {
     if (decoded.type && decoded.type !== 'access') {
       return sendError(res, ErrorCodes.TOKEN_INVALID, 'Invalid token type', 401)
     }
-    req.user = decoded
+    
+    // Check user existence in DB and get fresh data
+    const { prisma } = await import('../db.js')
+    const userExists = await prisma.user.findUnique({
+      where: { id: decoded.id },
+      select: { id: true, role: true, emailVerified: true }
+    })
+    
+    if (!userExists) {
+      return sendError(res, ErrorCodes.UNAUTHORIZED, 'User no longer exists', 401)
+    }
+    
+    req.user = { 
+      ...decoded, 
+      role: userExists.role as Role,
+      emailVerified: userExists.emailVerified 
+    }
     next()
   } catch (err: any) {
     // Детальніші помилки для клієнта
@@ -84,7 +100,8 @@ export function requireRole(roles: Role[]) {
  * Перевіряє що email верифіковано
  */
 export function requireVerifiedEmail(req: Request, res: Response, next: NextFunction) {
-  // Тут потрібно б перевірити emailVerified, але для цього потрібен запит до БД
-  // Поки що пропускаємо, можна додати пізніше
+  if (!req.user?.emailVerified) {
+    return sendError(res, ErrorCodes.FORBIDDEN, 'Email not verified', 403)
+  }
   next()
 }

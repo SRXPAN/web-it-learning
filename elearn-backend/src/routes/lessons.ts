@@ -9,6 +9,7 @@ import { localizeObject } from '../utils/i18n.js'
 import { ok } from '../utils/response.js'
 import type { Lang } from '@elearn/shared'
 
+
 const router = Router()
 
 // Helper to safely extract string from params (handles string | string[])
@@ -53,7 +54,9 @@ function localizeMaterial<T extends MaterialWithI18n>(
 
 // Schema for query params
 const querySchema = z.object({
-  lang: z.enum(['UA', 'PL', 'EN']).optional(),
+  lang: z.nativeEnum(Lang).optional(),
+  page: z.string().regex(/^\d+$/).optional().default('1'),
+  limit: z.string().regex(/^\d+$/).optional().default('10'),
 })
 
 // GET /lessons - List all lessons/materials
@@ -62,24 +65,30 @@ router.get(
   requireAuth,
   validateResource(querySchema, 'query'),
   asyncHandler(async (req: Request, res: Response) => {
-    const isStaff = req.user?.role === 'ADMIN' || req.user?.role === 'EDITOR'
-    const lang = (req.query.lang as any) as Lang | undefined
+    const { lang, page, limit } = req.query as unknown as z.infer<typeof querySchema>;
+    const take = parseInt(limit || '10');
+    const skip = (parseInt(page || '1') - 1) * take;
+    const isStaff = ['ADMIN', 'EDITOR'].includes(req.user!.role);
 
-    const materials = await (prisma.material.findMany as any)({
-      where: isStaff ? {} : { status: 'Published' },
-      orderBy: { createdAt: 'desc' },
-      include: {
-        topic: {
-          select: { id: true, name: true, slug: true },
+    const [materials, total] = await Promise.all([
+      prisma.material.findMany({
+        where: isStaff ? {} : { status: 'Published' },
+        orderBy: { createdAt: 'desc' },
+        take, skip,
+        include: { 
+          topic: { 
+            select: { id: true, name: true, slug: true, nameJson: true } 
+          } 
         },
-      },
-    })
+      }),
+      prisma.material.count({ where: isStaff ? {} : { status: 'Published' } })
+    ])
 
     const localizedMaterials = lang
       ? materials.map((m: any) => localizeMaterial(m, lang))
       : materials
 
-    return ok(res, { data: localizedMaterials })
+    return ok(res, { data: localizedMaterials, pagination: { page: parseInt(page || '1'), limit: parseInt(limit || '10'), total } })
   })
 )
 
@@ -90,11 +99,11 @@ router.get(
   validateResource(z.object({ id: z.string().uuid() }), 'params'),
   validateResource(querySchema, 'query'),
   asyncHandler(async (req: Request, res: Response) => {
-    const isStaff = req.user?.role === 'ADMIN' || req.user?.role === 'EDITOR'
-    const lang = (req.query.lang as any) as Lang | undefined
+    const isStaff = ['ADMIN', 'EDITOR'].includes(req.user!.role)
+    const { lang } = req.query as unknown as z.infer<typeof querySchema>;
     const id = getParam(req.params.id)
 
-    const material = await (prisma.material.findUnique as any)({
+    const material = await prisma.material.findUnique({
       where: { id },
       include: {
         topic: {
@@ -139,22 +148,33 @@ router.get(
   validateResource(z.object({ topicId: z.string().uuid() }), 'params'),
   validateResource(querySchema, 'query'),
   asyncHandler(async (req: Request, res: Response) => {
-    const isStaff = req.user?.role === 'ADMIN' || req.user?.role === 'EDITOR'
-    const lang = (req.query.lang as any) as Lang | undefined
+    const isStaff = ['ADMIN', 'EDITOR'].includes(req.user!.role)
+    const { lang, page, limit } = req.query as unknown as z.infer<typeof querySchema>;
+    const take = parseInt(limit || '10');
+    const skip = (parseInt(page || '1') - 1) * take;
 
-    const materials = await (prisma.material.findMany as any)({
-      where: {
-        topicId: req.params.topicId,
-        ...(isStaff ? {} : { status: 'Published' }),
-      },
-      orderBy: { createdAt: 'asc' },
-    })
+    const [materials, total] = await Promise.all([
+      prisma.material.findMany({
+        where: {
+          topicId: req.params.topicId,
+          ...(isStaff ? {} : { status: 'Published' }),
+        },
+        orderBy: { createdAt: 'asc' },
+        take, skip,
+      }),
+      prisma.material.count({
+        where: {
+          topicId: req.params.topicId,
+          ...(isStaff ? {} : { status: 'Published' }),
+        },
+      }),
+    ])
 
     const localizedMaterials = lang
       ? materials.map((m: any) => localizeMaterial(m, lang))
       : materials
 
-    return ok(res, { data: localizedMaterials })
+    return ok(res, { data: localizedMaterials, pagination: { page: parseInt(page || '1'), limit: parseInt(limit || '10'), total } })
   })
 )
 
