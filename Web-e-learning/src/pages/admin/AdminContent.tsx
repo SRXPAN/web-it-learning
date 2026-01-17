@@ -7,7 +7,7 @@ import { useTranslation } from '@/i18n/useTranslation'
 import { type TranslationKey } from '@/i18n/types'
 import { useAdminContent } from '@/hooks/useAdmin'
 import { ConfirmDialog } from '@/components/ConfirmDialog'
-import { TopicSidebar, TopicView, MaterialEditModal } from '@/pages/materialsComponents'
+import { TopicSidebar, TopicView, MaterialModal } from '@/pages/materialsComponents'
 import type { TopicNode, Material } from '@/pages/materialsComponents/types'
 import { Loading } from '@/components/Loading'
 import { QuizModal } from '@/pages/materialsComponents/QuizModal'
@@ -299,7 +299,7 @@ export default function AdminContent() {
 
       {/* Material Editor Modal */}
       {showMaterialModal && materialLessonId && (
-        <MaterialEditModal
+        <MaterialModal
           material={editingMaterial as any}
           lessonId={materialLessonId}
           preselectedType={materialType || undefined}

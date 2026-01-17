@@ -1,347 +1,288 @@
-import { memo, useCallback, useEffect, useState } from 'react'
-import {
-  X,
-  ExternalLink,
-  BookOpen,
-  PlayCircle,
-  FileText,
-  Link as LinkIcon,
-  CheckCircle2,
-  Download,
-  Maximize2,
-  Clock,
-  Eye,
-} from 'lucide-react'
+import { memo, useEffect, useState } from 'react'
+import { X, Save } from 'lucide-react'
+import { http as api } from '@/lib/http'
 import { useTranslation } from '@/i18n/useTranslation'
-import { localize } from '@/utils/localize'
-import type { Lang, LocalizedString } from '@elearn/shared'
-import type { Material } from './types'
+
+type Lang = 'EN' | 'UA' | 'PL'
+
+interface MaterialData {
+  id?: string
+  title: string
+  type: 'VIDEO' | 'TEXT' | 'pdf' | 'link'
+  url?: string | null
+  content?: string | null
+  titleCache?: Record<string, string> | null
+  urlCache?: Record<string, string> | null
+  contentCache?: Record<string, string> | null
+}
 
 interface MaterialModalProps {
-  material: Material | null
-  lang: Lang
+  material?: MaterialData | null
+  lessonId: string
+  preselectedType?: 'VIDEO' | 'TEXT' | 'pdf' | 'link'
   onClose: () => void
-  onMarkComplete: (id: string) => void
+  onSave?: () => void
+}
+
+
+interface MaterialFormState {
+  EN: { title: string; url: string; content: string }
+  UA: { title: string; url: string; content: string }
+  PL: { title: string; url: string; content: string }
+  type: 'VIDEO' | 'TEXT' | 'pdf' | 'link'
 }
 
 export const MaterialModal = memo(function MaterialModal({
   material,
-  lang,
+  lessonId,
+  preselectedType,
   onClose,
-  onMarkComplete,
+  onSave,
 }: MaterialModalProps) {
   const { t } = useTranslation()
-  const [isLoading, setIsLoading] = useState(true)
-  const [readTime, setReadTime] = useState(0)
+  const [activeLang, setActiveLang] = useState<Lang>('EN')
+  const [loading, setLoading] = useState(false)
+  const [error, setError] = useState<string | null>(null)
 
-  // Трекінг часу перегляду
+  const isEditMode = !!material?.id
+
+  const [formData, setFormData] = useState<MaterialFormState>({
+    EN: { title: '', url: '', content: '' },
+    UA: { title: '', url: '', content: '' },
+    PL: { title: '', url: '', content: '' },
+    type: (preselectedType as any) || material?.type || 'VIDEO'
+  })
+
   useEffect(() => {
-    if (!material) return
-    setIsLoading(true)
-    setReadTime(0)
-
-    const timer = setInterval(() => {
-      setReadTime((prev) => prev + 1)
-    }, 1000)
-
-    // Імітація завантаження
-    const loadTimer = setTimeout(() => setIsLoading(false), 500)
-
-    return () => {
-      clearInterval(timer)
-      clearTimeout(loadTimer)
+    if (material) {
+      setFormData({
+        EN: {
+          title: material.titleCache?.EN || material.title || '',
+          url: material.urlCache?.EN || material.url || '',
+          content: material.contentCache?.EN || material.content || ''
+        },
+        UA: {
+          title: material.titleCache?.UA || '',
+          url: material.urlCache?.UA || '',
+          content: material.contentCache?.UA || ''
+        },
+        PL: {
+          title: material.titleCache?.PL || '',
+          url: material.urlCache?.PL || '',
+          content: material.contentCache?.PL || ''
+        },
+        type: material.type || 'VIDEO'
+      })
     }
-  }, [material?.id])
+  }, [material])
 
-  // Авто-позначка після 5 секунд
-  useEffect(() => {
-    if (material && readTime >= 5) {
-      onMarkComplete(material.id)
+  const updateField = (field: 'title' | 'url' | 'content', value: string) => {
+    setFormData((prev) => ({
+      ...prev,
+      [activeLang]: { ...prev[activeLang], [field]: value }
+    }))
+  }
+
+  const handleSave = async (e: React.FormEvent) => {
+    e.preventDefault()
+    setError(null)
+
+    if (!formData.EN.title.trim() || !formData.UA.title.trim()) {
+      setError('Title required in English and Ukrainian')
+      return
     }
-  }, [readTime, material, onMarkComplete])
 
-  // ESC для закриття
+    setLoading(true)
+
+    try {
+      const payload = {
+        topicId: lessonId,
+        type: formData.type,
+        titleCache: {
+          EN: formData.EN.title,
+          UA: formData.UA.title,
+          PL: formData.PL.title || formData.EN.title
+        },
+        urlCache: formData.type !== 'TEXT' ? {
+          EN: formData.EN.url || null,
+          UA: formData.UA.url || null,
+          PL: formData.PL.url || null
+        } : null,
+        contentCache: formData.type === 'TEXT' ? {
+          EN: formData.EN.content,
+          UA: formData.UA.content,
+          PL: formData.PL.content || formData.EN.content
+        } : null
+      }
+
+      if (isEditMode && material?.id) {
+        await api.put(`/editor/materials/${material.id}`, payload)
+      } else {
+        await api.post('/editor/materials', payload)
+      }
+
+      onSave?.()
+      onClose()
+    } catch (err: any) {
+      console.error('Save failed:', err)
+      setError(err?.response?.data?.message || 'Failed to save material')
+    } finally {
+      setLoading(false)
+    }
+  }
+
   useEffect(() => {
     const handleEsc = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') onClose()
+      if (e.key === 'Escape' && !loading) onClose()
     }
     window.addEventListener('keydown', handleEsc)
     return () => window.removeEventListener('keydown', handleEsc)
-  }, [onClose])
+  }, [onClose, loading])
 
-  if (!material) return null
-
-  const m = material
-  const title = localize((m as any).titleJson as LocalizedString, m.title, lang)
-  const content = localize((m as any).contentJson as LocalizedString, m.content || '', lang)
-
-  // Іконки по типу
-  const getTypeConfig = () => {
-    switch (m.type) {
-      case 'video':
-        return {
-          Icon: PlayCircle,
-          color: 'text-pink-500',
-          bg: 'bg-pink-50 dark:bg-pink-900/20',
-          label: t('materials.video'),
-        }
-      case 'pdf':
-        return {
-          Icon: BookOpen,
-          color: 'text-amber-500',
-          bg: 'bg-amber-50 dark:bg-amber-900/20',
-          label: 'PDF',
-        }
-      case 'link':
-        return {
-          Icon: LinkIcon,
-          color: 'text-emerald-500',
-          bg: 'bg-emerald-50 dark:bg-emerald-900/20',
-          label: t('materials.link'),
-        }
-      default:
-        return {
-          Icon: FileText,
-          color: 'text-blue-500',
-          bg: 'bg-blue-50 dark:bg-blue-900/20',
-          label: t('materials.text'),
-        }
-    }
-  }
-
-  const typeConfig = getTypeConfig()
-  const TypeIcon = typeConfig.Icon
-
-  const formatTime = (sec: number) => {
-    const m = Math.floor(sec / 60)
-    const s = sec % 60
-    return m > 0 ? `${m}:${s.toString().padStart(2, '0')}` : `${s}с`
-  }
-
-  const openExternal = useCallback(() => {
-    if (m.url) window.open(m.url, '_blank', 'noopener,noreferrer')
-  }, [m.url])
+  const currentData = formData[activeLang]
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
-      {/* Backdrop */}
       <div
         className="absolute inset-0 bg-black/60 backdrop-blur-sm"
-        onClick={onClose}
+        onClick={loading ? undefined : onClose}
       />
 
-      {/* Modal */}
-      <div className="relative w-full max-w-4xl max-h-[90vh] bg-white dark:bg-gray-900 rounded-2xl shadow-2xl overflow-hidden flex flex-col animate-in fade-in zoom-in-95 duration-200">
-        {/* Header */}
+      <div className="relative w-full max-w-2xl max-h-[90vh] bg-white dark:bg-gray-900 rounded-2xl shadow-2xl overflow-hidden flex flex-col">
         <header className="flex items-center justify-between gap-4 px-6 py-4 border-b border-gray-200 dark:border-gray-800 bg-gray-50 dark:bg-gray-900/80">
-          <div className="flex items-center gap-4 min-w-0">
-            <div className={`flex-shrink-0 p-3 rounded-xl ${typeConfig.bg}`}>
-              <TypeIcon size={24} className={typeConfig.color} />
-            </div>
-            <div className="min-w-0">
-              <div className="flex items-center gap-2 mb-1">
-                <span className={`text-xs font-semibold uppercase tracking-wide ${typeConfig.color}`}>
-                  {typeConfig.label}
-                </span>
-                <span className="flex items-center gap-1 text-xs text-gray-500 dark:text-gray-400">
-                  <Clock size={12} />
-                  {formatTime(readTime)}
-                </span>
-                {readTime >= 5 && (
-                  <span className="flex items-center gap-1 text-xs text-emerald-600 dark:text-emerald-400 font-medium">
-                    <CheckCircle2 size={12} />
-                    {t('materials.viewed')}
-                  </span>
-                )}
-              </div>
-              <h2 className="text-lg font-semibold text-gray-900 dark:text-white truncate">
-                {title}
-              </h2>
-            </div>
-          </div>
-
-          <div className="flex items-center gap-2 flex-shrink-0">
-            {m.url && (
-              <>
-                <button
-                  onClick={openExternal}
-                  className="p-2 rounded-lg text-gray-500 hover:text-gray-700 hover:bg-gray-100 dark:text-gray-400 dark:hover:text-gray-200 dark:hover:bg-gray-800 transition-colors"
-                  title={t('materials.openExternal') || 'Відкрити у новій вкладці'}
-                >
-                  <Maximize2 size={18} />
-                </button>
-                {m.type === 'pdf' && (
-                  <a
-                    href={m.url}
-                    download
-                    className="p-2 rounded-lg text-gray-500 hover:text-gray-700 hover:bg-gray-100 dark:text-gray-400 dark:hover:text-gray-200 dark:hover:bg-gray-800 transition-colors"
-                    title={t('materials.download') || 'Завантажити'}
-                  >
-                    <Download size={18} />
-                  </a>
-                )}
-              </>
-            )}
-            <button
-              onClick={onClose}
-              className="p-2 rounded-lg text-gray-500 hover:text-gray-700 hover:bg-gray-100 dark:text-gray-400 dark:hover:text-gray-200 dark:hover:bg-gray-800 transition-colors"
-            >
-              <X size={20} />
-            </button>
-          </div>
+          <h2 className="text-lg font-semibold text-gray-900 dark:text-white">
+            {isEditMode ? t('editor.edit_material') : t('editor.add_material')}
+          </h2>
+          <button
+            onClick={onClose}
+            disabled={loading}
+            className="p-2 rounded-lg text-gray-500 hover:text-gray-700 hover:bg-gray-100 dark:text-gray-400 dark:hover:text-gray-200 dark:hover:bg-gray-800 transition-colors disabled:opacity-50"
+          >
+            <X size={20} />
+          </button>
         </header>
 
-        {/* Content */}
-        <div className="flex-1 overflow-auto">
-          {isLoading ? (
-            <div className="flex items-center justify-center h-96">
-              <div className="animate-spin rounded-full h-12 w-12 border-4 border-blue-600 border-t-transparent" />
-            </div>
-          ) : (
-            <div className="p-6">
-              {/* Video */}
-              {m.type === 'video' && m.url && (
-                <div className="aspect-video bg-black rounded-xl overflow-hidden">
-                  {m.url.includes('youtube.com') || m.url.includes('youtu.be') ? (
-                    <iframe
-                      src={getYoutubeEmbedUrl(m.url)}
-                      className="w-full h-full"
-                      allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
-                      allowFullScreen
-                      title={title}
-                    />
-                  ) : (
-                    <video
-                      src={m.url}
-                      controls
-                      className="w-full h-full"
-                      title={title}
-                    />
-                  )}
-                </div>
-              )}
-
-              {/* PDF */}
-              {m.type === 'pdf' && m.url && (
-                <div className="space-y-4">
-                  <div className="aspect-[4/3] bg-gray-100 dark:bg-gray-800 rounded-xl overflow-hidden">
-                    <iframe
-                      src={`${m.url}#toolbar=1&navpanes=0`}
-                      className="w-full h-full"
-                      title={title}
-                    />
-                  </div>
-                  <div className="flex justify-center">
-                    <a
-                      href={m.url}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-amber-100 text-amber-700 hover:bg-amber-200 dark:bg-amber-900/30 dark:text-amber-400 font-medium text-sm transition-colors"
-                    >
-                      <ExternalLink size={16} />
-                      {t('materials.openInNewTab') || 'Відкрити у новій вкладці'}
-                    </a>
-                  </div>
-                </div>
-              )}
-
-              {/* Link */}
-              {m.type === 'link' && m.url && (
-                <div className="flex flex-col items-center justify-center py-12 space-y-6">
-                  <div className="p-6 rounded-full bg-emerald-50 dark:bg-emerald-900/20">
-                    <LinkIcon size={48} className="text-emerald-500" />
-                  </div>
-                  <div className="text-center max-w-md">
-                    <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-2">
-                      {t('materials.externalLink') || 'Зовнішнє посилання'}
-                    </h3>
-                    <p className="text-sm text-gray-600 dark:text-gray-400 mb-4">
-                      {t('materials.externalLinkDesc') || 'Цей матеріал знаходиться на зовнішньому ресурсі'}
-                    </p>
-                    <code className="block px-4 py-2 rounded-lg bg-gray-100 dark:bg-gray-800 text-xs text-gray-600 dark:text-gray-400 break-all mb-6">
-                      {m.url}
-                    </code>
-                    <a
-                      href={m.url}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="inline-flex items-center gap-2 px-6 py-3 rounded-xl bg-emerald-600 text-white hover:bg-emerald-700 font-semibold transition-colors"
-                    >
-                      <ExternalLink size={18} />
-                      {t('materials.goToResource') || 'Перейти до ресурсу'}
-                    </a>
-                  </div>
-                </div>
-              )}
-
-              {/* Text */}
-              {m.type === 'text' && (
-                <div className="prose prose-gray dark:prose-invert max-w-none">
-                  {content ? (
-                    <div className="text-gray-700 dark:text-gray-300 leading-relaxed whitespace-pre-wrap">
-                      {content}
-                    </div>
-                  ) : (
-                    <div className="text-center py-12 text-gray-500 dark:text-gray-400">
-                      <FileText size={48} className="mx-auto mb-4 opacity-50" />
-                      <p>{t('materials.noContent') || 'Контент недоступний'}</p>
-                    </div>
-                  )}
-                </div>
-              )}
-
-              {/* Tags */}
-              {m.tags && m.tags.length > 0 && (
-                <div className="mt-6 pt-6 border-t border-gray-200 dark:border-gray-800">
-                  <div className="flex flex-wrap gap-2">
-                    {m.tags.map((tag) => (
-                      <span
-                        key={tag}
-                        className="px-3 py-1 rounded-full bg-gray-100 dark:bg-gray-800 text-xs text-gray-600 dark:text-gray-400"
-                      >
-                        #{tag}
-                      </span>
-                    ))}
-                  </div>
-                </div>
-              )}
+        <form onSubmit={handleSave} className="flex-1 overflow-auto p-6 space-y-6">
+          {error && (
+            <div className="p-4 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-lg text-red-600 dark:text-red-400 text-sm">
+              {error}
             </div>
           )}
-        </div>
 
-        {/* Footer */}
-        <footer className="flex items-center justify-between gap-4 px-6 py-4 border-t border-gray-200 dark:border-gray-800 bg-gray-50 dark:bg-gray-900/80">
-          <div className="flex items-center gap-2 text-sm text-gray-500 dark:text-gray-400">
-            <Eye size={16} />
-            <span>{t('materials.viewTime') || 'Час перегляду'}: {formatTime(readTime)}</span>
-          </div>
-          <div className="flex items-center gap-3">
-            <button
-              onClick={onClose}
-              className="px-4 py-2 rounded-lg text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-800 font-medium transition-colors"
-            >
-              {t('common.close')}
-            </button>
-            {m.url && (
+          <div className="flex gap-2 border-b border-gray-200 dark:border-gray-800">
+            {(['EN', 'UA', 'PL'] as Lang[]).map((lang) => (
               <button
-                onClick={openExternal}
-                className="inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-blue-600 text-white hover:bg-blue-700 font-medium transition-colors"
+                key={lang}
+                type="button"
+                onClick={() => setActiveLang(lang)}
+                className={`px-4 py-2 text-sm font-medium transition-colors ${
+                  activeLang === lang
+                    ? 'text-blue-600 dark:text-blue-400 border-b-2 border-blue-600 dark:border-blue-400'
+                    : 'text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-300'
+                }`}
               >
-                <ExternalLink size={16} />
-                {t('materials.openExternal') || 'Відкрити'}
+                {lang}
               </button>
-            )}
+            ))}
           </div>
-        </footer>
+
+          {!isEditMode && (
+            <div>
+              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                {t('editor.label.type')}
+              </label>
+              <div className="grid grid-cols-4 gap-2">
+                {(['VIDEO', 'TEXT', 'pdf', 'link'] as const).map((type) => (
+                  <button
+                    key={type}
+                    type="button"
+                    onClick={() => setFormData((prev) => ({ ...prev, type }))}
+                    className={`px-4 py-2 rounded-lg text-sm font-medium transition-all ${
+                      formData.type === type
+                        ? 'bg-blue-600 text-white shadow-md'
+                        : 'bg-gray-100 dark:bg-gray-800 text-gray-700 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-700'
+                    }`}
+                  >
+                    {type}
+                  </button>
+                ))}
+              </div>
+            </div>
+          )}
+
+          <div>
+            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+              {t('editor.label.title')} ({activeLang}) *
+            </label>
+            <input
+              type="text"
+              value={currentData.title}
+              onChange={(e) => updateField('title', e.target.value)}
+              placeholder={t('editor.label.title')}
+              className="w-full px-4 py-2 rounded-lg bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-700 text-gray-900 dark:text-gray-100 placeholder:text-gray-400 focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none"
+              required
+            />
+          </div>
+
+          {formData.type !== 'TEXT' && (
+            <div>
+              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                {t('editor.label.url')} ({activeLang})
+              </label>
+              <input
+                type="url"
+                value={currentData.url}
+                onChange={(e) => updateField('url', e.target.value)}
+                placeholder={t('editor.placeholder.urlOptional')}
+                className="w-full px-4 py-2 rounded-lg bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-700 text-gray-900 dark:text-gray-100 placeholder:text-gray-400 focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none"
+              />
+            </div>
+          )}
+
+          {formData.type === 'TEXT' && (
+            <div>
+              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                {t('editor.label.content')} ({activeLang})
+              </label>
+              <textarea
+                value={currentData.content}
+                onChange={(e) => updateField('content', e.target.value)}
+                placeholder={t('editor.label.content')}
+                rows={8}
+                className="w-full px-4 py-2 rounded-lg bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-700 text-gray-900 dark:text-gray-100 placeholder:text-gray-400 focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none resize-vertical"
+              />
+            </div>
+          )}
+
+          <div className="flex items-center justify-end gap-3 pt-4">
+            <button
+              type="button"
+              onClick={onClose}
+              disabled={loading}
+              className="px-4 py-2 rounded-lg text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-800 font-medium transition-colors disabled:opacity-50"
+            >
+              {t('common.cancel')}
+            </button>
+            <button
+              type="submit"
+              disabled={loading}
+              className="inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-blue-600 text-white hover:bg-blue-700 font-medium transition-colors disabled:opacity-50"
+            >
+              {loading ? (
+                <>
+                  <div className="animate-spin rounded-full h-4 w-4 border-2 border-white border-t-transparent" />
+                  {t('common.saving')}
+                </>
+              ) : (
+                <>
+                  <Save size={16} />
+                  {t('common.save')}
+                </>
+              )}
+            </button>
+          </div>
+        </form>
       </div>
     </div>
   )
 })
-
-// Утиліта для YouTube embed URL
-function getYoutubeEmbedUrl(url: string): string {
-  const regExp = /^.*(youtu.be\/|v\/|u\/\w\/|embed\/|watch\?v=|&v=)([^#&?]*).*/
-  const match = url.match(regExp)
-  const videoId = match && match[2].length === 11 ? match[2] : null
-  return videoId ? `https://www.youtube.com/embed/${videoId}` : url
-}
