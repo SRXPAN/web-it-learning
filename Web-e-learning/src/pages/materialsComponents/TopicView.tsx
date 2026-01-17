@@ -170,7 +170,7 @@ export function TopicView({
                 className="inline-flex items-center gap-2 rounded-xl border-2 border-dashed border-gray-300 px-4 py-3 text-sm font-semibold text-gray-600 hover:border-blue-500 hover:text-blue-600 dark:border-gray-700 dark:text-gray-200 dark:hover:border-blue-400 dark:hover:text-blue-200"
               >
                 <PlusCircle size={18} />
-                Add new lesson
+                {t('editor.action.addLesson') || 'Add new lesson'}
               </button>
             </div>
           )}
@@ -426,7 +426,7 @@ function TopicSection({
             </div>
             <p className="text-sm text-gray-500 dark:text-gray-400">
               {isEditable
-                ? 'No materials yet. Add your first material.'
+                ? t('editor.empty.noMaterials')
                 : t('materials.empty.noMaterials')
               }
             </p>

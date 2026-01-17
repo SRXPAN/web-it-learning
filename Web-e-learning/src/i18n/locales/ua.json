@@ -276,6 +276,7 @@
   "editor.add_option": "Додати варіант",
   "editor.delete_question": "Видалити питання",
   "editor.delete_material": "Видалити матеріал",
+  "editor.action.addLesson": "Додати новий урок",
 
     "editor.label.optionIsCorrect": "Ця опція є правильною",
     "editor.button.addOption": "Додати опцію",

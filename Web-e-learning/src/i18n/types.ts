@@ -465,6 +465,7 @@ export type TranslationKey =
   | 'editor.placeholder.explanation'
   | 'editor.action.reloadList'
   | 'editor.action.addQuestion'
+  | 'editor.action.addLesson'
   | 'editor.action.editQuiz'
   | 'editor.action.deleteQuiz'
   | 'editor.action.addOption'

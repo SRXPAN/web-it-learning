@@ -275,6 +275,7 @@
   "editor.add_option": "Add Option",
   "editor.delete_question": "Delete Question",
   "editor.delete_material": "Delete Material",
+  "editor.action.addLesson": "Add New Lesson",
 
   "leaderboard.title": "Leaderboard",
   "leaderboard.user": "User",

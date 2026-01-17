@@ -7,7 +7,7 @@ import { useTranslation } from '@/i18n/useTranslation'
 import { type TranslationKey } from '@/i18n/types'
 import { useAdminContent } from '@/hooks/useAdmin'
 import { ConfirmDialog } from '@/components/ConfirmDialog'
-import { TopicSidebar, TopicView, AdminMaterialModal } from '@/pages/materialsComponents'
+import { TopicSidebar, TopicView, MaterialEditModal } from '@/pages/materialsComponents'
 import type { TopicNode, Material } from '@/pages/materialsComponents/types'
 import { Loading } from '@/components/Loading'
 import { QuizModal } from '@/pages/materialsComponents/QuizModal'
@@ -297,8 +297,10 @@ export default function AdminContent() {
         />
       )}
 
-      {/*AdminMaterialModal
-          material={editingMaterial}
+      {/* Material Editor Modal */}
+      {showMaterialModal && materialLessonId && (
+        <MaterialEditModal
+          material={editingMaterial as any}
           lessonId={materialLessonId}
           preselectedType={materialType || undefined}
           onClose={() => {
@@ -314,9 +316,7 @@ export default function AdminContent() {
             setEditingMaterial(null)
             fetchTopics()
           }}
-        //div>
-          </div>
-        </div>
+        />
       )}
 
       {/* Quiz Editor Modal */}

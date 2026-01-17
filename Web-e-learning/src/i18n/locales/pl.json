@@ -292,6 +292,7 @@
   "editor.add_option": "Dodaj opcję",
   "editor.delete_question": "Usuń pytanie",
   "editor.delete_material": "Usuń materiał",
+  "editor.action.addLesson": "Dodaj nową lekcję",
   "leaderboard.rank": "Pozycja",
 
   "leaderboard.loading": "Ładowanie rankingu...",
