@@ -1,7 +1,4 @@
-/**
- * Topics API Routes
- * Public endpoints for browsing topics and materials
- */
+// src/routes/topics.ts
 import { Router, Request } from 'express'
 import { AppError, asyncHandler } from '../middleware/errorHandler.js'
 import { requireAuth, optionalAuth } from '../middleware/auth.js'
@@ -9,13 +6,19 @@ import { validateResource } from '../middleware/validateResource.js'
 import { topicSchemas } from '../schemas/topic.schema.js'
 import { getTopics, getTopicByIdOrSlug } from '../services/topics.service.js'
 import { ok } from '../utils/response.js'
+import { z } from 'zod' // Додали для локальної схеми
 
 const router = Router()
 
-// Helper to safely extract string from params (handles string | string[])
+// Helper
 function getParam(param: string | string[]): string {
   return Array.isArray(param) ? param[0] : param
 }
+
+// Simple schema for language query (used in GET /:slug)
+const langQuerySchema = z.object({
+  lang: z.enum(['UA', 'EN', 'PL']).default('EN')
+})
 
 /**
  * GET /api/topics
@@ -26,19 +29,20 @@ router.get(
   optionalAuth,
   validateResource(topicSchemas.pagination, 'query'),
   asyncHandler(async (req: Request, res) => {
-    const query = req.query as { page?: string; limit?: string; category?: string; lang?: string; search?: string }
-    const { page = '1', limit = '20', category, lang = 'EN', search } = query
+    // TypeScript safe casting based on Zod schema defaults
+    const { page, limit, category, lang, search } = req.query as unknown as { 
+      page: number, limit: number, category?: string, lang: string, search?: string 
+    }
 
-    // Check if user is staff (ADMIN or EDITOR)
-    const isStaff = req.user?.role === 'ADMIN' || req.user?.role === 'EDITOR'
+    const isStaff = ['ADMIN', 'EDITOR'].includes(req.user?.role || '')
 
-    // Call service with validated parameters
     const result = await getTopics({
-      page: parseInt(page) || 1,
-      limit: parseInt(limit) || 20,
+      page: page || 1,
+      limit: limit || 20,
       category: category as any,
-      lang: lang.toUpperCase(),
+      lang: lang.toUpperCase(), // Service expects uppercase
       isStaff,
+      search
     })
 
     return ok(res, result)
@@ -52,16 +56,18 @@ router.get(
 router.get(
   '/:slug',
   optionalAuth,
-  validateResource(topicSchemas.pagination, 'query'),
+  // 1. Validate route param (slug)
+  validateResource(topicSchemas.slugParam, 'params'), 
+  // 2. Validate query (lang only)
+  validateResource(langQuerySchema, 'query'),
   asyncHandler(async (req: Request, res) => {
     const slug = getParam(req.params.slug)
-    const lang = ((req.query.lang as string) || 'EN').toUpperCase()
+    const { lang } = req.query as unknown as { lang: string }
 
-    // Check if user is staff
-    const isStaff = req.user?.role === 'ADMIN' || req.user?.role === 'EDITOR'
+    const isStaff = ['ADMIN', 'EDITOR'].includes(req.user?.role || '')
 
     // Get topic with validation
-    const topic = await getTopicByIdOrSlug(slug, lang, isStaff)
+    const topic = await getTopicByIdOrSlug(slug, lang.toUpperCase(), isStaff)
 
     if (!topic) {
       throw AppError.notFound(`Topic '${slug}' not found`)

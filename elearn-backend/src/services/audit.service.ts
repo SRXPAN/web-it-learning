@@ -11,6 +11,7 @@ const SENSITIVE_FIELDS = [
   'passwordHash',
   'token',
   'refreshToken',
+  'accessToken',
   'apiKey',
   'secret',
   'privateKey',
@@ -21,35 +22,38 @@ const SENSITIVE_FIELDS = [
 ]
 
 /**
- * Санітизує sensitive поля з об'єкта
+ * Recursively sanitizes sensitive fields from an object or array
  */
-function sanitizeMetadata(obj: any): Record<string, any> {
-  if (!obj || typeof obj !== 'object') return {}
-  
+function sanitizeMetadata(obj: any): any {
+  if (!obj) return obj
+  if (typeof obj !== 'object') return obj
+
+  // Handle Arrays explicitly to preserve structure
+  if (Array.isArray(obj)) {
+    return obj.map(item => sanitizeMetadata(item))
+  }
+
   const sanitized: Record<string, any> = {}
-  
+
   for (const [key, value] of Object.entries(obj)) {
-    // Перевіримо, чи ключ sensitive
     const lowerKey = key.toLowerCase()
     const isSensitive = SENSITIVE_FIELDS.some(field => lowerKey.includes(field))
-    
+
     if (isSensitive) {
       sanitized[key] = '[REDACTED]'
-    } else if (typeof value === 'object' && value !== null) {
-      // Рекурсивна обробка вкладених об'єктів
-      sanitized[key] = sanitizeMetadata(value)
     } else {
-      sanitized[key] = value
+      // Recurse for nested objects/arrays
+      sanitized[key] = sanitizeMetadata(value)
     }
   }
-  
+
   return sanitized
 }
 
 export interface AuditLogEntry {
   userId?: string
-  action: string // CREATE, UPDATE, DELETE, LOGIN, LOGOUT, VIEW
-  resource: string // user, topic, material, quiz, file
+  action: string // CREATE, UPDATE, DELETE, LOGIN, ...
+  resource: string // user, topic, material, ...
   resourceId?: string
   metadata?: Record<string, any>
   ip?: string
@@ -58,9 +62,9 @@ export interface AuditLogEntry {
 
 export async function auditLog(entry: AuditLogEntry): Promise<void> {
   try {
-    // Санітизуємо metadata перед збереженням
+    // Sanitize metadata before saving
     const sanitizedMetadata = entry.metadata ? sanitizeMetadata(entry.metadata) : {}
-    
+
     await prisma.auditLog.create({
       data: {
         userId: entry.userId,
@@ -68,13 +72,15 @@ export async function auditLog(entry: AuditLogEntry): Promise<void> {
         resource: entry.resource,
         resourceId: entry.resourceId,
         metadata: sanitizedMetadata,
-        ip: entry.ip?.replace('::ffff:', ''), // Remove IPv4-mapped prefix
-        userAgent: entry.userAgent?.slice(0, 500), // Limit length
+        // Standardize IP (remove IPv4-mapped IPv6 prefix)
+        ip: entry.ip?.replace('::ffff:', ''),
+        // Database limits often truncate long UserAgents
+        userAgent: entry.userAgent?.slice(0, 500),
       },
     })
   } catch (error) {
-    // Don't throw - audit logging shouldn't break main functionality
-    logger.error('Audit log error', error as Error)
+    // Fail silently: Audit logging failure should not block the main application flow
+    logger.error('Audit log failed:', error instanceof Error ? error.message : String(error))
   }
 }
 
@@ -98,6 +104,7 @@ export const AuditResources = {
   MATERIAL: 'material',
   QUIZ: 'quiz',
   QUESTION: 'question',
+  OPTION: 'option',
   FILE: 'file',
   TRANSLATION: 'translation',
   SETTINGS: 'settings',

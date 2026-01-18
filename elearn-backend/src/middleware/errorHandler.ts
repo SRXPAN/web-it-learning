@@ -94,9 +94,11 @@ export function errorHandler(
 ): void {
   // Create error context for logging
   const errorContext = {
+    // @ts-ignore - req.id may be added by other middleware
     requestId: req.id,
     method: req.method,
     path: req.path,
+    // @ts-ignore - req.user added by auth middleware
     userId: req.user?.id,
     ip: req.ip,
     userAgent: req.headers['user-agent'],

@@ -94,7 +94,7 @@ model Material {
   titleCache    Json?        // {"UA": "...", "EN": "..."}
   type          MaterialType
   url           String?      // Fallback URL (EN)
-  urlCache      Json?        // {"UA": "s3/file_ua.pdf", "EN": "s3/file_en.pdf"}
+  urlJson      Json?        // {"UA": "s3/file_ua.pdf", "EN": "s3/file_en.pdf"}
   fileId        String?      // Reference to File for pdf/video/image
   file          File?        @relation(fields: [fileId], references: [id])
   content       String?      // Fallback content (EN)
@@ -353,7 +353,7 @@ model UiTranslation {
 // The normalized I18nKey/I18nValue tables have been removed.
 // Localization now uses JSON cache fields directly in Topic/Material/Quiz:
 // - titleCache: {"UA": "...", "EN": "...", "PL": "..."}
-// - urlCache, contentCache, descCache (similar structure)
+// - urlJson, contentCache, descCache (similar structure)
 
 // Щоденні цілі з перекладами
 model DailyGoalTemplate {

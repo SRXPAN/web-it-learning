@@ -1,6 +1,6 @@
 // src/services/topics.service.ts
 import { prisma } from '../db.js'
-import type { Category, Status } from '@elearn/shared'
+import type { Category } from '@elearn/shared'
 
 interface TopicQueryParams {
   page: number
@@ -8,15 +8,16 @@ interface TopicQueryParams {
   category?: Category
   lang: string
   isStaff: boolean
+  search?: string // <--- Added search param
 }
 
 /**
- * Helper to get localized text from JSON cache
+ * Helper to get localized text from JSON field
  */
-function getLocalizedText(cache: any, lang: string, fallback: string): string {
-  if (cache && typeof cache === 'object' && !Array.isArray(cache)) {
-    if (cache[lang]) return cache[lang]
-    if (cache['EN']) return cache['EN']
+function getLocalizedText(jsonField: any, lang: string, fallback: string): string {
+  if (jsonField && typeof jsonField === 'object' && !Array.isArray(jsonField)) {
+    if (jsonField[lang]) return jsonField[lang]
+    if (jsonField['EN']) return jsonField['EN']
   }
   return fallback
 }
@@ -25,12 +26,21 @@ function getLocalizedText(cache: any, lang: string, fallback: string): string {
  * Get paginated topics list with localization
  */
 export async function getTopics(params: TopicQueryParams) {
-  const { page, limit, category, lang, isStaff } = params
+  const { page, limit, category, lang, isStaff, search } = params
   
-  const whereClause = {
+  const whereClause: any = {
     parentId: null,
     ...(category ? { category: category as any } : {}),
-    ...(isStaff ? {} : { status: 'Published' as const }),
+    ...(isStaff ? {} : { status: 'Published' }),
+  }
+
+  // Implementation of Search Logic
+  if (search) {
+    whereClause.OR = [
+      { name: { contains: search, mode: 'insensitive' } },
+      { description: { contains: search, mode: 'insensitive' } },
+      // Optional: search in localized JSON too (Postgres JSONB support required for efficiency)
+    ]
   }
 
   const total = await prisma.topic.count({ where: whereClause })
@@ -48,22 +58,22 @@ export async function getTopics(params: TopicQueryParams) {
       status: true,
       name: true, 
       description: true,
-      titleCache: true,
-      descCache: true,
+      nameJson: true, // FIXED: was titleCache
+      descJson: true, // FIXED: was descCache
       children: {
-        where: isStaff ? {} : { status: 'Published' as const },
+        where: isStaff ? {} : { status: 'Published' },
         select: {
           id: true,
           slug: true,
           name: true,
           description: true,
-          titleCache: true,
-          descCache: true,
+          nameJson: true, // FIXED
+          descJson: true, // FIXED
           status: true,
           parentId: true,
           category: true,
           materials: {
-            where: isStaff ? {} : { status: 'Published' as const },
+            where: isStaff ? {} : { status: 'Published' },
             select: {
               id: true,
               title: true,
@@ -71,25 +81,25 @@ export async function getTopics(params: TopicQueryParams) {
               url: true,
               content: true,
               lang: true,
-              titleCache: true,
-              contentCache: true,
-              urlCache: true,
+              titleJson: true, // FIXED
+              contentJson: true, // FIXED
+              urlJson: true, // FIXED
               status: true
             }
           },
           quizzes: {
-            where: isStaff ? {} : { status: 'Published' as const },
+            where: isStaff ? {} : { status: 'Published' },
             select: {
               id: true,
               title: true,
               durationSec: true,
-              titleCache: true
+              titleJson: true // FIXED
             }
           }
         }
       },
       materials: {
-        where: isStaff ? {} : { status: 'Published' as const },
+        where: isStaff ? {} : { status: 'Published' },
         select: {
           id: true,
           title: true,
@@ -97,19 +107,19 @@ export async function getTopics(params: TopicQueryParams) {
           url: true,
           content: true,
           lang: true,
-          titleCache: true,
-          contentCache: true,
-          urlCache: true,
+          titleJson: true, // FIXED
+          contentJson: true, // FIXED
+          urlJson: true, // FIXED
           status: true
         }
       },
       quizzes: {
-        where: isStaff ? {} : { status: 'Published' as const },
+        where: isStaff ? {} : { status: 'Published' },
         select: {
           id: true,
           title: true,
           durationSec: true,
-          titleCache: true
+          titleJson: true // FIXED
         }
       }
     }
@@ -122,28 +132,28 @@ export async function getTopics(params: TopicQueryParams) {
     category: t.category,
     parentId: t.parentId,
     status: t.status,
-    name: getLocalizedText(t.titleCache, lang, t.name),
-    description: getLocalizedText(t.descCache, lang, t.description),
+    name: getLocalizedText(t.nameJson, lang, t.name),
+    description: getLocalizedText(t.descJson, lang, t.description),
     children: t.children.map(child => ({
       ...child,
-      name: getLocalizedText(child.titleCache, lang, child.name),
-      description: getLocalizedText(child.descCache, lang, child.description),
+      name: getLocalizedText(child.nameJson, lang, child.name),
+      description: getLocalizedText(child.descJson, lang, child.description),
       materials: child.materials.map(m => ({
         ...m,
-        title: getLocalizedText(m.titleCache, lang, m.title)
+        title: getLocalizedText(m.titleJson, lang, m.title)
       })),
       quizzes: child.quizzes.map(q => ({
         ...q,
-        title: getLocalizedText(q.titleCache, lang, q.title)
+        title: getLocalizedText(q.titleJson, lang, q.title)
       }))
     })),
     materials: t.materials.map(m => ({
       ...m,
-      title: getLocalizedText(m.titleCache, lang, m.title)
+      title: getLocalizedText(m.titleJson, lang, m.title)
     })),
     quizzes: t.quizzes.map(q => ({
       ...q,
-      title: getLocalizedText(q.titleCache, lang, q.title)
+      title: getLocalizedText(q.titleJson, lang, q.title)
     }))
   }))
 
@@ -167,7 +177,7 @@ export async function getTopicByIdOrSlug(
   const topic = await prisma.topic.findFirst({
     where: {
       OR: [{ id: idOrSlug }, { slug: idOrSlug }],
-      ...(isStaff ? {} : { status: 'Published' as const })
+      ...(isStaff ? {} : { status: 'Published' })
     },
     select: {
       id: true,
@@ -177,37 +187,37 @@ export async function getTopicByIdOrSlug(
       category: true,
       parentId: true,
       status: true,
-      titleCache: true,
-      descCache: true,
+      nameJson: true, // FIXED
+      descJson: true, // FIXED
       children: {
-        where: isStaff ? {} : { status: 'Published' as const },
+        where: isStaff ? {} : { status: 'Published' },
         select: {
           id: true,
           slug: true,
           name: true,
-          titleCache: true
+          nameJson: true // FIXED
         }
       },
       materials: {
-        where: isStaff ? {} : { status: 'Published' as const },
+        where: isStaff ? {} : { status: 'Published' },
         select: {
           id: true,
           title: true,
           type: true,
           url: true,
           content: true,
-          titleCache: true,
-          urlCache: true,
-          contentCache: true
+          titleJson: true, // FIXED
+          urlJson: true, // FIXED
+          contentJson: true // FIXED
         }
       },
       quizzes: {
-        where: isStaff ? {} : { status: 'Published' as const },
+        where: isStaff ? {} : { status: 'Published' },
         select: {
           id: true,
           title: true,
           durationSec: true,
-          titleCache: true
+          titleJson: true // FIXED
         }
       }
     }
@@ -217,21 +227,21 @@ export async function getTopicByIdOrSlug(
 
   return {
     ...topic,
-    name: getLocalizedText(topic.titleCache, lang, topic.name),
-    description: getLocalizedText(topic.descCache, lang, topic.description),
+    name: getLocalizedText(topic.nameJson, lang, topic.name),
+    description: getLocalizedText(topic.descJson, lang, topic.description),
     children: topic.children.map(c => ({
       ...c,
-      name: getLocalizedText(c.titleCache, lang, c.name)
+      name: getLocalizedText(c.nameJson, lang, c.name)
     })),
     materials: topic.materials.map(m => ({
       ...m,
-      title: getLocalizedText(m.titleCache, lang, m.title),
-      url: getLocalizedText(m.urlCache, lang, m.url || ''),
-      content: getLocalizedText(m.contentCache, lang, m.content || '')
+      title: getLocalizedText(m.titleJson, lang, m.title),
+      url: getLocalizedText(m.urlJson, lang, m.url || ''),
+      content: getLocalizedText(m.contentJson, lang, m.content || '')
     })),
     quizzes: topic.quizzes.map(q => ({
       ...q,
-      title: getLocalizedText(q.titleCache, lang, q.title)
+      title: getLocalizedText(q.titleJson, lang, q.title)
     }))
   }
 }

@@ -13,9 +13,11 @@ import express from 'express'
 import cors from 'cors'
 import helmet from 'helmet'
 import morgan from 'morgan'
-import { logger } from './utils/logger.js'
 import cookieParser from 'cookie-parser'
 
+import { logger } from './utils/logger.js'
+
+// Import Routes
 import authRouter from './routes/auth.js'
 import quizRouter from './routes/quiz.js'
 import editorRouter from './routes/editor.js'
@@ -25,53 +27,56 @@ import progressRouter from './routes/progress.js'
 import filesRouter from './routes/files.js'
 import adminRouter from './routes/admin.js'
 
-import { generalLimiter, authLimiter, webhookLimiter } from './middleware/rateLimit.js'
+// Import Middleware
+import { generalLimiter, authLimiter } from './middleware/rateLimit.js'
 import { validateCsrf } from './middleware/csrf.js'
-
+import { errorHandler, notFoundHandler } from './middleware/errorHandler.js'
 
 const app = express()
 
 app.set('trust proxy', 1)
 
-
 // --- Security headers ---
 app.use(helmet({
   crossOriginResourcePolicy: { policy: 'cross-origin' },
   referrerPolicy: { policy: 'no-referrer' },
-  contentSecurityPolicy: false, // CSP на фронтенді
+  contentSecurityPolicy: false, // CSP handles on frontend
   hsts: {
-    maxAge: 31536000, // 1 рік
+    maxAge: 31536000, // 1 year
     includeSubDomains: true,
     preload: true,
   },
 }))
+
 const allowed = Array.from(
   new Set(
     [
-      ...(process.env.CORS_ORIGIN?.split(',').map(s=>s.trim()) ?? []),
+      ...(process.env.CORS_ORIGIN?.split(',').map(s => s.trim()) ?? []),
       process.env.FRONTEND_URL,
       'http://localhost:5173',
       'http://localhost:5174'
     ].filter(Boolean)
   )
 )
+
 app.use(cors({
   origin: (origin, cb) => {
     if (!origin || allowed.includes(origin)) return cb(null, true)
     return cb(new Error('CORS not allowed'), false)
   },
   credentials: true,
-  methods: ['GET','POST','PUT','PATCH','DELETE','OPTIONS'],
-  allowedHeaders: ['Content-Type','Authorization','x-csrf-token']
+  methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
+  allowedHeaders: ['Content-Type', 'Authorization', 'x-csrf-token']
 }))
 
-// --- Логи ---
+// --- Logging ---
 app.use(morgan(process.env.NODE_ENV === 'production' ? 'combined' : 'dev'))
 app.use(cookieParser())
 
-// --- Ліміт розміру JSON тіла + звичайний парсер ---
+// --- Body Parser ---
 app.use(express.json({ limit: '1mb' }))
 
+// --- CSRF Protection (Mutating methods only) ---
 app.use('/api', (req, res, next) => {
   const mutatingMethods = ['POST', 'PUT', 'PATCH', 'DELETE']
   if (mutatingMethods.includes(req.method)) {
@@ -80,60 +85,31 @@ app.use('/api', (req, res, next) => {
   next()
 })
 
-// --- Глобальний м'який ліміт на решту API ---
+// --- Global Rate Limit ---
 app.use('/api', generalLimiter)
 
-// --- Healthcheck без auth ---
+// --- Healthcheck ---
 app.get('/api/health', (_req, res) => res.json({ ok: true }))
 
-
-// --- Auth роути з селективним лімітом (5 спроб за 15 хв) ---
+// --- Routes ---
 app.use('/api/auth', authLimiter, authRouter)
-
-// --- Інші модулі ---
 app.use('/api/topics', topicsRouter)
 app.use('/api/lessons', lessonsRouter)
 app.use('/api/quiz', quizRouter)
 app.use('/api/editor', editorRouter)
 app.use('/api/progress', progressRouter)
-app.use('/api/files', filesRouter) // File uploads
-
-// --- ADMIN ---
+app.use('/api/files', filesRouter)
 app.use('/api/admin', adminRouter)
 
-// --- 404 JSON ---
-app.use((req, res) => {
-  res.status(404).json({ error: 'Not found' })
-})
+// --- Error Handling (MUST be last) ---
+app.use(notFoundHandler) // 404 Handler
+app.use(errorHandler)    // Global Error Handler
 
-// --- Глобальний JSON error handler ---
-interface HttpError extends Error {
-  status?: number
-  type?: string
-}
-
-app.use((err: HttpError, _req: express.Request, res: express.Response, _next: express.NextFunction) => {
-  if (err?.message === 'CORS not allowed') {
-    return res.status(403).json({ error: 'CORS blocked' })
-  }
-  if (err?.type === 'entity.too.large') {
-    return res.status(413).json({ error: 'Payload too large' })
-  }
-  if (err?.type === 'entity.parse.failed') {
-    return res.status(400).json({ error: 'Invalid JSON' })
-  }
-  const status = typeof err?.status === 'number' ? err.status : 500
-  const message = err?.message || 'Internal Server Error'
-  if (process.env.NODE_ENV !== 'production') {
-    logger.error('Unhandled error', err as Error)
-  }
-  res.status(status).json({ error: message })
-})
-
+// --- Server Startup ---
 const port = Number(process.env.PORT ?? 4000)
 const server = app.listen(port, () => logger.info(`API listening on http://localhost:${port}`))
 
-// Graceful shutdown logic...
+// --- Graceful Shutdown ---
 async function gracefulShutdown(signal: string) {
   logger.warn(`${signal} received. Starting graceful shutdown...`)
   server.close(async (err) => {
@@ -144,14 +120,18 @@ async function gracefulShutdown(signal: string) {
     logger.info('HTTP server closed')
     try {
       const { prisma } = await import('./db.js')
-      await prisma.$disconnect()
-      logger.info('Database connection closed')
+      // Safe disconnect if using prisma extensions
+      if (prisma && '$disconnect' in prisma) {
+        await (prisma as any).$disconnect()
+        logger.info('Database connection closed')
+      }
     } catch (dbErr) {
       logger.error('Error closing database', dbErr as Error)
     }
     logger.info('Graceful shutdown completed')
     process.exit(0)
   })
+  
   setTimeout(() => {
     logger.error('Forced shutdown after timeout')
     process.exit(1)
@@ -167,4 +147,4 @@ process.on('uncaughtException', (err) => {
 
 process.on('unhandledRejection', (reason, promise) => {
   logger.error('Unhandled Rejection', new Error(String(reason)), { promise })
-})  
+})

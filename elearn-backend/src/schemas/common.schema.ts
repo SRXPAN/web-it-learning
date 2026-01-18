@@ -5,9 +5,10 @@
 import { z } from 'zod'
 
 /**
- * UUID validation
+ * CUID validation (Prisma default ID format)
+ * Changed from UUID to CUID because Prisma uses @default(cuid())
  */
-export const uuidSchema = z.string().uuid('Invalid ID format')
+export const cuidSchema = z.string().cuid('Invalid ID format')
 
 /**
  * Pagination query parameters
@@ -30,9 +31,10 @@ export type Lang = z.infer<typeof langSchema>
 
 /**
  * Standard ID parameter (for route params)
+ * Renamed to define it explicitly uses CUID
  */
 export const idParamSchema = z.object({
-  id: uuidSchema,
+  id: cuidSchema, 
 })
 
 export type IdParam = z.infer<typeof idParamSchema>
@@ -47,7 +49,7 @@ export const dateSchema = z
   .transform((val) => new Date(val))
 
 /**
- * Email validation (matches backend email regex)
+ * Email validation
  */
 export const emailSchema = z
   .string()
@@ -56,7 +58,8 @@ export const emailSchema = z
   .max(255)
 
 /**
- * Password validation (minimum 8 chars, at least one uppercase, one lowercase, one number, one special char)
+ * Password validation
+ * Expanded special characters regex to include common ones like _ - + = ?
  */
 export const passwordSchema = z
   .string()
@@ -64,7 +67,7 @@ export const passwordSchema = z
   .regex(/[A-Z]/, 'Password must contain at least one uppercase letter')
   .regex(/[a-z]/, 'Password must contain at least one lowercase letter')
   .regex(/[0-9]/, 'Password must contain at least one digit')
-  .regex(/[!@#$%^&*]/, 'Password must contain at least one special character (!@#$%^&*)')
+  .regex(/[\W_]/, 'Password must contain at least one special character') // \W matches any non-word char
 
 /**
  * Simplified password (for admin setting passwords)
@@ -89,12 +92,12 @@ export const nameSchema = z
 export const urlSchema = z.string().url('Invalid URL')
 
 /**
- * Status enum (common)
+ * Status enum
  */
 export const statusSchema = z.enum(['ACTIVE', 'INACTIVE', 'ARCHIVED'])
 
 /**
- * Role enum (user roles)
+ * Role enum
  */
 export const roleSchema = z.enum(['STUDENT', 'EDITOR', 'ADMIN'])
 
@@ -102,7 +105,8 @@ export const roleSchema = z.enum(['STUDENT', 'EDITOR', 'ADMIN'])
  * Common schemas object
  */
 export const commonSchemas = {
-  uuid: uuidSchema,
+  id: cuidSchema, // Use general name 'id' pointing to cuidSchema
+  cuid: cuidSchema,
   pagination: paginationSchema,
   lang: langSchema,
   idParam: idParamSchema,

@@ -29,8 +29,9 @@ import {
 } from '../services/auth.service.js'
 import { logger } from '../utils/logger.js'
 import bcrypt from 'bcryptjs'
-import { ok } from '../utils/response.js'
+import { ok, created } from '../utils/response.js'
 import { deleteFile } from '../services/storage.service.js'
+import { getBadges } from '../utils/gamification.js'
 
 const router = Router()
 
@@ -59,189 +60,28 @@ function getClientInfo(req: Request): { userAgent?: string; ip?: string } {
     ip: req.ip || forwardedIp,
   }
 }
-
-function getBadges(xp: number): string[] {
-  const badges: string[] = []
-  if (xp >= 10) badges.push('first_steps')
-  if (xp >= 50) badges.push('rising_star')
-  if (xp >= 100) badges.push('dedicated_learner')
-  if (xp >= 250) badges.push('quiz_master')
-  if (xp >= 500) badges.push('expert')
-  if (xp >= 1000) badges.push('legend')
-  return badges
-}
-
-// ============================================
-// AUTH ROUTES
-// ============================================
-
-/**
- * @openapi
- * /api/auth/csrf:
- *   get:
- *     tags:
- *       - Authentication
- *     summary: Get CSRF token
- *     description: Returns a CSRF token that must be included in all mutating requests
- *     responses:
- *       200:
- *         description: CSRF token generated successfully
- *         headers:
- *           X-CSRF-Token:
- *             schema:
- *               type: string
- *             description: CSRF token to include in subsequent requests
- *         content:
- *           application/json:
- *             schema:
- *               type: object
- *               properties:
- *                 csrfToken:
- *                   type: string
- */
 router.get('/csrf', setCsrfToken)
 
-/**
- * @openapi
- * /api/auth/me:
- *   get:
- *     tags:
- *       - Authentication
- *     summary: Get current user profile
- *     description: Returns the currently authenticated user's profile information
- *     security:
- *       - cookieAuth: []
- *       - bearerAuth: []
- *     responses:
- *       200:
- *         description: User profile retrieved successfully
- *         content:
- *           application/json:
- *             schema:
- *               type: object
- *               properties:
- *                 id:
- *                   type: string
- *                   format: uuid
- *                 name:
- *                   type: string
- *                 email:
- *                   type: string
- *                   format: email
- *                 role:
- *                   type: string
- *                   enum: [STUDENT, EDITOR, ADMIN]
- *                 xp:
- *                   type: integer
- *                 avatarId:
- *                   type: string
- *                   nullable: true
- *                 emailVerified:
- *                   type: boolean
- *                 avatarFile:
- *                   type: object
- *                   nullable: true
- *                   properties:
- *                     id:
- *                       type: string
- *                     key:
- *                       type: string
- *                     mimeType:
- *                       type: string
- *       401:
- *         description: Unauthorized - invalid or missing token
- *         content:
- *           application/json:
- *             schema:
- *               $ref: '#/components/schemas/Error'
- */
-router.get('/me', requireAuth, async (req, res, next) => {
-  try {
-    const user = await prisma.user.findUnique({
-      where: { id: req.user!.id },
-      select: { 
-        id: true, 
-        name: true, 
-        email: true, 
-        role: true, 
-        xp: true, 
-        avatarId: true,
-        emailVerified: true,
-        avatarFile: { select: { id: true, key: true, mimeType: true } },
-      },
-    })
-    if (!user) return res.status(401).json({ error: 'User not found' })
-    res.json(user)
-  } catch (e) { next(e) }
-})
+router.get('/me', requireAuth, asyncHandler(async (req: Request, res: Response) => {
+  const user = await prisma.user.findUnique({
+    where: { id: req.user!.id },
+    select: { 
+      id: true, 
+      name: true, 
+      email: true, 
+      role: true, 
+      xp: true, 
+      avatarId: true,
+      emailVerified: true,
+      avatarFile: { select: { id: true, key: true, mimeType: true } },
+    },
+  })
+  if (!user) {
+    throw AppError.notFound('User not found')
+  }
+  return ok(res, { ...user, badges: getBadges(user.xp) })
+}))
 
-/**
- * @openapi
- * /api/auth/register:
- *   post:
- *     tags:
- *       - Authentication
- *     summary: Register a new user
- *     description: Create a new student account and receive initial tokens
- *     requestBody:
- *       required: true
- *       content:
- *         application/json:
- *           schema:
- *             type: object
- *             required:
- *               - email
- *               - password
- *               - name
- *             properties:
- *               email:
- *                 type: string
- *                 format: email
- *               password:
- *                 type: string
- *                 format: password
- *               name:
- *                 type: string
- *     responses:
- *       200:
- *         description: User registered successfully
- *         headers:
- *           Set-Cookie:
- *             schema:
- *               type: string
- *             description: Authentication cookies (elearn_token, elearn_refresh_token)
- *         content:
- *           application/json:
- *             schema:
- *               type: object
- *               properties:
- *                 user:
- *                   $ref: '#/components/schemas/User'
- *                 message:
- *                   type: string
- *                   example: Registration successful. Please verify your email.
- *       400:
- *         description: Validation error or user already exists
- *         content:
- *           application/json:
- *             schema:
- *               type: object
- *               properties:
- *                 status:
- *                   type: string
- *                   example: error
- *                 message:
- *                   type: string
- *                 code:
- *                   type: string
- *                   nullable: true
- *       429:
- *         description: Too many registration attempts
- */
-/**
- * POST /api/auth/register
- * Register a new user account
- */
 router.post(
   '/register',
   authLimiter,
@@ -253,7 +93,7 @@ router.post(
     // SECURITY: Check if this is a fake response (empty tokens = user already exists)
     if (!result.tokens.accessToken || !result.tokens.refreshToken) {
       // Don't set cookies, but still return success to prevent user enumeration
-      return ok(res, {
+      return created(res, {
         user: {
           id: result.user.id,
           name: result.user.name,
@@ -267,90 +107,13 @@ router.post(
     }
 
     setAuthCookies(res, result.tokens.accessToken, result.tokens.refreshToken)
-    return ok(res, {
+    return created(res, {
       user: result.user,
       message: 'Registration successful. Please verify your email.',
     })
   })
 )
 
-/**
- * @openapi
- * /api/auth/login:
- *   post:
- *     tags:
- *       - Authentication
- *     summary: Login with email and password
- *     description: Authenticate a user and receive access/refresh tokens
- *     requestBody:
- *       required: true
- *       content:
- *         application/json:
- *           schema:
- *             type: object
- *             required:
- *               - email
- *               - password
- *             properties:
- *               email:
- *                 type: string
- *                 format: email
- *               password:
- *                 type: string
- *                 format: password
- *     responses:
- *       200:
- *         description: Login successful
- *         headers:
- *           Set-Cookie:
- *             schema:
- *               type: string
- *             description: Authentication cookies (elearn_token, elearn_refresh_token)
- *         content:
- *           application/json:
- *             schema:
- *               type: object
- *               properties:
- *                 user:
- *                   $ref: '#/components/schemas/User'
- *                 badges:
- *                   type: array
- *                   items:
- *                     type: string
- *                   example: ['first_steps', 'rising_star']
- *       400:
- *         description: Validation error
- *         content:
- *           application/json:
- *             schema:
- *               type: object
- *               properties:
- *                 status:
- *                   type: string
- *                   example: error
- *                 message:
- *                   type: string
- *                 code:
- *                   type: string
- *                   nullable: true
- *       401:
- *         description: Invalid credentials or unverified email
- *         content:
- *           application/json:
- *             schema:
- *               type: object
- *               properties:
- *                 status:
- *                   type: string
- *                   example: error
- *                 message:
- *                   type: string
- *                 code:
- *                   type: string
- *                   nullable: true
- *       429:
- *         description: Too many login attempts
- */
 router.post(
   '/login',
   authLimiter,
@@ -471,10 +234,6 @@ router.post(
   })
 )
 
-// ============================================
-// EMAIL VERIFICATION ROUTES
-// ============================================
-
 // POST /api/auth/verify-email — верифікація email
 router.post(
   '/verify-email',
@@ -511,10 +270,6 @@ router.post(
     return ok(res, { message: 'Verification email sent' })
   })
 )
-
-// ============================================
-// EMAIL & PROFILE ROUTES
-// ============================================
 
 // PUT /api/auth/email — змінити email
 router.put(
@@ -584,72 +339,65 @@ router.put(
 )
 
 // POST /api/auth/avatar — завантажити аватар (deprecated - use /files API instead)
-router.post('/avatar', requireAuth, async (req, res, next) => {
-  try {
-    const { fileId } = req.body
-    
-    if (!fileId) {
-      return res.status(400).json({ error: 'fileId is required. Use /files/presign-upload first.' })
-    }
-    
-    // Verify file exists and is owned by user
-    const file = await prisma.file.findUnique({
-      where: { id: fileId },
-    })
-    
-    if (!file || file.uploadedById !== req.user!.id) {
-      return res.status(400).json({ error: 'Invalid file' })
-    }
+router.post('/avatar', requireAuth, asyncHandler(async (req: Request, res: Response) => {
+  const { fileId } = req.body
+  
+  if (!fileId) {
+    throw AppError.badRequest('fileId is required. Use /files/presign-upload first.')
+  }
+  
+  // Verify file exists and is owned by user
+  const file = await prisma.file.findUnique({
+    where: { id: fileId },
+  })
+  
+  if (!file || file.uploadedById !== req.user!.id) {
+    throw AppError.badRequest('Invalid file')
+  }
 
-    // Get current user with avatar
-    const currentUser = await prisma.user.findUnique({
-      where: { id: req.user!.id },
-      include: { avatarFile: true }
-    })
+  // Get current user with avatar
+  const currentUser = await prisma.user.findUnique({
+    where: { id: req.user!.id },
+    include: { avatarFile: true }
+  })
 
-    // If new avatar is different from old one, delete old file from S3
-    if (fileId && currentUser?.avatarId && fileId !== currentUser.avatarId) {
-      if (currentUser.avatarFile?.key) {
-        deleteFile(currentUser.avatarFile.key).catch((err: unknown) =>
-          logger.error('Failed to cleanup old avatar:', err)
-        )
-      }
+  // If new avatar is different from old one, delete old file from S3
+  if (fileId && currentUser?.avatarId && fileId !== currentUser.avatarId) {
+    if (currentUser.avatarFile?.key) {
+      deleteFile(currentUser.avatarFile.key).catch((err: unknown) =>
+        logger.error('Failed to cleanup old avatar:', err)
+      )
     }
-    
-    const updatedUser = await prisma.user.update({
-      where: { id: req.user!.id },
-      data: { avatarId: fileId },
-      select: { 
-        id: true, name: true, email: true, role: true, xp: true, 
-        avatarId: true, emailVerified: true,
-        avatarFile: { select: { id: true, key: true, mimeType: true } }
-      },
-    })
-    
-    res.json({ ok: true, user: updatedUser })
-  } catch (e) { next(e) }
-})
+  }
+  
+  const updatedUser = await prisma.user.update({
+    where: { id: req.user!.id },
+    data: { avatarId: fileId },
+    select: { 
+      id: true, name: true, email: true, role: true, xp: true, 
+      avatarId: true, emailVerified: true,
+      avatarFile: { select: { id: true, key: true, mimeType: true } }
+    },
+  })
+  
+  return ok(res, { user: updatedUser })
+}))
 
 // DELETE /api/auth/avatar — видалити аватар
-router.delete('/avatar', requireAuth, async (req, res, next) => {
-  try {
-    const updatedUser = await prisma.user.update({
-      where: { id: req.user!.id },
-      data: { avatarId: null },
-      select: { 
-        id: true, name: true, email: true, role: true, xp: true, 
-        avatarId: true, emailVerified: true,
-        avatarFile: { select: { id: true, key: true, mimeType: true } }
-      },
-    })
-    
-    res.json({ ok: true, user: updatedUser })
-  } catch (e) { next(e) }
-})
+router.delete('/avatar', requireAuth, asyncHandler(async (req: Request, res: Response) => {
+  const updatedUser = await prisma.user.update({
+    where: { id: req.user!.id },
+    data: { avatarId: null },
+    select: { 
+      id: true, name: true, email: true, role: true, xp: true, 
+      avatarId: true, emailVerified: true,
+      avatarFile: { select: { id: true, key: true, mimeType: true } }
+    },
+  })
+  
+  return ok(res, { user: updatedUser })
+}))
 
-// ============================================
-// ACCOUNT MANAGEMENT
-// ============================================
 
 // DELETE /api/auth/account — видалення користувача (GDPR Right to be Forgotten)
 router.delete(
@@ -675,13 +423,10 @@ router.delete(
   })
 )
 
-// ============================================
-// LEADERBOARD
-// ============================================
-
 // GET /api/auth/leaderboard — топ користувачів
 router.get(
   '/leaderboard',
+  requireAuth,
   asyncHandler(async (req: Request, res: Response) => {
     const limit = Math.min(parseInt(req.query.limit as string) || 50, 100)
     const users = await prisma.user.findMany({

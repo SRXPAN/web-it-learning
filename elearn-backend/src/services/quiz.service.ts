@@ -50,9 +50,10 @@ export async function getQuizWithToken(quizId: string, userId: string, lang?: La
   // Apply localization if specified
   const shouldLocalize = lang && ['UA', 'PL', 'EN'].includes(lang)
   
+  // FIX: Changed titleCache to titleJson
   return {
     id: quiz.id,
-    title: shouldLocalize ? getLocalized(quiz.titleCache, lang, quiz.title) : quiz.title,
+    title: shouldLocalize ? getLocalized(quiz.titleJson, lang, quiz.title) : quiz.title,
     durationSec: quiz.durationSec,
     topicId: quiz.topicId,
     status: quiz.status,
@@ -109,7 +110,7 @@ export async function submitQuizAttempt(
           options: {
             select: {
               id: true,
-              correct: true
+              correct: true // Correct field name as per schema
             }
           }
         }
@@ -126,7 +127,6 @@ export async function submitQuizAttempt(
   
   answers.forEach((a) => {
     if (typeof a.optionId === 'string' && a.optionId.length > 0) {
-      // Якщо відповідь на це питання вже є, ми її перезаписуємо (або ігноруємо)
       uniqueAnswersMap.set(a.questionId, a);
     }
   });
@@ -138,9 +138,9 @@ export async function submitQuizAttempt(
   const explanationMap: Record<string, string> = {}
   
   for (const q of quiz.questions) {
-    const correct = q.options.find((o: any) => o.correct)
-    if (correct) {
-      correctMap[q.id] = correct.id
+    const correctOption = q.options.find((o: any) => o.correct)
+    if (correctOption) {
+      correctMap[q.id] = correctOption.id
     }
     
     // Get localized explanation if available
@@ -160,7 +160,7 @@ export async function submitQuizAttempt(
       userId,
       questionId: a.questionId,
       optionId: a.optionId!,
-      isCorrect: ok,
+      isCorrect: ok, // 'isCorrect' is correct for the Answer model (vs 'correct' for Option)
     }
   })
 
@@ -215,7 +215,7 @@ export async function getUserQuizHistory(
           select: { 
             id: true, 
             title: true,
-            titleCache: true,
+            titleJson: true, // FIX: Changed titleCache to titleJson
           }
         }
       },
@@ -228,8 +228,9 @@ export async function getUserQuizHistory(
 
   const history = attempts.map((a: any) => {
     let quizTitle = a.quiz.title
-    if (options.lang && a.quiz.titleCache) {
-      quizTitle = getLocalized(a.quiz.titleCache, options.lang, a.quiz.title)
+    // FIX: Changed titleCache to titleJson
+    if (options.lang && a.quiz.titleJson) {
+      quizTitle = getLocalized(a.quiz.titleJson, options.lang, a.quiz.title)
     }
     return {
       quizId: a.quiz.id,

@@ -2,6 +2,15 @@
 import { prisma } from '../db.js'
 
 /**
+ * Helper to get normalized UTC date (00:00:00.000 Z)
+ * Ensures streaks work correctly regardless of server timezone
+ */
+function getUtcToday(): Date {
+  const now = new Date()
+  return new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate()))
+}
+
+/**
  * Позначає матеріал як переглянутий
  */
 export async function markMaterialViewed(
@@ -16,7 +25,7 @@ export async function markMaterialViewed(
     create: {
       userId,
       materialId,
-      timeSpent,
+      timeSpent: timeSpent || 0,
     },
     update: {
       viewedAt: new Date(),
@@ -74,8 +83,7 @@ export async function updateDailyActivity(
     goalsCompleted?: number
   }
 ): Promise<void> {
-  const today = new Date()
-  today.setHours(0, 0, 0, 0)
+  const today = getUtcToday() // Use UTC normalized date
   
   await prisma.userActivity.upsert({
     where: {
@@ -102,9 +110,8 @@ export async function updateDailyActivity(
  * Отримує активність за останні N днів
  */
 export async function getRecentActivity(userId: string, days: number = 7) {
-  const startDate = new Date()
+  const startDate = getUtcToday()
   startDate.setDate(startDate.getDate() - days)
-  startDate.setHours(0, 0, 0, 0)
   
   const activities = await prisma.userActivity.findMany({
     where: {
@@ -127,7 +134,7 @@ export async function calculateStreak(userId: string): Promise<{
 }> {
   const activities = await prisma.userActivity.findMany({
     where: { userId },
-    orderBy: { date: 'desc' },
+    orderBy: { date: 'desc' }, // Newest first
     select: { date: true },
   })
   
@@ -138,61 +145,57 @@ export async function calculateStreak(userId: string): Promise<{
   let currentStreak = 0
   let longestStreak = 0
   let tempStreak = 1
-  const today = new Date()
-  today.setHours(0, 0, 0, 0)
   
+  const today = getUtcToday()
   const lastActivityDate = new Date(activities[0].date)
-  lastActivityDate.setHours(0, 0, 0, 0)
   
-  // Перевіряємо чи є активність сьогодні або вчора
-  const daysDiff = Math.floor((today.getTime() - lastActivityDate.getTime()) / (1000 * 60 * 60 * 24))
+  // 1. Calculate Current Streak
+  const msPerDay = 1000 * 60 * 60 * 24
+  const daysDiff = Math.floor((today.getTime() - lastActivityDate.getTime()) / msPerDay)
   
-  if (daysDiff > 1) {
-    // Streak перервано
-    currentStreak = 0
-  } else {
-    // Рахуємо поточний streak
+  // Streak is only active if activity was Today (0) or Yesterday (1)
+  if (daysDiff <= 1) {
     currentStreak = 1
     for (let i = 1; i < activities.length; i++) {
       const prevDate = new Date(activities[i - 1].date)
       const currDate = new Date(activities[i].date)
-      prevDate.setHours(0, 0, 0, 0)
-      currDate.setHours(0, 0, 0, 0)
       
-      const diff = Math.floor((prevDate.getTime() - currDate.getTime()) / (1000 * 60 * 60 * 24))
+      const diff = Math.round((prevDate.getTime() - currDate.getTime()) / msPerDay)
       
       if (diff === 1) {
         currentStreak++
-        tempStreak++
       } else {
-        break
+        break // Streak broken
       }
     }
+  } else {
+    currentStreak = 0 // User missed more than 1 day
   }
   
-  // Знаходимо найдовший streak
+  
+
+  // 2. Calculate Longest Streak (Iterate full history)
   tempStreak = 1
+  // Start with at least 1 if we have any activity
+  longestStreak = activities.length > 0 ? 1 : 0; 
+
   for (let i = 1; i < activities.length; i++) {
     const prevDate = new Date(activities[i - 1].date)
     const currDate = new Date(activities[i].date)
-    prevDate.setHours(0, 0, 0, 0)
-    currDate.setHours(0, 0, 0, 0)
     
-    const diff = Math.floor((prevDate.getTime() - currDate.getTime()) / (1000 * 60 * 60 * 24))
+    const diff = Math.round((prevDate.getTime() - currDate.getTime()) / msPerDay)
     
     if (diff === 1) {
       tempStreak++
-      longestStreak = Math.max(longestStreak, tempStreak)
     } else {
-      tempStreak = 1
+      tempStreak = 1 // Reset counter
     }
+    longestStreak = Math.max(longestStreak, tempStreak)
   }
-  
-  longestStreak = Math.max(longestStreak, currentStreak)
   
   return {
     current: currentStreak,
-    longest: longestStreak,
+    longest: Math.max(longestStreak, currentStreak),
     lastActiveDate: activities[0]?.date ?? null,
   }
 }
@@ -228,14 +231,14 @@ export async function syncViewedMaterials(
   userId: string, 
   localMaterialIds: string[]
 ): Promise<string[]> {
-  // Отримуємо те, що вже є на сервері
+  // Get what exists on server
   const serverViewed = await getViewedMaterialIds(userId)
   const serverSet = new Set(serverViewed)
   
-  // Знаходимо нові локальні матеріали
+  // Find strictly new materials
   const newLocal = localMaterialIds.filter(id => !serverSet.has(id))
   
-  // Додаємо нові на сервер
+  // Insert new ones
   if (newLocal.length > 0) {
     await prisma.materialView.createMany({
       data: newLocal.map(materialId => ({ userId, materialId })),
@@ -243,7 +246,6 @@ export async function syncViewedMaterials(
     })
   }
   
-  // Повертаємо повний список
-  const allViewed = [...new Set([...serverViewed, ...newLocal])]
-  return allViewed
+  // Return merged list
+  return [...new Set([...serverViewed, ...newLocal])]
 }

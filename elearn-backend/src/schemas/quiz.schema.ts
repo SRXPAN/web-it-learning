@@ -12,7 +12,7 @@ const questionOptionSchema = z.object({
   id: z.string().cuid().optional(),
   text: z.string().min(1, 'Option text required').max(1000),
   textJson: z.record(z.string()).optional(),
-  isCorrect: z.boolean().default(false),
+  correct: z.boolean().default(false), // Changed from isCorrect to match Prisma schema
 })
 
 export type QuestionOption = z.infer<typeof questionOptionSchema>

@@ -469,3 +469,57 @@ export async function deleteUser(userId: string): Promise<boolean> {
   
   return true
 }
+// Add imports
+import { deleteFile } from './storage.service.js'
+
+/**
+ * Оновлення аватара користувача
+ */
+export async function updateUserAvatar(userId: string, fileId: string): Promise<any> {
+  // 1. Verify file exists
+  const file = await prisma.file.findUnique({ where: { id: fileId } })
+  if (!file) throw AppError.badRequest('File not found')
+  
+  // Optional: Check file ownership if file is private
+  // if (file.uploadedById !== userId) throw AppError.forbidden('Access denied')
+
+  // 2. Get current user to cleanup old avatar
+  const currentUser = await prisma.user.findUnique({
+    where: { id: userId },
+    include: { avatarFile: true }
+  })
+
+  // 3. Cleanup old avatar if exists and different
+  if (currentUser?.avatarId && currentUser.avatarId !== fileId && currentUser.avatarFile?.key) {
+    // Non-blocking cleanup
+    deleteFile(currentUser.avatarFile.key).catch(err => 
+      console.error('Failed to cleanup old avatar:', err)
+    )
+  }
+
+  // 4. Update user
+  return prisma.user.update({
+    where: { id: userId },
+    data: { avatarId: fileId },
+    select: { 
+      id: true, name: true, email: true, role: true, xp: true, 
+      avatarId: true, emailVerified: true,
+      avatarFile: { select: { id: true, key: true, mimeType: true } }
+    },
+  })
+}
+
+/**
+ * Видалення аватара
+ */
+export async function removeUserAvatar(userId: string): Promise<any> {
+  return prisma.user.update({
+    where: { id: userId },
+    data: { avatarId: null },
+    select: { 
+      id: true, name: true, email: true, role: true, xp: true, 
+      avatarId: true, emailVerified: true,
+      avatarFile: { select: { id: true, key: true, mimeType: true } }
+    },
+  })
+}

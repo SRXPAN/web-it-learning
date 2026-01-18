@@ -9,76 +9,77 @@ import { localizeObject } from '../utils/i18n.js'
 import { ok } from '../utils/response.js'
 import type { Lang } from '@elearn/shared'
 
-
 const router = Router()
 
-// Helper to safely extract string from params (handles string | string[])
 function getParam(param: string | string[]): string {
   return Array.isArray(param) ? param[0] : param
 }
 
-// Type for material with optional i18n fields
+// Improved Type Definition
 interface MaterialWithI18n {
-  title?: string
+  title: string
   titleJson?: unknown
   content?: string | null
   contentJson?: unknown
   [key: string]: unknown
 }
 
-// Helper to localize material using JSON fields
 function localizeMaterial<T extends MaterialWithI18n>(
   material: T,
   lang: Lang
 ): Omit<T, 'titleJson' | 'contentJson'> {
-  const result: Record<string, unknown> = { ...material }
-  let contentLang: string = 'EN'; // Default
+  // 1. Clone object to avoid mutation
+  const result: any = { ...material }
   
-  // Localize title from titleJson
-  if (material.titleJson) {
-    const localized = localizeObject(material as Record<string, unknown>, lang, { titleJson: 'title' })
-    result.title = localized.title
-    
-    // Check if translation exists for requested language
-    if (material.titleJson && typeof material.titleJson === 'object' && (material.titleJson as any)[lang]) {
+  // 2. Determine content language (metadata)
+  let contentLang = 'EN';
+  const titleJson = material.titleJson as Record<string, string> | null;
+  if (titleJson && typeof titleJson === 'object' && titleJson[lang]) {
       contentLang = lang;
-    }
+  }
+
+  // 3. Localize specific fields
+  if (material.titleJson) {
+    const localized = localizeObject(material as any, lang, { titleJson: 'title' })
+    result.title = localized.title
   }
   
-  // Localize content from contentJson
   if (material.contentJson) {
-    const localized = localizeObject(material as Record<string, unknown>, lang, { contentJson: 'content' })
+    const localized = localizeObject(material as any, lang, { contentJson: 'content' })
     result.content = localized.content
   }
   
-  // Clean up internal fields from response
+  // 4. Cleanup internal fields
   delete result.titleJson
   delete result.contentJson
   
-  // Add metadata for frontend
+  // 5. Add meta info
   result.meta = {
     requestedLang: lang,
     contentLang: contentLang
   };
   
-  return result as Omit<T, 'titleJson' | 'contentJson'>
+  return result
 }
 
-// Schema for query params
+// Schemas
 const querySchema = z.object({
   lang: z.enum(['UA', 'PL', 'EN']).optional(),
   page: z.string().regex(/^\d+$/).optional().default('1'),
   limit: z.string().regex(/^\d+$/).optional().default('10'),
 })
 
-// GET /lessons - List all lessons/materials
+// Validation schemas for IDs (Using CUID for Prisma compatibility)
+const idParams = z.object({ id: z.string().cuid() });
+const topicParams = z.object({ topicId: z.string().cuid() });
+
+// GET /lessons
 router.get(
   '/',
   requireAuth,
   validateResource(querySchema, 'query'),
   asyncHandler(async (req: Request, res: Response) => {
-    const query = req.query as unknown as z.infer<typeof querySchema>;
-    const { lang, page = '1', limit = '10' } = query;
+    const { lang, page = '1', limit = '10' } = req.query as unknown as z.infer<typeof querySchema>;
     const take = parseInt(limit);
     const skip = (parseInt(page) - 1) * take;
     const isStaff = ['ADMIN', 'EDITOR'].includes(req.user!.role);
@@ -87,7 +88,8 @@ router.get(
       prisma.material.findMany({
         where: isStaff ? {} : { status: 'Published' },
         orderBy: { createdAt: 'desc' },
-        take, skip,
+        take, 
+        skip,
         include: { 
           topic: { 
             select: { id: true, name: true, slug: true, nameJson: true } 
@@ -105,16 +107,15 @@ router.get(
   })
 )
 
-// GET /lessons/:id - Get single lesson/material by ID
+// GET /lessons/:id
 router.get(
   '/:id',
   requireAuth,
-  validateResource(z.object({ id: z.string().uuid() }), 'params'),
+  validateResource(idParams, 'params'), // Corrected validation
   validateResource(querySchema, 'query'),
   asyncHandler(async (req: Request, res: Response) => {
     const isStaff = ['ADMIN', 'EDITOR'].includes(req.user!.role)
-    const query = req.query as unknown as z.infer<typeof querySchema>;
-    const { lang } = query;
+    const { lang } = req.query as unknown as z.infer<typeof querySchema>;
     const id = getParam(req.params.id)
 
     const material = await prisma.material.findUnique({
@@ -135,36 +136,37 @@ router.get(
       throw AppError.forbidden('Access denied')
     }
 
+    // Fire-and-forget view increment
     prisma.material
       .update({ where: { id }, data: { views: { increment: 1 } } })
       .catch(() => {})
 
-    if (lang && ['UA', 'PL', 'EN'].includes(lang)) {
-      const localized = localizeMaterial(material, lang as Lang)
-      let localizedTopic = material.topic
-      if (material.topic?.nameJson) {
-        const topicLocalized = localizeObject(material.topic, lang as Lang, { nameJson: 'name' })
-        localizedTopic = { ...topicLocalized }
-        delete (localizedTopic as any).nameJson
+    if (lang) {
+      const localized = localizeMaterial(material as any, lang as Lang)
+      
+      // Localize nested topic if present
+      if (localized.topic && (localized.topic as any).nameJson) {
+        const topicLocalized = localizeObject(localized.topic as any, lang as Lang, { nameJson: 'name' });
+        (localized.topic as any) = { ...topicLocalized };
+        delete (localized.topic as any).nameJson;
       }
 
-      return res.json({ ...localized, topic: localizedTopic })
-    } else {
-      return res.json(material)
-    }
+      return res.json(localized)
+    } 
+    
+    return res.json(material)
   })
 )
 
-// GET /lessons/by-topic/:topicId - Get lessons by topic
+// GET /lessons/by-topic/:topicId
 router.get(
   '/by-topic/:topicId',
   requireAuth,
-  validateResource(z.object({ topicId: z.string().uuid() }), 'params'),
+  validateResource(topicParams, 'params'), // Corrected validation
   validateResource(querySchema, 'query'),
   asyncHandler(async (req: Request, res: Response) => {
     const isStaff = ['ADMIN', 'EDITOR'].includes(req.user!.role)
-    const query = req.query as unknown as z.infer<typeof querySchema>;
-    const { lang, page = '1', limit = '10' } = query;
+    const { lang, page = '1', limit = '10' } = req.query as unknown as z.infer<typeof querySchema>;
     const take = parseInt(limit);
     const skip = (parseInt(page) - 1) * take;
     const topicId = getParam(req.params.topicId)
@@ -175,8 +177,9 @@ router.get(
           topicId: topicId,
           ...(isStaff ? {} : { status: 'Published' }),
         },
-        orderBy: { createdAt: 'asc' },
-        take, skip,
+        orderBy: { createdAt: 'asc' }, // Lessons usually ordered ASC
+        take, 
+        skip,
       }),
       prisma.material.count({
         where: {

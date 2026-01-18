@@ -13,31 +13,10 @@ export const materialTypeEnum = z.enum(['pdf', 'video', 'text', 'link'])
 export type MaterialType = z.infer<typeof materialTypeEnum>
 
 /**
- * Localized text cache schema - ensures all required languages are present
- */
-const titleCacheSchema = z.object({
-  UA: z.string().min(1, 'UA title required'),
-  EN: z.string().min(1, 'EN title required'),
-  PL: z.string().min(1, 'PL title required').optional(),
-})
-
-const contentCacheSchema = z.object({
-  UA: z.string().optional(),
-  EN: z.string().optional(),
-  PL: z.string().optional(),
-})
-
-const urlCacheSchema = z.object({
-  UA: z.string().url().optional(),
-  EN: z.string().url().min(1, 'EN URL required'),
-  PL: z.string().url().optional(),
-})
-
-/**
- * Create material schema - for creating new materials with language-specific content
+ * Create material schema
  */
 export const createMaterialSchema = z.object({
-  topicId: z.string().uuid('Invalid topic ID'),
+  topicId: z.string().cuid('Invalid topic ID'), // Changed to CUID
   type: materialTypeEnum,
   
   // Language-specific titles
@@ -63,7 +42,7 @@ export const createMaterialSchema = z.object({
 export type CreateMaterialInput = z.infer<typeof createMaterialSchema>
 
 /**
- * Update material schema - for updating existing materials
+ * Update material schema
  */
 export const updateMaterialSchema = createMaterialSchema.partial()
 
@@ -71,7 +50,6 @@ export type UpdateMaterialInput = z.infer<typeof updateMaterialSchema>
 
 /**
  * Bulk update material translations schema
- * Used when updating all language versions at once
  */
 export const updateMaterialTranslationsSchema = z.object({
   titleUA: z.string().min(1).max(255).optional(),
@@ -99,7 +77,7 @@ export const materialPaginationSchema = z.object({
   limit: z.coerce.number().int().positive().max(100).default(20),
   type: materialTypeEnum.optional(),
   status: z.enum(['DRAFT', 'PUBLISHED']).optional(),
-  topicId: z.string().cuid().optional(),
+  topicId: z.string().cuid().optional(), // This was already correct
   lang: commonSchemas.lang.optional(),
 })
 
@@ -109,18 +87,17 @@ export type MaterialPaginationInput = z.infer<typeof materialPaginationSchema>
  * Material ID parameter schema
  */
 export const materialIdParamSchema = z.object({
-  id: z.string().uuid('Invalid material ID'),
+  id: z.string().cuid('Invalid material ID'), // Changed to CUID
 })
 
 export type MaterialIdParam = z.infer<typeof materialIdParamSchema>
 
 /**
  * Material with topic and ID parameter schema
- * Used for routes like /editor/topics/:topicId/materials/:id
  */
 export const topicMaterialParamSchema = z.object({
-  topicId: z.string().uuid('Invalid topic ID'),
-  id: z.string().uuid('Invalid material ID'),
+  topicId: z.string().cuid('Invalid topic ID'), // Changed to CUID
+  id: z.string().cuid('Invalid material ID'),   // Changed to CUID
 })
 
 export type TopicMaterialParam = z.infer<typeof topicMaterialParamSchema>

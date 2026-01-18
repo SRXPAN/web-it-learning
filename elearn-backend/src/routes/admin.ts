@@ -8,8 +8,6 @@ import { auditLog, AuditActions, AuditResources } from '../services/audit.servic
 import { z } from 'zod'
 import { emailSchema, nameSchema, passwordSchemaSimple } from '../utils/validation'
 import { logger } from '../utils/logger.js'
-import fs from 'fs/promises';
-import path from 'path';
 import { asyncHandler } from '../middleware/errorHandler.js'
 
 const router = Router()

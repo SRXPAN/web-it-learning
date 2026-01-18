@@ -2,35 +2,78 @@ import { config } from 'dotenv'
 import { resolve } from 'path'
 import { fileURLToPath } from 'url'
 import { dirname } from 'path'
+import { PrismaClient } from '@prisma/client'
 
-// Load .env from monorepo root
+// Load .env
 const __filename = fileURLToPath(import.meta.url)
 const __dirname = dirname(__filename)
 config({ path: resolve(__dirname, '../../.env') })
 
-import { PrismaClient } from '@prisma/client'
+// Base client
+const prismaClientSingleton = () => {
+  return new PrismaClient({
+    log: process.env.NODE_ENV === 'production' ? [] : ['error', 'warn'],
+  })
+}
 
-const g = globalThis as unknown as { prisma?: PrismaClient }
+const globalForPrisma = globalThis as unknown as {
+  prisma: ReturnType<typeof prismaClientSingleton>
+}
 
-export const prisma =
-    g.prisma ??
-    new PrismaClient({
-        log: process.env.NODE_ENV === 'production' ? [] : ['error', 'warn'],
-    })
+const basePrisma = globalForPrisma.prisma ?? prismaClientSingleton()
 
-if (process.env.NODE_ENV !== 'production') g.prisma = prisma
+// EXTENDED CLIENT (Better Soft Delete)
+export const prisma = basePrisma.$extends({
+  model: {
+    $allModels: {
+      // Helper method to soft delete
+      async softDelete(id: string) {
+        return (this as any).update({
+          where: { id },
+          data: { deletedAt: new Date() },
+        })
+      },
+      // Helper to restore
+      async restore(id: string) {
+        return (this as any).update({
+          where: { id },
+          data: { deletedAt: null },
+        })
+      }
+    },
+  },
+  query: {
+    material: {
+      async findMany({ args, query }) {
+        if (args.where?.deletedAt === undefined) {
+          args.where = { ...args.where, deletedAt: null }
+        }
+        return query(args)
+      },
+      async findFirst({ args, query }) {
+        if (args.where?.deletedAt === undefined) {
+          args.where = { ...args.where, deletedAt: null }
+        }
+        return query(args)
+      },
+      // Note: We don't override findUnique because it requires a unique constraint.
+      // Usually, soft-deleted items stay in findUnique unless you change the ID logic.
+    },
+    quiz: {
+      async findMany({ args, query }) {
+        if (args.where?.deletedAt === undefined) {
+          args.where = { ...args.where, deletedAt: null }
+        }
+        return query(args)
+      },
+      async findFirst({ args, query }) {
+        if (args.where?.deletedAt === undefined) {
+          args.where = { ...args.where, deletedAt: null }
+        }
+        return query(args)
+      },
+    },
+  },
+})
 
-// Soft delete middleware for Material and Quiz models
-prisma.$use(async (params, next) => {
-  if (['Material', 'Quiz'].includes(params.model || '')) {
-    if (params.action === 'findMany') {
-      if (!params.args.where) params.args.where = {};
-      if (params.args.where.deletedAt === undefined) params.args.where.deletedAt = null;
-    }
-    if (params.action === 'findFirst' || params.action === 'findUnique') {
-      params.action = 'findFirst';
-      params.args.where.deletedAt = null;
-    }
-  }
-  return next(params);
-});
+if (process.env.NODE_ENV !== 'production') globalForPrisma.prisma = basePrisma
