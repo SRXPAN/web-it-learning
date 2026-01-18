@@ -18,7 +18,6 @@ import cookieParser from 'cookie-parser'
 
 import authRouter from './routes/auth.js'
 import quizRouter from './routes/quiz.js'
-import inviteRouter from './routes/invite.js'
 import editorRouter from './routes/editor.js'
 import topicsRouter from './routes/topics.js'
 import lessonsRouter from './routes/lessons.js'
@@ -29,7 +28,6 @@ import adminRouter from './routes/admin.js'
 import { generalLimiter, authLimiter, webhookLimiter } from './middleware/rateLimit.js'
 import { validateCsrf } from './middleware/csrf.js'
 import { sanitize } from './middleware/sanitize.js'
-import { swaggerSpec } from './swagger.js'
 
 const app = express()
 
@@ -89,15 +87,9 @@ app.use('/api', generalLimiter)
 // --- Healthcheck без auth ---
 app.get('/api/health', (_req, res) => res.json({ ok: true }))
 
-// --- API Documentation (OpenAPI JSON) ---
-app.get('/api-docs', (_req, res) => res.json(swaggerSpec))
-app.get('/api-docs.json', (_req, res) => res.json(swaggerSpec))
 
 // --- Auth роути з селективним лімітом (5 спроб за 15 хв) ---
 app.use('/api/auth', authLimiter, authRouter)
-
-// --- Invite (чутливі) — додатковий authLimiter ---
-app.use('/api/invite', authLimiter, inviteRouter)
 
 // --- Інші модулі ---
 app.use('/api/topics', topicsRouter)
