@@ -1,0 +1,127 @@
+[
+  {
+    "title": "Sorting Basics",
+    "titleJson": { 
+      "UA": "Основи сортування", 
+      "PL": "Podstawy sortowania", 
+      "EN": "Sorting Basics" 
+    },
+    "durationSec": 180,
+    "questions": [
+      {
+        "text": "Середня складність QuickSort?",
+        "textJson": { 
+          "UA": "Середня складність QuickSort?", 
+          "PL": "Średnia złożoność QuickSort?", 
+          "EN": "Average complexity of QuickSort?" 
+        },
+        "explanation": "QuickSort середньо працює за O(n log n) завдяки поділу масиву.",
+        "explanationJson": { 
+          "UA": "QuickSort середньо працює за O(n log n) завдяки поділу масиву.", 
+          "PL": "QuickSort średnio działa w O(n log n) dzięki podziałowi tablicy.", 
+          "EN": "QuickSort averages O(n log n) due to array partitioning." 
+        },
+        "tags": ["Sorting", "Complexity"],
+        "difficulty": "Easy",
+        "options": [
+          { 
+            "text": "O(n log n)", 
+            "textJson": { "UA": "O(n log n)", "PL": "O(n log n)", "EN": "O(n log n)" }, 
+            "correct": true 
+          },
+          { 
+            "text": "O(n²)", 
+            "textJson": { "UA": "O(n²)", "PL": "O(n²)", "EN": "O(n²)" }, 
+            "correct": false 
+          },
+          { 
+            "text": "O(log n)", 
+            "textJson": { "UA": "O(log n)", "PL": "O(log n)", "EN": "O(log n)" }, 
+            "correct": false 
+          },
+          { 
+            "text": "O(n)", 
+            "textJson": { "UA": "O(n)", "PL": "O(n)", "EN": "O(n)" }, 
+            "correct": false 
+          }
+        ]
+      },
+      {
+        "text": "Який алгоритм сортування є стабільним?",
+        "textJson": { 
+          "UA": "Який алгоритм сортування є стабільним?", 
+          "PL": "Który algorytm sortowania jest stabilny?", 
+          "EN": "Which sorting algorithm is stable?" 
+        },
+        "explanation": "MergeSort не змінює порядок рівних елементів, тому є стабільним.",
+        "explanationJson": { 
+          "UA": "MergeSort не змінює порядок рівних елементів, тому є стабільним.", 
+          "PL": "MergeSort nie zmienia kolejności równych elementów, więc jest stabilny.", 
+          "EN": "MergeSort doesn't change order of equal elements, so it's stable." 
+        },
+        "tags": ["Sorting", "Stability"],
+        "difficulty": "Medium",
+        "options": [
+          { 
+            "text": "QuickSort", 
+            "textJson": { "UA": "QuickSort", "PL": "QuickSort", "EN": "QuickSort" }, 
+            "correct": false 
+          },
+          { 
+            "text": "MergeSort", 
+            "textJson": { "UA": "MergeSort", "PL": "MergeSort", "EN": "MergeSort" }, 
+            "correct": true 
+          },
+          { 
+            "text": "HeapSort", 
+            "textJson": { "UA": "HeapSort", "PL": "HeapSort", "EN": "HeapSort" }, 
+            "correct": false 
+          },
+          { 
+            "text": "SelectionSort", 
+            "textJson": { "UA": "SelectionSort", "PL": "SelectionSort", "EN": "SelectionSort" }, 
+            "correct": false 
+          }
+        ]
+      },
+      {
+        "text": "Яка найгірша складність HeapSort?",
+        "textJson": { 
+          "UA": "Яка найгірша складність HeapSort?", 
+          "PL": "Jaka jest najgorsza złożoność HeapSort?", 
+          "EN": "What is the worst-case complexity of HeapSort?" 
+        },
+        "explanation": "HeapSort завжди працює за O(n log n), навіть у найгіршому випадку.",
+        "explanationJson": { 
+          "UA": "HeapSort завжди працює за O(n log n), навіть у найгіршому випадку.", 
+          "PL": "HeapSort zawsze działa w O(n log n), nawet w najgorszym przypadku.", 
+          "EN": "HeapSort always runs in O(n log n), even in worst case." 
+        },
+        "tags": ["Sorting", "HeapSort"],
+        "difficulty": "Medium",
+        "options": [
+          { 
+            "text": "O(n²)", 
+            "textJson": { "UA": "O(n²)", "PL": "O(n²)", "EN": "O(n²)" }, 
+            "correct": false 
+          },
+          { 
+            "text": "O(n log n)", 
+            "textJson": { "UA": "O(n log n)", "PL": "O(n log n)", "EN": "O(n log n)" }, 
+            "correct": true 
+          },
+          { 
+            "text": "O(n)", 
+            "textJson": { "UA": "O(n)", "PL": "O(n)", "EN": "O(n)" }, 
+            "correct": false 
+          },
+          { 
+            "text": "O(log n)", 
+            "textJson": { "UA": "O(log n)", "PL": "O(log n)", "EN": "O(log n)" }, 
+            "correct": false 
+          }
+        ]
+      }
+    ]
+  }
+]

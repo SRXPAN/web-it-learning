@@ -1,0 +1,145 @@
+[
+  {
+    "title": "Graph Algorithms",
+    "titleJson": { 
+      "UA": "Алгоритми на графах", 
+      "PL": "Algorytmy grafowe", 
+      "EN": "Graph Algorithms" 
+    },
+    "durationSec": 180,
+    "questions": [
+      {
+        "text": "BFS обходить граф…",
+        "textJson": { 
+          "UA": "BFS обходить граф…", 
+          "PL": "BFS przechodzi graf…", 
+          "EN": "BFS traverses graph…" 
+        },
+        "explanation": "BFS рухається по рівнях від стартової вершини.",
+        "explanationJson": { 
+          "UA": "BFS рухається по рівнях від стартової вершини.", 
+          "PL": "BFS porusza się po poziomach od wierzchołka początkowego.", 
+          "EN": "BFS moves level by level from starting vertex." 
+        },
+        "tags": ["Graphs", "BFS"],
+        "difficulty": "Easy",
+        "options": [
+          { 
+            "text": "в глибину", 
+            "textJson": { "UA": "в глибину", "PL": "w głąb", "EN": "depth-first" }, 
+            "correct": false 
+          },
+          { 
+            "text": "вшир", 
+            "textJson": { "UA": "вшир", "PL": "wszerz", "EN": "breadth-first" }, 
+            "correct": true 
+          },
+          { 
+            "text": "випадково", 
+            "textJson": { "UA": "випадково", "PL": "losowo", "EN": "randomly" }, 
+            "correct": false 
+          }
+        ]
+      },
+      {
+        "text": "Яка структура даних лежить в основі BFS?",
+        "textJson": { 
+          "UA": "Яка структура даних лежить в основі BFS?", 
+          "PL": "Jaka struktura danych leży u podstaw BFS?", 
+          "EN": "What data structure is used in BFS?" 
+        },
+        "explanation": "BFS використовує чергу для зберігання сусідів.",
+        "explanationJson": { 
+          "UA": "BFS використовує чергу для зберігання сусідів.", 
+          "PL": "BFS używa kolejki do przechowywania sąsiadów.", 
+          "EN": "BFS uses queue to store neighbors." 
+        },
+        "tags": ["Graphs", "BFS"],
+        "difficulty": "Easy",
+        "options": [
+          { 
+            "text": "Стек", 
+            "textJson": { "UA": "Стек", "PL": "Stos", "EN": "Stack" }, 
+            "correct": false 
+          },
+          { 
+            "text": "Черга", 
+            "textJson": { "UA": "Черга", "PL": "Kolejka", "EN": "Queue" }, 
+            "correct": true 
+          },
+          { 
+            "text": "Купа", 
+            "textJson": { "UA": "Купа", "PL": "Kopiec", "EN": "Heap" }, 
+            "correct": false 
+          }
+        ]
+      },
+      {
+        "text": "DFS використовує…",
+        "textJson": { 
+          "UA": "DFS використовує…", 
+          "PL": "DFS używa…", 
+          "EN": "DFS uses…" 
+        },
+        "explanation": "DFS використовує стек (або рекурсію, яка неявно використовує call stack).",
+        "explanationJson": { 
+          "UA": "DFS використовує стек (або рекурсію, яка неявно використовує call stack).", 
+          "PL": "DFS używa stosu (lub rekurencji, która niejawnie używa call stack).", 
+          "EN": "DFS uses stack (or recursion which implicitly uses call stack)." 
+        },
+        "tags": ["Graphs", "DFS"],
+        "difficulty": "Easy",
+        "options": [
+          { 
+            "text": "Стек або рекурсію", 
+            "textJson": { "UA": "Стек або рекурсію", "PL": "Stos lub rekurencję", "EN": "Stack or recursion" }, 
+            "correct": true 
+          },
+          { 
+            "text": "Чергу", 
+            "textJson": { "UA": "Чергу", "PL": "Kolejkę", "EN": "Queue" }, 
+            "correct": false 
+          },
+          { 
+            "text": "Хеш-таблицю", 
+            "textJson": { "UA": "Хеш-таблицю", "PL": "Tablicę haszującą", "EN": "Hash table" }, 
+            "correct": false 
+          }
+        ]
+      },
+      {
+        "text": "Алгоритм Дейкстри використовується для…",
+        "textJson": { 
+          "UA": "Алгоритм Дейкстри використовується для…", 
+          "PL": "Algorytm Dijkstry służy do…", 
+          "EN": "Dijkstra's algorithm is used for…" 
+        },
+        "explanation": "Алгоритм Дейкстри знаходить найкоротший шлях від вершини до всіх інших у графі з додатніми вагами.",
+        "explanationJson": { 
+          "UA": "Алгоритм Дейкстри знаходить найкоротший шлях від вершини до всіх інших у графі з додатніми вагами.", 
+          "PL": "Algorytm Dijkstry znajduje najkrótszą ścieżkę od wierzchołka do wszystkich innych w grafie z dodatnimi wagami.", 
+          "EN": "Dijkstra's algorithm finds shortest path from vertex to all others in graph with positive weights." 
+        },
+        "tags": ["Graphs", "Dijkstra"],
+        "difficulty": "Medium",
+        "options": [
+          { 
+            "text": "Пошуку найкоротшого шляху", 
+            "textJson": { "UA": "Пошуку найкоротшого шляху", "PL": "Szukania najkrótszej ścieżki", "EN": "Finding shortest path" }, 
+            "correct": true 
+          },
+          { 
+            "text": "Сортування вершин", 
+            "textJson": { "UA": "Сортування вершин", "PL": "Sortowania wierzchołków", "EN": "Sorting vertices" }, 
+            "correct": false 
+          },
+          { 
+            "text": "Пошуку циклів", 
+            "textJson": { "UA": "Пошуку циклів", "PL": "Szukania cykli", "EN": "Finding cycles" }, 
+            "correct": false 
+          }
+        ]
+      }
+    ]
+  }
+]

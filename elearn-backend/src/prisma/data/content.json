@@ -14,6 +14,7 @@
         "description": "Quick/Merge/Heap",
         "descJson": { "UA": "Quick/Merge/Heap сортування", "PL": "Sortowanie Quick/Merge/Heap", "EN": "Quick/Merge/Heap sorting" },
         "category": "Programming",
+        "quizFile": "sorting.json",
         "materials": [
           { 
             "title": "QuickSort – PDF", 
@@ -38,61 +39,9 @@
               "EN": "Comparison of sorting algorithms:\n\n**QuickSort**: Average O(n log n), worst O(n²), in-place, not stable\n**MergeSort**: Always O(n log n), requires O(n) space, stable"
             }
           }
-        ],
-        "quizzes": [
-          {
-            "title": "Sorting Basics",
-            "titleJson": { "UA": "Основи сортування", "PL": "Podstawy sortowania", "EN": "Sorting Basics" },
-            "durationSec": 180,
-            "questions": [
-              {
-                "text": "Середня складність QuickSort?",
-                "textJson": { 
-                  "UA": "Середня складність QuickSort?", 
-                  "PL": "Średnia złożoność QuickSort?", 
-                  "EN": "Average complexity of QuickSort?" 
-                },
-                "explanation": "QuickSort середньо працює за O(n log n) завдяки поділу масиву.",
-                "explanationJson": { 
-                  "UA": "QuickSort середньо працює за O(n log n) завдяки поділу масиву.", 
-                  "PL": "QuickSort średnio działa w O(n log n) dzięki podziałowi tablicy.", 
-                  "EN": "QuickSort averages O(n log n) due to array partitioning." 
-                },
-                "tags": ["Sorting", "Complexity"],
-                "difficulty": "Easy",
-                "options": [
-                  { "text": "O(n log n)", "textJson": { "UA": "O(n log n)", "PL": "O(n log n)", "EN": "O(n log n)" }, "correct": true },
-                  { "text": "O(n²)", "textJson": { "UA": "O(n²)", "PL": "O(n²)", "EN": "O(n²)" }, "correct": false },
-                  { "text": "O(log n)", "textJson": { "UA": "O(log n)", "PL": "O(log n)", "EN": "O(log n)" }, "correct": false },
-                  { "text": "O(n)", "textJson": { "UA": "O(n)", "PL": "O(n)", "EN": "O(n)" }, "correct": false }
-                ]
-              },
-              {
-                "text": "Який алгоритм сортування є стабільним?",
-                "textJson": { 
-                  "UA": "Який алгоритм сортування є стабільним?", 
-                  "PL": "Który algorytm sortowania jest stabilny?", 
-                  "EN": "Which sorting algorithm is stable?" 
-                },
-                "explanation": "MergeSort не змінює порядок рівних елементів, тому є стабільним.",
-                "explanationJson": { 
-                  "UA": "MergeSort не змінює порядок рівних елементів, тому є стабільним.", 
-                  "PL": "MergeSort nie zmienia kolejności równych elementów, więc jest stabilny.", 
-                  "EN": "MergeSort doesn't change order of equal elements, so it's stable." 
-                },
-                "tags": ["Sorting", "Stability"],
-                "difficulty": "Medium",
-                "options": [
-                  { "text": "QuickSort", "textJson": { "UA": "QuickSort", "PL": "QuickSort", "EN": "QuickSort" }, "correct": false },
-                  { "text": "MergeSort", "textJson": { "UA": "MergeSort", "PL": "MergeSort", "EN": "MergeSort" }, "correct": true },
-                  { "text": "HeapSort", "textJson": { "UA": "HeapSort", "PL": "HeapSort", "EN": "HeapSort" }, "correct": false },
-                  { "text": "SelectionSort", "textJson": { "UA": "SelectionSort", "PL": "SelectionSort", "EN": "SelectionSort" }, "correct": false }
-                ]
-              }
-            ]
-          }
         ]
       },
+      
       {
         "slug": "graphs",
         "name": "Graphs",
@@ -100,6 +49,7 @@
         "description": "BFS/DFS/Dijkstra",
         "descJson": { "UA": "Алгоритми BFS, DFS та Dijkstra", "PL": "Algorytmy BFS, DFS i Dijkstra", "EN": "BFS, DFS and Dijkstra algorithms" },
         "category": "Programming",
+        "quizFile": "graphs.json",
         "materials": [
           { 
             "title": "BFS & DFS – Video", 
@@ -117,57 +67,6 @@
               "PL": "**Typy grafów:**\n- Skierowane vs Nieskierowane\n- Ważone vs Nieważone\n\n**Przechodzenia:**\n- BFS: Poziom po poziomie, używa Kolejki\n- DFS: W głąb, używa Stosu",
               "EN": "**Graph Types:**\n- Directed vs Undirected\n- Weighted vs Unweighted\n\n**Traversals:**\n- BFS: Level by level, uses Queue\n- DFS: Deep first, uses Stack"
             }
-          }
-        ],
-        "quizzes": [
-          {
-            "title": "Graph Algorithms",
-            "titleJson": { "UA": "Алгоритми на графах", "PL": "Algorytmy grafowe", "EN": "Graph Algorithms" },
-            "durationSec": 180,
-            "questions": [
-              {
-                "text": "BFS обходить граф…",
-                "textJson": { 
-                  "UA": "BFS обходить граф…", 
-                  "PL": "BFS przechodzi graf…", 
-                  "EN": "BFS traverses graph…" 
-                },
-                "explanation": "BFS рухається по рівнях від стартової вершини.",
-                "explanationJson": { 
-                  "UA": "BFS рухається по рівнях від стартової вершини.", 
-                  "PL": "BFS porusza się po poziomach od wierzchołka początkowego.", 
-                  "EN": "BFS moves level by level from starting vertex." 
-                },
-                "tags": ["Graphs", "BFS"],
-                "difficulty": "Easy",
-                "options": [
-                  { "text": "в глибину", "textJson": { "UA": "в глибину", "PL": "w głąb", "EN": "depth-first" }, "correct": false },
-                  { "text": "вшир", "textJson": { "UA": "вшир", "PL": "wszerz", "EN": "breadth-first" }, "correct": true },
-                  { "text": "випадково", "textJson": { "UA": "випадково", "PL": "losowo", "EN": "randomly" }, "correct": false }
-                ]
-              },
-              {
-                "text": "Яка структура даних лежить в основі BFS?",
-                "textJson": { 
-                  "UA": "Яка структура даних лежить в основі BFS?", 
-                  "PL": "Jaka struktura danych leży u podstaw BFS?", 
-                  "EN": "What data structure is used in BFS?" 
-                },
-                "explanation": "BFS використовує чергу для зберігання сусідів.",
-                "explanationJson": { 
-                  "UA": "BFS використовує чергу для зберігання сусідів.", 
-                  "PL": "BFS używa kolejki do przechowywania sąsiadów.", 
-                  "EN": "BFS uses queue to store neighbors." 
-                },
-                "tags": ["Graphs", "BFS"],
-                "difficulty": "Easy",
-                "options": [
-                  { "text": "Стек", "textJson": { "UA": "Стек", "PL": "Stos", "EN": "Stack" }, "correct": false },
-                  { "text": "Черга", "textJson": { "UA": "Черга", "PL": "Kolejka", "EN": "Queue" }, "correct": true },
-                  { "text": "Купа", "textJson": { "UA": "Купа", "PL": "Kopiec", "EN": "Heap" }, "correct": false }
-                ]
-              }
-            ]
           }
         ]
       }

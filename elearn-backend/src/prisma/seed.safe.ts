@@ -114,9 +114,26 @@ async function importTopic(topicData: any, parentId: string | null = null) {
     }
   }
 
-  // 3. Імпортуємо Квізи
-  if (quizzes && quizzes.length > 0) {
-    for (const quiz of quizzes) {
+  // 3. Імпортуємо Квізи (підтримка зовнішніх файлів)
+  let quizzesToImport = quizzes || []
+
+  // Якщо вказано quizFile - завантажуємо квізи з окремого файлу
+  if (topicData.quizFile) {
+    try {
+      const quizFilePath = path.join(__dirname, 'data', 'quizzes', topicData.quizFile)
+      console.log(`   📦 Loading external quiz from ${topicData.quizFile}...`)
+      const fileContent = await fs.readFile(quizFilePath, 'utf-8')
+      const externalQuizzes = JSON.parse(fileContent)
+      // Якщо у файлі масив - беремо його, якщо об'єкт - огортаємо в масив
+      quizzesToImport = Array.isArray(externalQuizzes) ? externalQuizzes : [externalQuizzes]
+      console.log(`   ✅ Loaded ${quizzesToImport.length} quiz(zes) from external file`)
+    } catch (e: any) {
+      console.error(`   ❌ Failed to load quiz file ${topicData.quizFile}:`, e.message)
+    }
+  }
+
+  if (quizzesToImport && quizzesToImport.length > 0) {
+    for (const quiz of quizzesToImport) {
       const { id: quizId, topicId, questions, createdById, createdBy, createdAt, updatedAt, deletedAt, attempts, ...quizData } = quiz
 
       try {
