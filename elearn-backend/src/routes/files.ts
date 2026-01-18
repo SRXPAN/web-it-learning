@@ -8,7 +8,6 @@ import { z } from 'zod'
 import rateLimit from 'express-rate-limit'
 import { prisma } from '../db.js'
 import { requireAuth } from '../middleware/auth'
-import { requireRole } from '../middleware/roles'
 import { asyncHandler } from '../middleware/errorHandler.js'
 import { validateResource } from '../middleware/validateResource.js'
 import {
@@ -28,6 +27,15 @@ const router = Router()
 // Helper to safely extract string from params (handles string | string[])
 function getParam(param: string | string[]): string {
   return Array.isArray(param) ? param[0] : param
+}
+
+// Role helper
+const requireRole = (roles: string[]) => {
+  return (req: Request, res: Response, next: Function) => {
+    if (!req.user) return forbidden(res, 'Not authenticated')
+    if (!roles.includes(req.user.role)) return forbidden(res, 'Insufficient permissions')
+    next()
+  }
 }
 
 // Rate limiter for file uploads

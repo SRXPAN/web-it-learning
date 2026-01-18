@@ -1,0 +1,383 @@
+[
+  {
+    "slug": "algorithms",
+    "name": "Algorithms",
+    "nameJson": { "UA": "Алгоритми", "PL": "Algorytmy", "EN": "Algorithms" },
+    "description": "Sorting and graphs",
+    "descJson": { "UA": "Сортування та графи", "PL": "Sortowanie i grafy", "EN": "Sorting and graphs" },
+    "category": "Programming",
+    "children": [
+      {
+        "slug": "sorting",
+        "name": "Sorting",
+        "nameJson": { "UA": "Сортування", "PL": "Sortowanie", "EN": "Sorting" },
+        "description": "Quick/Merge/Heap",
+        "descJson": { "UA": "Quick/Merge/Heap сортування", "PL": "Sortowanie Quick/Merge/Heap", "EN": "Quick/Merge/Heap sorting" },
+        "category": "Programming",
+        "materials": [
+          { 
+            "title": "QuickSort – PDF", 
+            "titleJson": { "UA": "QuickSort – PDF", "PL": "QuickSort – PDF", "EN": "QuickSort – PDF" },
+            "type": "pdf", 
+            "url": "https://example.com/quicksort.pdf" 
+          },
+          { 
+            "title": "Merge Sort – Video", 
+            "titleJson": { "UA": "Merge Sort – Відео", "PL": "Merge Sort – Wideo", "EN": "Merge Sort – Video" },
+            "type": "video", 
+            "url": "https://www.youtube.com/watch?v=Ns7tGNbtvV4" 
+          },
+          { 
+            "title": "Sorting Algorithms Comparison", 
+            "titleJson": { "UA": "Порівняння алгоритмів сортування", "PL": "Porównanie algorytmów sortowania", "EN": "Sorting Algorithms Comparison" },
+            "type": "text", 
+            "content": "Comparison of sorting algorithms:\n\n**QuickSort**: Average O(n log n), worst O(n²), in-place, not stable\n**MergeSort**: Always O(n log n), requires O(n) space, stable",
+            "contentJson": { 
+              "UA": "Порівняння алгоритмів сортування:\n\n**QuickSort**: Середнє O(n log n), гірше O(n²), на місці, нестабільний\n**MergeSort**: Завжди O(n log n), потребує O(n) пам'яті, стабільний",
+              "PL": "Porównanie algorytmów sortowania:\n\n**QuickSort**: Średnio O(n log n), najgorsze O(n²), w miejscu, niestabilny\n**MergeSort**: Zawsze O(n log n), wymaga O(n) pamięci, stabilny",
+              "EN": "Comparison of sorting algorithms:\n\n**QuickSort**: Average O(n log n), worst O(n²), in-place, not stable\n**MergeSort**: Always O(n log n), requires O(n) space, stable"
+            }
+          }
+        ],
+        "quizzes": [
+          {
+            "title": "Sorting Basics",
+            "titleJson": { "UA": "Основи сортування", "PL": "Podstawy sortowania", "EN": "Sorting Basics" },
+            "durationSec": 180,
+            "questions": [
+              {
+                "text": "Середня складність QuickSort?",
+                "textJson": { 
+                  "UA": "Середня складність QuickSort?", 
+                  "PL": "Średnia złożoność QuickSort?", 
+                  "EN": "Average complexity of QuickSort?" 
+                },
+                "explanation": "QuickSort середньо працює за O(n log n) завдяки поділу масиву.",
+                "explanationJson": { 
+                  "UA": "QuickSort середньо працює за O(n log n) завдяки поділу масиву.", 
+                  "PL": "QuickSort średnio działa w O(n log n) dzięki podziałowi tablicy.", 
+                  "EN": "QuickSort averages O(n log n) due to array partitioning." 
+                },
+                "tags": ["Sorting", "Complexity"],
+                "difficulty": "Easy",
+                "options": [
+                  { "text": "O(n log n)", "textJson": { "UA": "O(n log n)", "PL": "O(n log n)", "EN": "O(n log n)" }, "correct": true },
+                  { "text": "O(n²)", "textJson": { "UA": "O(n²)", "PL": "O(n²)", "EN": "O(n²)" }, "correct": false },
+                  { "text": "O(log n)", "textJson": { "UA": "O(log n)", "PL": "O(log n)", "EN": "O(log n)" }, "correct": false },
+                  { "text": "O(n)", "textJson": { "UA": "O(n)", "PL": "O(n)", "EN": "O(n)" }, "correct": false }
+                ]
+              },
+              {
+                "text": "Який алгоритм сортування є стабільним?",
+                "textJson": { 
+                  "UA": "Який алгоритм сортування є стабільним?", 
+                  "PL": "Który algorytm sortowania jest stabilny?", 
+                  "EN": "Which sorting algorithm is stable?" 
+                },
+                "explanation": "MergeSort не змінює порядок рівних елементів, тому є стабільним.",
+                "explanationJson": { 
+                  "UA": "MergeSort не змінює порядок рівних елементів, тому є стабільним.", 
+                  "PL": "MergeSort nie zmienia kolejności równych elementów, więc jest stabilny.", 
+                  "EN": "MergeSort doesn't change order of equal elements, so it's stable." 
+                },
+                "tags": ["Sorting", "Stability"],
+                "difficulty": "Medium",
+                "options": [
+                  { "text": "QuickSort", "textJson": { "UA": "QuickSort", "PL": "QuickSort", "EN": "QuickSort" }, "correct": false },
+                  { "text": "MergeSort", "textJson": { "UA": "MergeSort", "PL": "MergeSort", "EN": "MergeSort" }, "correct": true },
+                  { "text": "HeapSort", "textJson": { "UA": "HeapSort", "PL": "HeapSort", "EN": "HeapSort" }, "correct": false },
+                  { "text": "SelectionSort", "textJson": { "UA": "SelectionSort", "PL": "SelectionSort", "EN": "SelectionSort" }, "correct": false }
+                ]
+              }
+            ]
+          }
+        ]
+      },
+      {
+        "slug": "graphs",
+        "name": "Graphs",
+        "nameJson": { "UA": "Графи", "PL": "Grafy", "EN": "Graphs" },
+        "description": "BFS/DFS/Dijkstra",
+        "descJson": { "UA": "Алгоритми BFS, DFS та Dijkstra", "PL": "Algorytmy BFS, DFS i Dijkstra", "EN": "BFS, DFS and Dijkstra algorithms" },
+        "category": "Programming",
+        "materials": [
+          { 
+            "title": "BFS & DFS – Video", 
+            "titleJson": { "UA": "BFS і DFS – Відео", "PL": "BFS i DFS – Wideo", "EN": "BFS & DFS – Video" },
+            "type": "video", 
+            "url": "https://www.youtube.com/watch?v=pcKY4hjDrxk" 
+          },
+          { 
+            "title": "Graph Theory Basics", 
+            "titleJson": { "UA": "Основи теорії графів", "PL": "Podstawy teorii grafów", "EN": "Graph Theory Basics" },
+            "type": "text", 
+            "content": "**Graph Types:**\n- Directed vs Undirected\n- Weighted vs Unweighted\n\n**Traversals:**\n- BFS: Level by level, uses Queue\n- DFS: Deep first, uses Stack",
+            "contentJson": {
+              "UA": "**Типи графів:**\n- Орієнтовані vs Неорієнтовані\n- Зважені vs Незважені\n\n**Обходи:**\n- BFS: По рівнях, використовує Чергу\n- DFS: У глибину, використовує Стек",
+              "PL": "**Typy grafów:**\n- Skierowane vs Nieskierowane\n- Ważone vs Nieważone\n\n**Przechodzenia:**\n- BFS: Poziom po poziomie, używa Kolejki\n- DFS: W głąb, używa Stosu",
+              "EN": "**Graph Types:**\n- Directed vs Undirected\n- Weighted vs Unweighted\n\n**Traversals:**\n- BFS: Level by level, uses Queue\n- DFS: Deep first, uses Stack"
+            }
+          }
+        ],
+        "quizzes": [
+          {
+            "title": "Graph Algorithms",
+            "titleJson": { "UA": "Алгоритми на графах", "PL": "Algorytmy grafowe", "EN": "Graph Algorithms" },
+            "durationSec": 180,
+            "questions": [
+              {
+                "text": "BFS обходить граф…",
+                "textJson": { 
+                  "UA": "BFS обходить граф…", 
+                  "PL": "BFS przechodzi graf…", 
+                  "EN": "BFS traverses graph…" 
+                },
+                "explanation": "BFS рухається по рівнях від стартової вершини.",
+                "explanationJson": { 
+                  "UA": "BFS рухається по рівнях від стартової вершини.", 
+                  "PL": "BFS porusza się po poziomach od wierzchołka początkowego.", 
+                  "EN": "BFS moves level by level from starting vertex." 
+                },
+                "tags": ["Graphs", "BFS"],
+                "difficulty": "Easy",
+                "options": [
+                  { "text": "в глибину", "textJson": { "UA": "в глибину", "PL": "w głąb", "EN": "depth-first" }, "correct": false },
+                  { "text": "вшир", "textJson": { "UA": "вшир", "PL": "wszerz", "EN": "breadth-first" }, "correct": true },
+                  { "text": "випадково", "textJson": { "UA": "випадково", "PL": "losowo", "EN": "randomly" }, "correct": false }
+                ]
+              },
+              {
+                "text": "Яка структура даних лежить в основі BFS?",
+                "textJson": { 
+                  "UA": "Яка структура даних лежить в основі BFS?", 
+                  "PL": "Jaka struktura danych leży u podstaw BFS?", 
+                  "EN": "What data structure is used in BFS?" 
+                },
+                "explanation": "BFS використовує чергу для зберігання сусідів.",
+                "explanationJson": { 
+                  "UA": "BFS використовує чергу для зберігання сусідів.", 
+                  "PL": "BFS używa kolejki do przechowywania sąsiadów.", 
+                  "EN": "BFS uses queue to store neighbors." 
+                },
+                "tags": ["Graphs", "BFS"],
+                "difficulty": "Easy",
+                "options": [
+                  { "text": "Стек", "textJson": { "UA": "Стек", "PL": "Stos", "EN": "Stack" }, "correct": false },
+                  { "text": "Черга", "textJson": { "UA": "Черга", "PL": "Kolejka", "EN": "Queue" }, "correct": true },
+                  { "text": "Купа", "textJson": { "UA": "Купа", "PL": "Kopiec", "EN": "Heap" }, "correct": false }
+                ]
+              }
+            ]
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "slug": "oop-basics",
+    "name": "OOP Basics",
+    "nameJson": { "UA": "Основи ООП", "PL": "Podstawy OOP", "EN": "OOP Basics" },
+    "description": "Encapsulation, Inheritance, Polymorphism",
+    "descJson": { "UA": "Інкапсуляція, Наслідування, Поліморфізм", "PL": "Enkapsulacja, Dziedziczenie, Polimorfizm", "EN": "Encapsulation, Inheritance, Polymorphism" },
+    "category": "Programming",
+    "materials": [
+      { "title": "OOP Concepts", "type": "text", "content": "**Four Pillars of OOP:**\n\n1. **Encapsulation**: Bundling data and methods, hiding internal state\n2. **Abstraction**: Hiding complexity, showing only necessary features\n3. **Inheritance**: Creating new classes from existing ones\n4. **Polymorphism**: Objects taking many forms, method overriding\n\n**SOLID Principles:**\n- S: Single Responsibility\n- O: Open/Closed\n- L: Liskov Substitution\n- I: Interface Segregation\n- D: Dependency Inversion" },
+      { "title": "SOLID Principles – Video", "type": "video", "url": "https://www.youtube.com/watch?v=pTB30aXS77U" },
+      { "title": "Design Patterns", "type": "link", "url": "https://refactoring.guru/design-patterns" },
+      { "title": "OOP vs Functional", "type": "text", "content": "OOP focuses on objects containing data and behavior.\nFunctional programming focuses on pure functions and immutability.\nModern languages support both paradigms." }
+    ],
+    "quizzes": [
+      {
+        "title": "OOP & SOLID",
+        "durationSec": 180,
+        "questions": [
+          {
+            "text": "Який принцип про «одну причину для змін»?",
+            "explanation": "SRP означає, що клас має одну зону відповідальності.",
+            "tags": ["OOP", "SOLID"],
+            "difficulty": "Easy",
+            "options": [
+              { "text": "LSP" },
+              { "text": "SRP", "correct": true },
+              { "text": "DIP" },
+              { "text": "OCP" }
+            ]
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "slug": "linear-algebra",
+    "name": "Linear Algebra",
+    "nameJson": { "UA": "Лінійна алгебра", "PL": "Algebra liniowa", "EN": "Linear Algebra" },
+    "description": "Vectors, matrices, multiplication",
+    "descJson": { "UA": "Вектори, матриці, множення", "PL": "Wektory, macierze, mnożenie", "EN": "Vectors, matrices, multiplication" },
+    "category": "Mathematics",
+    "materials": [
+      { "title": "Matrices – PDF", "type": "pdf", "url": "https://example.com/matrix.pdf" },
+      { "title": "Linear Algebra – Video", "type": "video", "url": "https://www.youtube.com/watch?v=fNk_zzaMoSs" },
+      { "title": "Vector Operations", "type": "text", "content": "Vector addition: (a1, a2) + (b1, b2) = (a1+b1, a2+b2)\nScalar multiplication: k*(a1, a2) = (k*a1, k*a2)\nDot product: a·b = a1*b1 + a2*b2" }
+    ],
+    "quizzes": [
+      {
+        "title": "Linear Algebra Basics",
+        "durationSec": 120,
+        "questions": [
+          {
+            "text": "Що таке детермінант матриці 2x2?",
+            "explanation": "Детермінант матриці [[a,b],[c,d]] = ad - bc",
+            "tags": ["Matrix"],
+            "difficulty": "Easy",
+            "options": [
+              { "text": "ad - bc", "correct": true },
+              { "text": "ad + bc" }
+            ]
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "slug": "sql-basics",
+    "name": "SQL Basics",
+    "nameJson": { "UA": "SQL: основи", "PL": "SQL: podstawy", "EN": "SQL Basics" },
+    "description": "SELECT, WHERE, JOIN",
+    "descJson": { "UA": "Основи SQL: SELECT, WHERE, JOIN", "PL": "Podstawy SQL: SELECT, WHERE, JOIN", "EN": "SQL basics: SELECT, WHERE, JOIN" },
+    "category": "Databases",
+    "materials": [
+      { "title": "SQL JOIN Types", "type": "text", "content": "**JOIN Types:**\n\n- **INNER JOIN**: Returns only matching rows\n- **LEFT JOIN**: All from left + matching from right..." }
+    ],
+    "quizzes": [
+      {
+        "title": "SQL Mastery",
+        "durationSec": 180,
+        "questions": [
+           {
+            "text": "LEFT JOIN повертає…",
+            "explanation": "LEFT JOIN залишає всі рядки з лівої таблиці.",
+            "tags": ["JOIN"],
+            "difficulty": "Easy",
+            "options": [
+              { "text": "усі з лівої", "correct": true },
+              { "text": "тільки співпадіння" }
+            ]
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "slug": "osi-model",
+    "name": "OSI Model",
+    "nameJson": { "UA": "Модель OSI", "PL": "Model OSI", "EN": "OSI Model" },
+    "description": "7 layers of network communication",
+    "descJson": { "UA": "7 шарів мережевої комунікації", "PL": "7 warstw komunikacji sieciowej", "EN": "7 layers of network communication" },
+    "category": "Networks",
+    "materials": [
+      { "title": "OSI Model Overview", "type": "text", "content": "**OSI 7 Layers (top to bottom):**..." }
+    ],
+    "quizzes": [
+       {
+        "title": "OSI & Networking",
+        "durationSec": 150,
+        "questions": [
+          {
+            "text": "Скільки шарів у моделі OSI?",
+            "explanation": "Модель OSI має 7 шарів...",
+            "tags": ["OSI", "Basics"],
+            "difficulty": "Easy",
+            "options": [
+              { "text": "7", "correct": true },
+              { "text": "8" }
+            ]
+          }
+        ]
+       }
+    ]
+  },
+  {
+    "slug": "html-css-basics",
+    "name": "HTML & CSS Basics",
+    "nameJson": { "UA": "Основи HTML та CSS", "PL": "Podstawy HTML i CSS", "EN": "HTML & CSS Basics" },
+    "description": "Web page structure and styling",
+    "descJson": { "UA": "Структура та стилізація веб-сторінок", "PL": "Struktura i stylizacja stron", "EN": "Web page structure and styling" },
+    "category": "WebDevelopment",
+    "materials": [
+      { "title": "HTML Fundamentals", "type": "text", "content": "**HTML Structure:**..." }
+    ],
+    "quizzes": [
+       {
+        "title": "HTML & CSS Quiz",
+        "durationSec": 150,
+        "questions": [
+          {
+            "text": "Який тег створює посилання?",
+            "tags": ["HTML", "Tags"],
+            "difficulty": "Easy",
+            "options": [
+              { "text": "<a>", "correct": true },
+              { "text": "<link>" }
+            ]
+          }
+        ]
+       }
+    ]
+  },
+  {
+    "slug": "javascript-basics",
+    "name": "JavaScript Basics",
+    "nameJson": { "UA": "Основи JavaScript", "PL": "Podstawy JavaScript", "EN": "JavaScript Basics" },
+    "description": "Variables, functions, DOM",
+    "descJson": { "UA": "Змінні, функції, DOM", "PL": "Zmienne, funkcje, DOM", "EN": "Variables, functions, DOM" },
+    "category": "WebDevelopment",
+    "materials": [
+      { "title": "JS Variables", "type": "text", "content": "**Variable Declaration:**..." }
+    ],
+    "quizzes": [
+      {
+        "title": "JavaScript Fundamentals",
+        "durationSec": 180,
+        "questions": [
+          {
+            "text": "Різниця між let та const?",
+            "tags": ["JS", "Variables"],
+            "difficulty": "Easy",
+            "options": [
+              { "text": "let можна змінити, const - ні", "correct": true },
+              { "text": "Немає різниці" }
+            ]
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "slug": "web-security",
+    "name": "Web Security",
+    "nameJson": { "UA": "Веб-безпека", "PL": "Bezpieczeństwo webowe", "EN": "Web Security" },
+    "description": "XSS, CSRF, SQL Injection",
+    "descJson": { "UA": "XSS, CSRF, SQL Injection", "PL": "XSS, CSRF, SQL Injection", "EN": "XSS, CSRF, SQL Injection" },
+    "category": "Security",
+    "materials": [
+      { "title": "Common Vulnerabilities", "type": "text", "content": "**OWASP Top 10:**..." }
+    ],
+    "quizzes": [
+      {
+        "title": "Security Fundamentals",
+        "durationSec": 150,
+        "questions": [
+          {
+            "text": "Що таке XSS?",
+            "tags": ["Security", "XSS"],
+            "difficulty": "Easy",
+            "options": [
+              { "text": "Cross-Site Scripting", "correct": true },
+              { "text": "SQL атака" }
+            ]
+          }
+        ]
+      }
+    ]
+  }
+]

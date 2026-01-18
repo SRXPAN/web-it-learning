@@ -1,19 +1,16 @@
-/**
- * Admin API Routes
- * User management, system settings, audit logs
- * Requires ADMIN role
- */
 import { Router, Request, Response } from 'express'
 import { Role, Prisma } from '@prisma/client'
 import bcrypt from 'bcryptjs'
 import { prisma } from '../db.js'
 import { requireAuth } from '../middleware/auth'
-import { requireRole } from '../middleware/roles'
 import { ok, created, badRequest, notFound, forbidden, serverError, conflict } from '../utils/response'
 import { auditLog, AuditActions, AuditResources } from '../services/audit.service'
 import { z } from 'zod'
 import { emailSchema, nameSchema, passwordSchemaSimple } from '../utils/validation'
 import { logger } from '../utils/logger.js'
+import fs from 'fs/promises';
+import path from 'path';
+import { asyncHandler } from '../middleware/errorHandler.js'
 
 const router = Router()
 
@@ -26,6 +23,13 @@ function getParam(param: string | string[]): string {
 router.use(requireAuth)
 
 // Role helpers
+const requireRole = (roles: string[]) => {
+  return (req: Request, res: Response, next: Function) => {
+    if (!req.user) return forbidden(res, 'Not authenticated')
+    if (!roles.includes(req.user.role)) return forbidden(res, 'Insufficient permissions')
+    next()
+  }
+}
 const requireAdmin = requireRole(['ADMIN'])
 const requireAdminOrEditor = requireRole(['ADMIN', 'EDITOR'])
 
@@ -119,7 +123,6 @@ router.get('/stats', requireRole(['ADMIN', 'EDITOR']), async (req: Request, res:
 router.use('/users', requireAdmin)
 router.use('/audit-logs', requireAdmin)
 router.use('/content', requireAdminOrEditor)
-router.use('/i18n', requireAdminOrEditor)
 
 // ============================================
 // USER MANAGEMENT
@@ -414,13 +417,16 @@ router.delete('/users/:id', async (req: Request, res: Response) => {
     }
 
     // Delete related data
-    await prisma.$transaction([
-      prisma.refreshToken.deleteMany({ where: { userId: id } }),
-      prisma.answer.deleteMany({ where: { userId: id } }),
-      prisma.materialView.deleteMany({ where: { userId: id } }),
-      prisma.userActivity.deleteMany({ where: { userId: id } }),
-      prisma.user.delete({ where: { id } }),
-    ])
+    const timestamp = Date.now();
+    await prisma.user.update({
+      where: { id },
+      data: {
+        deletedAt: new Date(),
+        email: `deleted_admin_${timestamp}_${user.email}`, // Звільняємо email
+          // Можна також очистити пароль або сесії
+        tokens: { deleteMany: {} } 
+      }
+    });
 
     await auditLog({
       userId: req.user!.id,
@@ -1118,11 +1124,144 @@ router.delete('/content/options/:id', async (req: Request, res: Response) => {
 })
 
 // ============================================
-// I18N MANAGEMENT REMOVED
+// CONTENT EXPORT/IMPORT
 // ============================================
-// The I18nKey/I18nValue tables have been removed.
-// Translations are now managed via:
-// - JSON locale files in Web-e-learning/src/i18n/locales/ for UI strings
-// - JSON cache fields (titleCache, urlCache, etc.) in Topic/Material/Quiz for content
+
+/**
+ * GET /admin/content/export
+ * Експортує всю ієрархію контенту (теми, матеріали, квізи) у JSON
+ * Рекурсивна глибина: 5 рівнів вкладеності
+ * Доступ: ADMIN
+ */
+router.get('/content/export', requireRole(['ADMIN']), asyncHandler(async (req, res) => {
+  logger.info('Content export started')
+
+  // Рекурсивна функція для генерації include на потрібну глибину
+  const getTopicInclude = (depth: number): any => {
+    if (depth === 0) {
+      return {
+        materials: {
+          select: {
+            id: true,
+            title: true,
+            titleJson: true,
+            titleCache: true,
+            type: true,
+            url: true,
+            urlCache: true,
+            content: true,
+            contentJson: true,
+            contentCache: true,
+            lang: true,
+            status: true,
+            publishedAt: true,
+            createdAt: true,
+            updatedAt: true,
+          },
+        },
+        quizzes: {
+          select: {
+            id: true,
+            title: true,
+            titleJson: true,
+            titleCache: true,
+            durationSec: true,
+            status: true,
+            publishedAt: true,
+            createdAt: true,
+            updatedAt: true,
+            questions: {
+              select: {
+                id: true,
+                text: true,
+                textJson: true,
+                explanation: true,
+                explanationJson: true,
+                tags: true,
+                difficulty: true,
+                options: {
+                  select: {
+                    id: true,
+                    text: true,
+                    textJson: true,
+                    correct: true,
+                  },
+                },
+              },
+            },
+          },
+        },
+      }
+    }
+
+    return {
+      materials: {
+        select: {
+          id: true,
+          title: true,
+          titleJson: true,
+          titleCache: true,
+          type: true,
+          url: true,
+          urlCache: true,
+          content: true,
+          contentJson: true,
+          contentCache: true,
+          lang: true,
+          status: true,
+          publishedAt: true,
+          createdAt: true,
+          updatedAt: true,
+        },
+      },
+      quizzes: {
+        select: {
+          id: true,
+          title: true,
+          titleJson: true,
+          titleCache: true,
+          durationSec: true,
+          status: true,
+          publishedAt: true,
+          createdAt: true,
+          updatedAt: true,
+          questions: {
+            select: {
+              id: true,
+              text: true,
+              textJson: true,
+              explanation: true,
+              explanationJson: true,
+              tags: true,
+              difficulty: true,
+              options: {
+                select: {
+                  id: true,
+                  text: true,
+                  textJson: true,
+                  correct: true,
+                },
+              },
+            },
+          },
+        },
+      },
+      children: { include: getTopicInclude(depth - 1) },
+    }
+  }
+
+  // Витягуємо всі кореневі теми з вкладеністю до 5 рівнів
+  const data = await prisma.topic.findMany({
+    where: { parentId: null },
+    include: getTopicInclude(5), // 5 рівнів глибини
+  })
+
+  logger.info(`Exported ${data.length} root topics`)
+
+  // Повертаємо як файл для завантаження
+  res.setHeader('Content-Type', 'application/json; charset=utf-8')
+  res.setHeader('Content-Disposition', 'attachment; filename=content.json')
+  res.send(JSON.stringify(data, null, 2))
+}))
 
 export default router

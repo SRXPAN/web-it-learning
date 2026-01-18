@@ -27,9 +27,11 @@ import adminRouter from './routes/admin.js'
 
 import { generalLimiter, authLimiter, webhookLimiter } from './middleware/rateLimit.js'
 import { validateCsrf } from './middleware/csrf.js'
-import { sanitize } from './middleware/sanitize.js'
+
 
 const app = express()
+
+app.set('trust proxy', 1)
 
 
 // --- Security headers ---
@@ -69,9 +71,6 @@ app.use(cookieParser())
 
 // --- Ліміт розміру JSON тіла + звичайний парсер ---
 app.use(express.json({ limit: '1mb' }))
-
-// --- Санітизація вхідних даних ---
-app.use(sanitize)
 
 app.use('/api', (req, res, next) => {
   const mutatingMethods = ['POST', 'PUT', 'PATCH', 'DELETE']

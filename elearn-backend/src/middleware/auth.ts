@@ -2,6 +2,7 @@
 import type { Request, Response, NextFunction } from 'express'
 import jwt from 'jsonwebtoken'
 import type { Role } from '@elearn/shared'
+import { prisma } from '../db.js'
 import { getJwtSecret, getEnv } from '../utils/env.js'
 import { sendError, ErrorCodes } from '../utils/response.js'
 
@@ -44,9 +45,6 @@ export async function requireAuth(req: Request, res: Response, next: NextFunctio
     if (decoded.type && decoded.type !== 'access') {
       return sendError(res, ErrorCodes.TOKEN_INVALID, 'Invalid token type', 401)
     }
-    
-    // Check user existence in DB and get fresh data
-    const { prisma } = await import('../db.js')
     const userExists = await prisma.user.findUnique({
       where: { id: decoded.id },
       select: { id: true, role: true, emailVerified: true }
@@ -63,7 +61,6 @@ export async function requireAuth(req: Request, res: Response, next: NextFunctio
     }
     next()
   } catch (err: any) {
-    // Детальніші помилки для клієнта
     if (err.name === 'TokenExpiredError') {
       return sendError(res, ErrorCodes.TOKEN_EXPIRED, 'Token expired', 401)
     }
