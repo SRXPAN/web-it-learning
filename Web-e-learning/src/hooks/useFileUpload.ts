@@ -1,9 +1,5 @@
-/**
- * File Upload Hook
- * Handles S3/R2 presigned URL uploads
- */
-import { useState, useCallback } from 'react'
-import { apiPost, apiGet, apiDelete } from '@/lib/http'
+import { useState, useCallback, useRef, useEffect } from 'react'
+import { api } from '@/lib/http'
 
 interface PresignResponse {
   fileId: string
@@ -11,7 +7,7 @@ interface PresignResponse {
   key: string
 }
 
-interface FileInfo {
+export interface FileInfo {
   id: string
   url: string
   originalName: string
@@ -25,12 +21,15 @@ interface UploadProgress {
   percent: number
 }
 
-type FileCategory = 'avatars' | 'materials' | 'attachments'
+export type FileCategory = 'avatars' | 'materials' | 'attachments'
 
 export function useFileUpload() {
   const [uploading, setUploading] = useState(false)
   const [progress, setProgress] = useState<UploadProgress | null>(null)
   const [error, setError] = useState<string | null>(null)
+  
+  // Зберігаємо посилання на поточний запит, щоб можна було скасувати
+  const xhrRef = useRef<XMLHttpRequest | null>(null)
 
   const upload = useCallback(async (
     file: File,
@@ -38,21 +37,25 @@ export function useFileUpload() {
   ): Promise<FileInfo | null> => {
     setUploading(true)
     setError(null)
-    setProgress(null)
+    setProgress({ loaded: 0, total: file.size, percent: 0 })
 
     try {
-      // Step 1: Get presigned URL
-      const presign = await apiPost<PresignResponse>('/files/presign-upload', {
-        filename: file.name,
-        mimeType: file.type,
-        size: file.size,
-        category,
+      // 1. Отримуємо Presigned URL від бекенду
+      const presign = await api<PresignResponse>('/files/presign-upload', {
+        method: 'POST',
+        body: JSON.stringify({
+          filename: file.name,
+          mimeType: file.type,
+          size: file.size,
+          category,
+        })
       })
 
-      // Step 2: Upload directly to S3/R2
+      // 2. Завантажуємо файл напряму в R2/S3 через XHR (для прогресу)
       await new Promise<void>((resolve, reject) => {
         const xhr = new XMLHttpRequest()
-        
+        xhrRef.current = xhr
+
         xhr.upload.addEventListener('progress', (e) => {
           if (e.lengthComputable) {
             setProgress({
@@ -71,45 +74,61 @@ export function useFileUpload() {
           }
         })
 
-        xhr.addEventListener('error', () => {
-          reject(new Error('Upload failed'))
-        })
+        xhr.addEventListener('error', () => reject(new Error('Network error during upload')))
+        xhr.addEventListener('abort', () => reject(new Error('Upload cancelled')))
 
         xhr.open('PUT', presign.uploadUrl)
-        xhr.setRequestHeader('Content-Type', file.type)
+        xhr.setRequestHeader('Content-Type', file.type) // Важливо: тип має співпадати з підписаним
         xhr.send(file)
       })
 
-      // Step 3: Confirm upload
-      const fileInfo = await apiPost<FileInfo>('/files/confirm', {
-        fileId: presign.fileId,
+      // 3. Підтверджуємо завантаження на бекенді
+      const fileInfo = await api<FileInfo>('/files/confirm', {
+        method: 'POST',
+        body: JSON.stringify({ fileId: presign.fileId })
       })
 
       setProgress({ loaded: file.size, total: file.size, percent: 100 })
       return fileInfo
+
     } catch (err) {
-      const message = err instanceof Error ? err.message : 'Upload failed'
-      setError(message)
+      if (err instanceof Error && err.message === 'Upload cancelled') {
+        setError(null)
+      } else {
+        const message = err instanceof Error ? err.message : 'Upload failed'
+        setError(message)
+        console.error('File upload error:', err)
+      }
       return null
     } finally {
       setUploading(false)
+      xhrRef.current = null
     }
   }, [])
 
-  const getFile = useCallback(async (fileId: string): Promise<FileInfo | null> => {
-    try {
-      return await apiGet<FileInfo>(`/files/${fileId}`)
-    } catch {
-      return null
+  const cancelUpload = useCallback(() => {
+    if (xhrRef.current) {
+      xhrRef.current.abort()
+      setUploading(false)
+      setProgress(null)
     }
   }, [])
 
   const deleteFile = useCallback(async (fileId: string): Promise<boolean> => {
     try {
-      await apiDelete(`/files/${fileId}`)
+      await api(`/files/${fileId}`, { method: 'DELETE' })
       return true
     } catch {
       return false
+    }
+  }, [])
+
+  // Очищення при розмонтуванні компонента
+  useEffect(() => {
+    return () => {
+      if (xhrRef.current) {
+        xhrRef.current.abort()
+      }
     }
   }, [])
 
@@ -121,7 +140,7 @@ export function useFileUpload() {
 
   return {
     upload,
-    getFile,
+    cancelUpload,
     deleteFile,
     uploading,
     progress,

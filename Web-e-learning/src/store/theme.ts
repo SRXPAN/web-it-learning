@@ -1,22 +1,43 @@
-
 import { create } from 'zustand'
+import { persist } from 'zustand/middleware'
 
-type State = { theme: 'light' | 'dark' }
-type Actions = { toggle:()=>void, set:(t:'light'|'dark')=>void }
+type Theme = 'light' | 'dark'
 
-const key = 'elearn_theme'
-
-function applyTheme(t:'light'|'dark'){
-  const root = document.documentElement
-  if(t==='dark') root.classList.add('dark'); else root.classList.remove('dark')
+interface ThemeState {
+  theme: Theme
+  toggle: () => void
+  set: (theme: Theme) => void
 }
 
-export const useTheme = create<State & Actions>((set)=>{
-  const stored = (localStorage.getItem(key) as 'light'|'dark'|null) || 'light'
-  applyTheme(stored)
-  return ({
-    theme: stored,
-    set: (t)=>{ localStorage.setItem(key,t); applyTheme(t); set({theme:t}) },
-    toggle: ()=> set(s=>{ const t = s.theme==='light'?'dark':'light'; localStorage.setItem(key,t); applyTheme(t); return {theme:t} })
-  })
-})
+function applyTheme(t: Theme) {
+  const root = document.documentElement
+  if (t === 'dark') {
+    root.classList.add('dark')
+  } else {
+    root.classList.remove('dark')
+  }
+}
+
+export const useTheme = create<ThemeState>()(
+  persist(
+    (set, get) => ({
+      theme: 'light',
+      set: (t) => {
+        applyTheme(t)
+        set({ theme: t })
+      },
+      toggle: () => {
+        const newTheme = get().theme === 'light' ? 'dark' : 'light'
+        applyTheme(newTheme)
+        set({ theme: newTheme })
+      },
+    }),
+    {
+      name: 'elearn_theme',
+      onRehydrateStorage: () => (state) => {
+        // Застосовуємо тему при завантаженні сторінки
+        if (state) applyTheme(state.theme)
+      }
+    }
+  )
+)

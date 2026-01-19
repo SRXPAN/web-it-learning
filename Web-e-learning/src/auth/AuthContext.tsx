@@ -1,10 +1,9 @@
 // src/auth/AuthContext.tsx
-import React, { createContext, useContext, useEffect, useMemo, useState, useCallback, useRef } from 'react'
+import React, { createContext, useContext, useEffect, useMemo, useState, useCallback } from 'react'
 import { api, fetchCsrfToken } from '../lib/http'
-import { startPeriodicSync, stopPeriodicSync, performFullSync } from '../services/progress'
 import type { User, AuthResponse } from '@elearn/shared'
 
-// Re-export User type for backward compatibility
+// Re-export User type for convenience
 export type { User }
 
 type AuthState = {
@@ -18,6 +17,7 @@ type AuthState = {
 }
 
 const AuthCtx = createContext<AuthState | null>(null)
+
 export const useAuth = () => {
   const ctx = useContext(AuthCtx)
   if (!ctx) throw new Error('AuthContext not found')
@@ -27,49 +27,36 @@ export const useAuth = () => {
 export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [user, setUser] = useState<User | null>(null)
   const [loading, setLoading] = useState(true)
-  const syncStartedRef = useRef(false)
-
-  // Запуск синхронізації при авторизації
-  const startSync = useCallback((userId: string) => {
-    if (!syncStartedRef.current) {
-      syncStartedRef.current = true
-      // Виконуємо повну синхронізацію при вході
-      performFullSync(userId).catch(console.error)
-      // Запускаємо періодичну синхронізацію
-      startPeriodicSync(userId)
-    }
-  }, [])
-
-  // Зупинка синхронізації при виході
-  const stopSync = useCallback(() => {
-    syncStartedRef.current = false
-    stopPeriodicSync()
-  }, [])
 
   useEffect(() => {
-    // Отримуємо CSRF токен і перевіряємо авторизацію паралельно
-    Promise.all([
-      fetchCsrfToken().catch(() => null), // CSRF токен - не критично якщо не вдалось
-      api<User>('/auth/me').catch(() => null),
-    ])
-      .then(([, userData]) => {
+    const initAuth = async () => {
+      try {
+        // 1. Отримуємо CSRF токен (потрібен для POST/PUT/DELETE)
+        await fetchCsrfToken().catch(err => console.warn('CSRF init warning:', err))
+        
+        // 2. Перевіряємо сесію (HttpOnly Cookie)
+        // Якщо токен валідний, бекенд поверне об'єкт User
+        const userData = await api<User>('/auth/me')
         setUser(userData)
-        if (userData) {
-          startSync(userData.id)
-        }
-      })
-      .finally(() => setLoading(false))
-    
-    return () => stopSync()
-  }, [startSync, stopSync])
+      } catch (err) {
+        // 401 Unauthorized або мережева помилка -> користувач не залогінений
+        setUser(null)
+      } finally {
+        setLoading(false)
+      }
+    }
+
+    initAuth()
+  }, [])
 
   async function login(email: string, password: string): Promise<void> {
+    // Бекенд повертає { user: User } всередині `data`
+    // api<T> вже розпаковує response.data
     const { user: userData } = await api<AuthResponse>('/auth/login', { 
       method: 'POST', 
       body: JSON.stringify({ email, password }), 
     })
     setUser(userData)
-    startSync(userData.id)
   }
 
   async function register(name: string, email: string, password: string): Promise<void> {
@@ -78,18 +65,27 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       body: JSON.stringify({ name, email, password }), 
     })
     setUser(userData)
-    startSync(userData.id)
   }
 
   async function logout(): Promise<void> {
-    stopSync()
-    await api('/auth/logout', { method: 'POST' })
-    setUser(null)
+    try {
+      await api('/auth/logout', { method: 'POST' })
+    } catch (error) {
+      console.error('Logout failed:', error)
+    } finally {
+      setUser(null)
+      // Опціонально: повне перезавантаження, щоб очистити кеш стану додатка
+      // window.location.href = '/login'
+    }
   }
 
   async function refresh(): Promise<void> {
-    const u = await api<User>('/auth/me')
-    setUser(u)
+    try {
+      const u = await api<User>('/auth/me')
+      setUser(u)
+    } catch {
+      setUser(null)
+    }
   }
 
   const updateUser = useCallback((updates: Partial<User>) => {

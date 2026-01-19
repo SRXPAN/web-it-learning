@@ -357,13 +357,16 @@ model UiTranslation {
 
 // Щоденні цілі з перекладами
 model DailyGoalTemplate {
-  id           String   @id @default(cuid())
-  category     String // quiz, materials, learning, practice, review
-  weight       Int      @default(1)
-  translations Json // {"UA": "...", "PL": "...", "EN": "..."}
-  isActive     Boolean  @default(true)
-  createdAt    DateTime @default(now())
-  updatedAt    DateTime @default(now()) @updatedAt
+  id          String   @id @default(uuid())
+  userId      String
+  user        User     @relation(fields: [userId], references: [id])
+  
+  date        String   // Формат "YYYY-MM-DD"
+  templateId  String   // Наприклад "g1", "g15" з твого файлу
+  isCompleted Boolean  @default(false)
+  progress    Int      @default(0) // Якщо ціль "пройти 3 квізи", тут буде 1, 2 або 3
+
+  @@unique([userId, date, templateId])
 }
 
 // Слабкі місця / рекомендації

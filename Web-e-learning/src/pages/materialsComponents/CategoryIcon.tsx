@@ -1,5 +1,5 @@
 import { Code2, Sigma, Database as DatabaseIcon, Network, Globe, Smartphone, Brain, Shield, Container, Monitor } from 'lucide-react'
-import type { Category } from './types'
+import type { Category } from '@elearn/shared'
 
 export const CategoryIcon = ({ category }: { category: Category }) => {
   const icons: Record<Category, JSX.Element> = {
@@ -14,5 +14,5 @@ export const CategoryIcon = ({ category }: { category: Category }) => {
     DevOps: <Container size={18} />,
     OperatingSystems: <Monitor size={18} />,
   }
-  return icons[category]
+  return icons[category] || <Code2 size={18} />
 }

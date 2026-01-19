@@ -1,43 +1,22 @@
-import type { TopicTree, Lang } from '@/services/topics'
-import type { LocalizedString } from '@elearn/shared'
+import type { Topic, Material, Category } from '@elearn/shared'
 
-export type TopicNode = TopicTree
-export type Material = TopicTree['materials'][number]
-export type Tab = 'ALL' | 'pdf' | 'video' | 'text' | 'link'
-export type Category = NonNullable<TopicNode['category']>
+export type { Category, Material }
 
-// Локалізовані назви категорій
-export const CAT_LABELS: Record<Category, LocalizedString> = {
-  Programming: { UA: 'Програмування', PL: 'Programowanie', EN: 'Programming' },
-  Mathematics: { UA: 'Математика', PL: 'Matematyka', EN: 'Mathematics' },
-  Databases: { UA: 'Бази даних', PL: 'Bazy danych', EN: 'Databases' },
-  Networks: { UA: 'Мережі', PL: 'Sieci', EN: 'Networks' },
-  WebDevelopment: { UA: 'Веб-розробка', PL: 'Tworzenie stron', EN: 'Web Development' },
-  MobileDevelopment: { UA: 'Мобільна розробка', PL: 'Rozwój mobilny', EN: 'Mobile Development' },
-  MachineLearning: { UA: 'Машинне навчання', PL: 'Uczenie maszynowe', EN: 'Machine Learning' },
-  Security: { UA: 'Кібербезпека', PL: 'Cyberbezpieczeństwo', EN: 'Cybersecurity' },
-  DevOps: { UA: 'DevOps', PL: 'DevOps', EN: 'DevOps' },
-  OperatingSystems: { UA: 'Операційні системи', PL: 'Systemy operacyjne', EN: 'Operating Systems' },
+// Розширюємо Topic для фронтенд-логіки (деревоподібна структура)
+export interface TopicNode extends Topic {
+  children?: TopicNode[]
+  materials?: Material[]
+  // Ці поля має повертати API
+  totalMaterials?: number
+  viewedMaterials?: number
+  progress?: number // 0-100
 }
 
-// Функція для отримання локалізованої назви категорії
-export function getCategoryLabel(category: Category, lang: Lang = 'EN'): string {
-  const labels = CAT_LABELS[category]
-  return labels?.[lang] || labels?.EN || category
-}
-
-// Legacy export для зворотної сумісності
-export const CAT_LABEL: Record<Category, string> = {
-  Programming: 'Програмування',
-  Mathematics: 'Математика',
-  Databases: 'Бази даних',
-  Networks: 'Мережі',
-  WebDevelopment: 'Веб-розробка',
-  MobileDevelopment: 'Мобільна розробка',
-  MachineLearning: 'Машинне навчання',
-  Security: 'Кібербезпека',
-  DevOps: 'DevOps',
-  OperatingSystems: 'Операційні системи',
-}
+export type Tab = 'ALL' | 'PDF' | 'VIDEO' | 'TEXT' | 'LINK'
 
 export const DEFAULT_CAT: Category = 'Programming'
+
+export const getCategoryLabel = (cat: Category, lang: string) => {
+  // Проста мапа, або можна використати t()
+  return cat
+}

@@ -7,8 +7,14 @@ interface ProgressPillProps {
 
 function ProgressPill({ seen, total }: ProgressPillProps) {
   const pct = total ? Math.round((seen / total) * 100) : 0
+  
   return (
-    <span className="text-xs px-3 py-1.5 rounded-full font-semibold bg-gradient-primary text-white shadow-flat dark:bg-gradient-to-r dark:from-accentFrom dark:to-accentTo dark:shadow-neumorph">
+    <span 
+      className="inline-flex items-center text-xs px-3 py-1 rounded-full font-semibold 
+                 bg-gradient-to-r from-primary-600 to-accent-500 text-white 
+                 shadow-sm border border-white/20 dark:border-white/10"
+      aria-label={`${seen} of ${total} completed, ${pct}%`}
+    >
       {seen}/{total} • {pct}%
     </span>
   )

@@ -1,27 +1,29 @@
-/**
- * Admin API Hooks
- * For user management, audit logs, system stats
- */
 import { useState, useEffect, useCallback, useRef } from 'react'
-import { apiGet, apiPost, apiPut, apiDelete } from '@/lib/http'
+import { api } from '@/lib/http'
+import type { 
+  User, 
+  Role, 
+  TopicLite, 
+  Category, 
+  Status 
+} from '@elearn/shared'
 
 // ============================================
-// ABORT CONTROLLER HELPER
+// HELPER: ABORT CONTROLLER
 // ============================================
 
-/**
- * Хук для управління AbortController і скасування запитів при unmount
- */
 function useAbortController() {
   const controllerRef = useRef<AbortController | null>(null)
 
-  // Ініціалізуємо новий AbortController
   const getSignal = useCallback(() => {
+    // Abort previous request if exists
+    if (controllerRef.current) {
+      controllerRef.current.abort()
+    }
     controllerRef.current = new AbortController()
     return controllerRef.current.signal
   }, [])
 
-  // Скасовуємо запит при unmount
   useEffect(() => {
     return () => {
       if (controllerRef.current) {
@@ -33,13 +35,11 @@ function useAbortController() {
   return { getSignal }
 }
 
-// Types
-interface User {
-  id: string
-  email: string
-  name: string
-  role: 'STUDENT' | 'EDITOR' | 'ADMIN'
-  xp: number
+// ============================================
+// TYPES (Admin Specific)
+// ============================================
+
+export interface AdminUser extends User {
   emailVerified: boolean
   createdAt: string
   updatedAt: string
@@ -50,7 +50,7 @@ interface User {
   }
 }
 
-interface AuditLog {
+export interface AuditLog {
   id: string
   userId: string | null
   action: string
@@ -68,6 +68,7 @@ interface AuditLog {
 }
 
 interface PaginatedResponse<T> {
+  data: T[]
   pagination: {
     page: number
     limit: number
@@ -76,15 +77,7 @@ interface PaginatedResponse<T> {
   }
 }
 
-interface UsersResponse extends PaginatedResponse<User> {
-  users: User[]
-}
-
-interface AuditLogsResponse extends PaginatedResponse<AuditLog> {
-  logs: AuditLog[]
-}
-
-interface SystemStats {
+export interface SystemStats {
   users: {
     total: number
     byRole: Record<string, number>
@@ -105,9 +98,12 @@ interface SystemStats {
   }
 }
 
-// Users Hook
+// ============================================
+// USERS HOOK
+// ============================================
+
 export function useAdminUsers(initialPage = 1, initialLimit = 20) {
-  const [users, setUsers] = useState<User[]>([])
+  const [users, setUsers] = useState<AdminUser[]>([])
   const [pagination, setPagination] = useState({ page: 1, limit: 20, total: 0, pages: 0 })
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
@@ -128,66 +124,33 @@ export function useAdminUsers(initialPage = 1, initialLimit = 20) {
       if (params?.role) query.set('role', params.role)
       if (params?.search) query.set('search', params.search)
 
-      const response = await apiGet<UsersResponse>(`/admin/users?${query}`, getSignal())
-      setUsers(response.users)
-      setPagination(response.pagination)
+      const res = await api<PaginatedResponse<AdminUser>>(`/admin/users?${query}`, { signal: getSignal() })
+      setUsers(res.data)
+      setPagination(res.pagination)
     } catch (err) {
-      // Ігноруємо помилку AbortError
-      if (err instanceof Error && err.name === 'AbortError') {
-        return
-      }
+      if (err instanceof Error && err.name === 'AbortError') return
       setError(err instanceof Error ? err.message : 'Failed to load users')
     } finally {
       setLoading(false)
     }
   }, [getSignal])
 
-  const updateRole = useCallback(async (userId: string, role: string) => {
+  const updateRole = useCallback(async (userId: string, role: Role) => {
     try {
-      await apiPut(`/admin/users/${userId}/role`, { role })
-      // Refresh list
+      await api(`/admin/users/${userId}/role`, { method: 'PUT', body: JSON.stringify({ role }) })
       fetchUsers({ page: pagination.page, limit: pagination.limit })
       return true
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to update role')
-      return false
-    }
-  }, [fetchUsers, pagination])
-
-  const verifyUser = useCallback(async (userId: string) => {
-    try {
-      await apiPut(`/admin/users/${userId}/verify`, {})
-      fetchUsers({ page: pagination.page, limit: pagination.limit })
-      return true
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to verify user')
-      return false
-    }
-  }, [fetchUsers, pagination])
-
-  const createUser = useCallback(async (data: {
-    email: string
-    name: string
-    password: string
-    role?: string
-  }) => {
-    try {
-      await apiPost('/admin/users', data)
-      fetchUsers({ page: 1, limit: pagination.limit })
-      return true
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to create user')
+    } catch {
       return false
     }
   }, [fetchUsers, pagination])
 
   const deleteUser = useCallback(async (userId: string) => {
     try {
-      await apiDelete(`/admin/users/${userId}`)
+      await api(`/admin/users/${userId}`, { method: 'DELETE' })
       fetchUsers({ page: pagination.page, limit: pagination.limit })
       return true
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to delete user')
+    } catch {
       return false
     }
   }, [fetchUsers, pagination])
@@ -196,20 +159,13 @@ export function useAdminUsers(initialPage = 1, initialLimit = 20) {
     fetchUsers({ page: initialPage, limit: initialLimit })
   }, [])
 
-  return {
-    users,
-    pagination,
-    loading,
-    error,
-    fetchUsers,
-    updateRole,
-    verifyUser,
-    createUser,
-    deleteUser,
-  }
+  return { users, pagination, loading, error, fetchUsers, updateRole, deleteUser }
 }
 
-// Audit Logs Hook
+// ============================================
+// AUDIT LOGS HOOK
+// ============================================
+
 export function useAdminAuditLogs(initialPage = 1, initialLimit = 50) {
   const [logs, setLogs] = useState<AuditLog[]>([])
   const [pagination, setPagination] = useState({ page: 1, limit: 50, total: 0, pages: 0 })
@@ -234,18 +190,12 @@ export function useAdminAuditLogs(initialPage = 1, initialLimit = 50) {
       if (params?.limit) query.set('limit', params.limit.toString())
       if (params?.userId) query.set('userId', params.userId)
       if (params?.action) query.set('action', params.action)
-      if (params?.resource) query.set('resource', params.resource)
-      if (params?.startDate) query.set('startDate', params.startDate)
-      if (params?.endDate) query.set('endDate', params.endDate)
-
-      const response = await apiGet<AuditLogsResponse>(`/admin/audit-logs?${query}`, getSignal())
-      setLogs(response.logs)
-      setPagination(response.pagination)
+      
+      const res = await api<PaginatedResponse<AuditLog>>(`/admin/audit-logs?${query}`, { signal: getSignal() })
+      setLogs(res.data)
+      setPagination(res.pagination)
     } catch (err) {
-      // Ігноруємо AbortError
-      if (err instanceof Error && err.name === 'AbortError') {
-        return
-      }
+      if (err instanceof Error && err.name === 'AbortError') return
       setError(err instanceof Error ? err.message : 'Failed to load audit logs')
     } finally {
       setLoading(false)
@@ -256,16 +206,13 @@ export function useAdminAuditLogs(initialPage = 1, initialLimit = 50) {
     fetchLogs({ page: initialPage, limit: initialLimit })
   }, [])
 
-  return {
-    logs,
-    pagination,
-    loading,
-    error,
-    fetchLogs,
-  }
+  return { logs, pagination, loading, error, fetchLogs }
 }
 
-// System Stats Hook
+// ============================================
+// SYSTEM STATS HOOK
+// ============================================
+
 export function useAdminStats() {
   const [stats, setStats] = useState<SystemStats | null>(null)
   const [loading, setLoading] = useState(true)
@@ -273,23 +220,14 @@ export function useAdminStats() {
   const { getSignal } = useAbortController()
 
   const fetchStats = useCallback(async () => {
-    console.log('useAdminStats: Starting fetch...')
     setLoading(true)
     setError(null)
     try {
-      console.log('useAdminStats: Calling API...')
-      const response = await apiGet<SystemStats>('/admin/stats', getSignal())
-      console.log('useAdminStats: Response received:', response)
-      setStats(response)
+      const data = await api<SystemStats>('/admin/stats', { signal: getSignal() })
+      setStats(data)
     } catch (err) {
-      // Ігноруємо AbortError
-      if (err instanceof Error && err.name === 'AbortError') {
-        console.log('useAdminStats: Request aborted')
-        return
-      }
-      const errorMessage = err instanceof Error ? err.message : 'Failed to load stats'
-      console.error('useAdminStats: Error:', errorMessage, err)
-      setError(errorMessage)
+      if (err instanceof Error && err.name === 'AbortError') return
+      setError(err instanceof Error ? err.message : 'Failed to load stats')
     } finally {
       setLoading(false)
     }
@@ -299,27 +237,21 @@ export function useAdminStats() {
     fetchStats()
   }, [fetchStats])
 
-  return {
-    stats,
-    loading,
-    error,
-    refresh: fetchStats,
-  }
+  return { stats, loading, error, refresh: fetchStats }
 }
 
-// Content Types
-export interface Topic {
-  id: string
+// ============================================
+// CONTENT MANAGEMENT HOOK
+// ============================================
+
+export interface AdminTopic extends TopicLite {
   slug: string
-  name: string
-  nameJson?: Record<string, string>
   description: string
-  descJson?: Record<string, string>
-  category: string
-  status: string
+  category: Category
+  status: Status
   parentId: string | null
   publishedAt?: string | null
-  children?: Topic[]
+  children?: AdminTopic[]
   _count?: {
     materials: number
     quizzes: number
@@ -327,25 +259,8 @@ export interface Topic {
   }
 }
 
-interface TopicCreateData {
-  slug: string
-  name: string
-  nameJson?: Record<string, string>
-  description?: string
-  descJson?: Record<string, string>
-  category?: string
-  parentId?: string | null
-}
-
-interface TopicUpdateData extends Partial<TopicCreateData> {
-  status?: string
-  publishedAt?: string | null
-}
-
-// Admin Content Hook
 export function useAdminContent() {
-  const [topics, setTopics] = useState<Topic[]>([])
-  const [total, setTotal] = useState(0)
+  const [topics, setTopics] = useState<AdminTopic[]>([])
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const { getSignal } = useAbortController()
@@ -354,78 +269,29 @@ export function useAdminContent() {
     setLoading(true)
     setError(null)
     try {
-      const response = await apiGet<{ topics: Topic[]; total: number }>('/admin/content/topics', getSignal())
-      setTopics(response.topics)
-      setTotal(response.total)
+      const res = await api<{ topics: AdminTopic[] }>('/admin/content/topics', { signal: getSignal() })
+      setTopics(res.topics)
     } catch (err) {
-      // Ігноруємо AbortError
-      if (err instanceof Error && err.name === 'AbortError') {
-        return
-      }
+      if (err instanceof Error && err.name === 'AbortError') return
       setError(err instanceof Error ? err.message : 'Failed to load topics')
     } finally {
       setLoading(false)
     }
   }, [getSignal])
 
-  const createTopic = useCallback(async (data: TopicCreateData) => {
-    try {
-      const result = await apiPost<Topic>('/admin/content/topics', data)
-      await fetchTopics()
-      return result
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to create topic')
-      throw err
-    }
-  }, [fetchTopics])
-
-  const updateTopic = useCallback(async (id: string, data: TopicUpdateData) => {
-    try {
-      const result = await apiPut<Topic>(`/admin/content/topics/${id}`, data)
-      await fetchTopics()
-      return result
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to update topic')
-      throw err
-    }
-  }, [fetchTopics])
-
   const deleteTopic = useCallback(async (id: string) => {
     try {
-      await apiDelete(`/admin/content/topics/${id}`)
+      await api(`/admin/content/topics/${id}`, { method: 'DELETE' })
       await fetchTopics()
       return true
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to delete topic')
-      throw err
+    } catch {
+      return false
     }
   }, [fetchTopics])
-
-  const publishTopic = useCallback(async (id: string) => {
-    return updateTopic(id, { status: 'Published', publishedAt: new Date().toISOString() })
-  }, [updateTopic])
-
-  const unpublishTopic = useCallback(async (id: string) => {
-    return updateTopic(id, { status: 'Draft', publishedAt: null })
-  }, [updateTopic])
 
   useEffect(() => {
     fetchTopics()
   }, [])
 
-  return {
-    topics,
-    total,
-    loading,
-    error,
-    fetchTopics,
-    createTopic,
-    updateTopic,
-    deleteTopic,
-    publishTopic,
-    unpublishTopic,
-  }
+  return { topics, loading, error, fetchTopics, deleteTopic }
 }
-
-// NOTE: useAdminTranslations hook removed - using JSON locale files instead
-// UI translations are now managed via src/i18n/locales/*.json files

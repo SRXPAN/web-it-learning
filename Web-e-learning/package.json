@@ -8,41 +8,33 @@
   },
   "scripts": {
     "dev": "vite",
-    "build": "tsc && vite build",
-    "build:production": "vite build",
-    "build:cloudflare": "npm run build && cp _redirects dist/ && cp public/_headers dist/",
+    "build": "tsc -b && vite build",
     "preview": "vite preview",
-    "test": "vitest run",
-    "test:ui": "vitest --ui",
     "lint": "tsc -b",
-    "ci": "npm run lint && npm run test && npm run build"
+    "test": "vitest run"
   },
   "dependencies": {
     "@elearn/shared": "*",
-    "@types/canvas-confetti": "^1.9.0",
-    "canvas-confetti": "^1.9.4",
-    "clsx": "^2.1.1",
-    "lucide-react": "^0.468.0",
+    "canvas-confetti": "^1.9.2",
+    "clsx": "^2.1.0",
+    "lucide-react": "^0.344.0",
     "react": "^18.2.0",
     "react-dom": "^18.2.0",
-    "react-router-dom": "^6.26.0",
-    "terser": "^5.44.1",
-    "zustand": "^4.5.4"
+    "react-router-dom": "^6.22.0",
+    "tailwind-merge": "^2.2.1",
+    "zustand": "^4.5.0"
   },
   "devDependencies": {
-    "@testing-library/jest-dom": "^6.6.3",
-    "@testing-library/react": "^16.0.0",
-    "@types/node": "^24.7.0",
-    "@types/react": "^18.2.66",
-    "@types/react-dom": "^18.2.22",
-    "@vitejs/plugin-react": "^4.3.1",
-    "@vitest/coverage-v8": "^1.6.0",
-    "autoprefixer": "^10.4.20",
-    "jsdom": "^24.1.1",
-    "postcss": "^8.4.45",
-    "tailwindcss": "^3.4.10",
-    "typescript": "^5.6.2",
-    "vite": "^7.1.9",
-    "vitest": "^1.6.0"
+    "@types/canvas-confetti": "^1.6.4",
+    "@types/node": "^20.11.0",
+    "@types/react": "^18.2.55",
+    "@types/react-dom": "^18.2.19",
+    "@vitejs/plugin-react": "^4.2.1",
+    "autoprefixer": "^10.4.17",
+    "postcss": "^8.4.35",
+    "tailwindcss": "^3.4.1",
+    "typescript": "^5.3.3",
+    "vite": "^5.1.0",
+    "vitest": "^1.2.2"
   }
 }

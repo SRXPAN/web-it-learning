@@ -1,13 +1,6 @@
-/**
- * Admin Files Management Page
- * View and manage uploaded files
- */
 import { useState, useEffect, useCallback } from 'react'
-import { useTranslation } from '@/i18n/useTranslation'
-import { apiGet, apiDelete } from '@/lib/http'
 import {
   FolderOpen,
-  Search,
   Trash2,
   Download,
   Image,
@@ -15,15 +8,17 @@ import {
   File,
   Film,
   Music,
-  ChevronLeft,
-  ChevronRight,
-  Eye,
   Filter,
+  AlertCircle
 } from 'lucide-react'
-import { Loading } from '@/components/Loading'
+
+import { useTranslation } from '@/i18n/useTranslation'
+import { api } from '@/lib/http'
+import { SkeletonList } from '@/components/Skeletons'
+import { ConfirmDialog } from '@/components/ConfirmDialog'
 import { Pagination } from '@/components/admin/Pagination'
-import { PageHeader } from '@/components/admin/PageHeader'
-import { ConfirmDialog as AdminConfirmDialog } from '@/components/admin/ConfirmDialog'
+
+// --- Types ---
 
 interface FileRecord {
   id: string
@@ -33,6 +28,7 @@ interface FileRecord {
   category: string
   visibility: 'PUBLIC' | 'PRIVATE' | 'SIGNED'
   createdAt: string
+  url: string // Presigned or direct URL
   uploadedBy?: {
     id: string
     name: string
@@ -41,8 +37,8 @@ interface FileRecord {
 }
 
 interface FilesResponse {
-  files: FileRecord[]
-  pagination: {
+  data: FileRecord[]
+  meta: {
     page: number
     limit: number
     total: number
@@ -50,7 +46,9 @@ interface FilesResponse {
   }
 }
 
-const categoryColors: Record<string, string> = {
+// --- Constants ---
+
+const CATEGORY_COLORS: Record<string, string> = {
   avatar: 'bg-blue-100 text-blue-700 dark:bg-blue-900/50 dark:text-blue-300',
   material: 'bg-green-100 text-green-700 dark:bg-green-900/50 dark:text-green-300',
   attachment: 'bg-purple-100 text-purple-700 dark:bg-purple-900/50 dark:text-purple-300',
@@ -61,7 +59,7 @@ const getFileIcon = (mimeType: string) => {
   if (mimeType.startsWith('image/')) return Image
   if (mimeType.startsWith('video/')) return Film
   if (mimeType.startsWith('audio/')) return Music
-  if (mimeType.includes('pdf') || mimeType.includes('document')) return FileText
+  if (mimeType.includes('pdf') || mimeType.includes('document') || mimeType.includes('text')) return FileText
   return File
 }
 
@@ -74,186 +72,210 @@ const formatFileSize = (bytes: number) => {
 
 export default function AdminFiles() {
   const { t } = useTranslation()
+  
+  // State
   const [files, setFiles] = useState<FileRecord[]>([])
-  const [pagination, setPagination] = useState({ page: 1, limit: 20, total: 0, pages: 0 })
-  const [loading, setLoading] = useState(false)
+  const [pagination, setPagination] = useState({ page: 1, limit: 20, total: 0, pages: 1 })
+  const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
+  
+  // Actions
   const [deleteConfirm, setDeleteConfirm] = useState<FileRecord | null>(null)
   const [categoryFilter, setCategoryFilter] = useState('')
 
-  const fetchFiles = useCallback(async (params?: {
-    page?: number
-    limit?: number
-    category?: string
-  }) => {
+  const fetchFiles = useCallback(async (page = 1, category = '') => {
     setLoading(true)
     setError(null)
     try {
-      const query = new URLSearchParams()
-      if (params?.page) query.set('page', params.page.toString())
-      if (params?.limit) query.set('limit', params.limit.toString())
-      if (params?.category) query.set('category', params.category)
+      const params = new URLSearchParams({
+        page: page.toString(),
+        limit: '20',
+        ...(category && { category })
+      })
 
-      const response = await apiGet<FilesResponse>(`/files?${query}`)
-      setFiles(response.files)
-      setPagination(response.pagination)
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to load files')
+      const response = await api<FilesResponse>(`/admin/files?${params.toString()}`)
+      setFiles(response.data)
+      setPagination(response.meta)
+    } catch (err: any) {
+      if (!err.message?.includes('404')) {
+        setError(err.message || t('common.loadFailed'))
+      }
+      setFiles([])
     } finally {
       setLoading(false)
     }
-  }, [])
+  }, [t])
+
+  // Initial load
+  useEffect(() => {
+    fetchFiles(1, categoryFilter)
+  }, [fetchFiles, categoryFilter])
 
   const handleDelete = async () => {
     if (!deleteConfirm) return
     try {
-      await apiDelete(`/files/${deleteConfirm.id}`)
-      fetchFiles({ page: pagination?.page || 1, category: categoryFilter })
+      await api(`/admin/files/${deleteConfirm.id}`, { method: 'DELETE' })
       setDeleteConfirm(null)
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to delete file')
+      fetchFiles(pagination.page, categoryFilter)
+    } catch (err: any) {
+      setError(err.message || 'Failed to delete file')
     }
   }
 
-  const handleDownload = async (fileId: string, fileName: string) => {
-    try {
-      const response = await apiGet<{ url: string }>(`/files/${fileId}`)
-      // Open download link
-      const link = document.createElement('a')
-      link.href = response.url
-      link.download = fileName
-      document.body.appendChild(link)
-      link.click()
-      document.body.removeChild(link)
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to download file')
+  const handleDownload = (file: FileRecord) => {
+    // If we have a direct URL, use it. Otherwise, request a signed URL.
+    if (file.url) {
+      window.open(file.url, '_blank')
+    } else {
+      // Fallback: Request download URL from API
+      api<{ url: string }>(`/files/${file.id}/download`)
+        .then(res => window.open(res.url, '_blank'))
+        .catch(() => alert('Download failed'))
     }
-  }
-
-  useEffect(() => {
-    fetchFiles()
-  }, [])
-
-  if (loading && (!files || files.length === 0)) {
-    return <Loading />
   }
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-6 animate-in fade-in duration-500">
+      
       {/* Header */}
-      <PageHeader
-        icon={FolderOpen}
-        title={t('admin.files')}
-        description={t('admin.filesDescription')}
-        stats={`${pagination?.total || 0} ${t('common.total')}`}
-      />
-
-      {/* Filters */}
-      <div className="flex gap-4">
-        <select
-          value={categoryFilter}
-          onChange={(e) => {
-            setCategoryFilter(e.target.value)
-            fetchFiles({ page: 1, category: e.target.value })
-          }}
-          className="px-4 py-2 border border-gray-200 dark:border-gray-700 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-white"
-        >
-          <option value="">{t('admin.allCategories')}</option>
-          <option value="avatar">{t('admin.avatars')}</option>
-          <option value="material">{t('admin.materials')}</option>
-          <option value="attachment">{t('admin.attachments')}</option>
-        </select>
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+        <div>
+          <h1 className="text-2xl font-bold text-gray-900 dark:text-white flex items-center gap-3 font-display">
+            <FolderOpen className="w-8 h-8 text-primary-600" />
+            {t('admin.files', 'Files')}
+          </h1>
+          <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">
+            {t('admin.filesDescription', 'Manage uploaded files and assets')}
+          </p>
+        </div>
+        
+        <div className="flex items-center gap-3">
+          <div className="relative">
+            <Filter className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
+            <select
+              value={categoryFilter}
+              onChange={(e) => setCategoryFilter(e.target.value)}
+              className="pl-9 pr-8 py-2 border border-gray-200 dark:border-gray-700 rounded-lg bg-white dark:bg-gray-800 text-sm focus:ring-2 focus:ring-primary-500 outline-none appearance-none cursor-pointer"
+            >
+              <option value="">{t('admin.allCategories', 'All Categories')}</option>
+              <option value="avatar">{t('admin.avatars', 'Avatars')}</option>
+              <option value="material">{t('admin.materials', 'Materials')}</option>
+              <option value="attachment">{t('admin.attachments', 'Attachments')}</option>
+            </select>
+          </div>
+        </div>
       </div>
 
       {/* Error */}
       {error && (
-        <div className="p-4 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-lg text-red-600 dark:text-red-400">
+        <div className="p-4 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-xl text-red-600 dark:text-red-400 flex items-center gap-3">
+          <AlertCircle size={20} />
           {error}
         </div>
       )}
 
-      {/* Files Grid */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-        {(files || []).map((file) => {
-          const FileIcon = getFileIcon(file.mimeType)
-
-          return (
-            <div
-              key={file.id}
-              className="bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700 p-4"
-            >
-              <div className="flex items-start gap-3">
-                <div className="p-3 bg-gray-100 dark:bg-gray-700 rounded-lg">
-                  <FileIcon className="w-6 h-6 text-gray-600 dark:text-gray-300" />
-                </div>
-                <div className="flex-1 min-w-0">
-                  <p className="font-medium text-gray-900 dark:text-white truncate" title={file.originalName}>
-                    {file.originalName}
-                  </p>
-                  <div className="mt-1 flex items-center gap-2 text-sm text-gray-500 dark:text-gray-400">
-                    <span>{formatFileSize(file.size)}</span>
-                    <span>•</span>
-                    <span className={`px-2 py-0.5 rounded-full text-xs ${categoryColors[file.category] || categoryColors.other}`}>
-                      {file.category}
-                    </span>
-                  </div>
-                  {file.uploadedBy && (
-                    <p className="mt-1 text-xs text-gray-400 dark:text-gray-500">
-                      {t('admin.uploadedBy')}: {file.uploadedBy.name}
-                    </p>
-                  )}
-                  <p className="mt-1 text-xs text-gray-400 dark:text-gray-500">
-                    {new Date(file.createdAt).toLocaleDateString()}
-                  </p>
-                </div>
-              </div>
-
-              <div className="mt-4 flex items-center gap-2 pt-3 border-t border-gray-100 dark:border-gray-700">
-                <button
-                  onClick={() => handleDownload(file.id, file.originalName)}
-                  className="flex-1 flex items-center justify-center gap-2 px-3 py-2 text-sm text-blue-600 dark:text-blue-400 hover:bg-blue-50 dark:hover:bg-blue-900/20 rounded-lg"
-                >
-                  <Download className="w-4 h-4" />
-                  {t('common.download')}
-                </button>
-                <button
-                  onClick={() => setDeleteConfirm(file)}
-                  className="flex-1 flex items-center justify-center gap-2 px-3 py-2 text-sm text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/20 rounded-lg"
-                >
-                  <Trash2 className="w-4 h-4" />
-                  {t('common.delete')}
-                </button>
-              </div>
-            </div>
-          )
-        })}
-      </div>
-
-      {(!files || files.length === 0) && !loading && (
-        <div className="text-center py-12 bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700">
-          <FolderOpen className="w-12 h-12 mx-auto text-gray-300 dark:text-gray-600" />
-          <p className="mt-4 text-gray-500 dark:text-gray-400">{t('admin.noFilesFound')}</p>
+      {/* Content */}
+      {loading ? (
+        <div className="bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700 p-6">
+          <SkeletonList count={6} />
         </div>
-      )}
+      ) : (
+        <>
+          {files.length === 0 ? (
+            <div className="text-center py-20 bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700">
+              <FolderOpen className="w-16 h-16 mx-auto text-gray-300 dark:text-gray-600 mb-4" />
+              <h3 className="text-lg font-medium text-gray-900 dark:text-white">
+                {t('admin.noFilesFound', 'No files found')}
+              </h3>
+              {categoryFilter && (
+                <button 
+                  onClick={() => setCategoryFilter('')}
+                  className="mt-2 text-primary-600 hover:underline text-sm"
+                >
+                  Clear filters
+                </button>
+              )}
+            </div>
+          ) : (
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
+              {files.map((file) => {
+                const FileIcon = getFileIcon(file.mimeType)
+                return (
+                  <div
+                    key={file.id}
+                    className="group bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700 p-4 hover:shadow-md transition-all hover:border-primary-300 dark:hover:border-primary-700"
+                  >
+                    <div className="flex items-start gap-3 mb-3">
+                      <div className="p-3 bg-gray-50 dark:bg-gray-700/50 rounded-lg shrink-0">
+                        <FileIcon className="w-6 h-6 text-gray-500 dark:text-gray-400" />
+                      </div>
+                      <div className="min-w-0 flex-1">
+                        <h4 className="font-medium text-gray-900 dark:text-white truncate text-sm" title={file.originalName}>
+                          {file.originalName}
+                        </h4>
+                        <div className="flex items-center gap-2 mt-1 text-xs text-gray-500 dark:text-gray-400">
+                          <span>{formatFileSize(file.size)}</span>
+                          <span>•</span>
+                          <span className={`px-1.5 py-0.5 rounded-full ${CATEGORY_COLORS[file.category] || CATEGORY_COLORS.other}`}>
+                            {file.category}
+                          </span>
+                        </div>
+                      </div>
+                    </div>
 
-      {/* Pagination */}
-      {pagination && (
-        <Pagination
-          currentPage={pagination.page}
-          totalPages={pagination.pages}
-          totalItems={pagination.total}
-          onPageChange={(page) => fetchFiles({ page, category: categoryFilter })}
-          disabled={loading}
-        />
+                    <div className="text-xs text-gray-400 dark:text-gray-500 mb-4 px-1">
+                      <div>Uploaded: {new Date(file.createdAt).toLocaleDateString()}</div>
+                      {file.uploadedBy && (
+                        <div className="truncate">By: {file.uploadedBy.name}</div>
+                      )}
+                    </div>
+
+                    <div className="flex items-center gap-2 pt-3 border-t border-gray-100 dark:border-gray-700">
+                      <button
+                        onClick={() => handleDownload(file)}
+                        className="flex-1 flex items-center justify-center gap-1.5 px-3 py-1.5 text-xs font-medium text-blue-600 dark:text-blue-400 hover:bg-blue-50 dark:hover:bg-blue-900/20 rounded-lg transition-colors"
+                      >
+                        <Download className="w-3.5 h-3.5" />
+                        {t('common.download', 'Download')}
+                      </button>
+                      <button
+                        onClick={() => setDeleteConfirm(file)}
+                        className="flex-1 flex items-center justify-center gap-1.5 px-3 py-1.5 text-xs font-medium text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/20 rounded-lg transition-colors"
+                      >
+                        <Trash2 className="w-3.5 h-3.5" />
+                        {t('common.delete', 'Delete')}
+                      </button>
+                    </div>
+                  </div>
+                )
+              })}
+            </div>
+          )}
+
+          {/* Pagination */}
+          {pagination.pages > 1 && (
+            <div className="mt-6">
+              <Pagination
+                currentPage={pagination.page}
+                totalPages={pagination.pages}
+                totalItems={pagination.total}
+                onPageChange={(p) => fetchFiles(p, categoryFilter)}
+                disabled={loading}
+              />
+            </div>
+          )}
+        </>
       )}
 
       {/* Delete Confirmation */}
-      <AdminConfirmDialog
+      <ConfirmDialog
         isOpen={!!deleteConfirm}
-        title={t('admin.deleteFile')}
-        message={t('admin.deleteFileConfirm').replace('{name}', deleteConfirm?.originalName || '')}
+        title={t('admin.deleteFile', 'Delete File')}
+        message={t('admin.deleteFileConfirm', 'Are you sure you want to delete {name}?').replace('{name}', deleteConfirm?.originalName || '')}
+        confirmText={t('common.delete', 'Delete')}
+        cancelText={t('common.cancel', 'Cancel')}
         onConfirm={handleDelete}
-        onCancel={() => setDeleteConfirm(null)}
+        onClose={() => setDeleteConfirm(null)}
         variant="danger"
       />
     </div>

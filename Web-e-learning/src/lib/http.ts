@@ -1,6 +1,5 @@
 import { useToast } from '@/components/Toast'
 
-// src/lib/http.ts
 const base = (import.meta.env.VITE_API_URL ?? '').replace(/\/$/, '')
 const API_URL = `${base}/api`
 
@@ -10,6 +9,7 @@ const CSRF_HEADER = 'x-csrf-token'
 const toast = {
   error: (msg: string) => {
     const safeMessage = typeof msg === 'string' && msg.trim() ? msg : 'Something went wrong'
+    // Access zustand store outside of React components
     useToast.getState().push({ type: 'error', msg: safeMessage })
   },
 }
@@ -25,17 +25,16 @@ function extractErrorMessage(data: any, fallback = 'Something went wrong'): stri
   return fallback
 }
 
-// Флаг для запобігання множинним refresh запитам
+// Flag to prevent multiple concurrent refresh requests
 let isRefreshing = false
 let refreshPromise: Promise<boolean> | null = null
 
-// Затримка для exponential backoff
 function delay(ms: number): Promise<void> {
   return new Promise(resolve => setTimeout(resolve, ms))
 }
 
 /**
- * Отримує CSRF токен з cookie
+ * Gets CSRF token from cookie (if available)
  */
 function getCsrfToken(): string | null {
   const match = document.cookie.match(new RegExp(`(^| )${CSRF_COOKIE}=([^;]+)`))
@@ -43,22 +42,26 @@ function getCsrfToken(): string | null {
 }
 
 /**
- * Завантажує CSRF токен з сервера
+ * Fetches fresh CSRF token from server
  */
 export async function fetchCsrfToken(): Promise<string> {
-  const res = await fetch(`${API_URL}/auth/csrf`, {
-    credentials: 'include',
-  })
-  if (!res.ok) throw new Error('Failed to fetch CSRF token')
-  const data = await res.json()
-  return data.csrfToken
+  try {
+    const res = await fetch(`${API_URL}/auth/csrf`, {
+      credentials: 'include',
+    })
+    if (!res.ok) throw new Error('Failed to fetch CSRF token')
+    const data = await res.json()
+    return data.csrfToken
+  } catch (e) {
+    console.warn('CSRF Fetch Error:', e)
+    return ''
+  }
 }
 
 /**
- * Оновлює токени через refresh endpoint
+ * Refreshes tokens via refresh endpoint
  */
 async function refreshTokens(): Promise<boolean> {
-  // Якщо вже оновлюємо - чекаємо на результат
   if (isRefreshing && refreshPromise) {
     return refreshPromise
   }
@@ -66,12 +69,17 @@ async function refreshTokens(): Promise<boolean> {
   isRefreshing = true
   refreshPromise = (async () => {
     try {
+      let token = getCsrfToken()
+      if (!token) {
+        token = await fetchCsrfToken()
+      }
+
       const res = await fetch(`${API_URL}/auth/refresh`, {
         method: 'POST',
         credentials: 'include',
         headers: {
           'Content-Type': 'application/json',
-          [CSRF_HEADER]: getCsrfToken() || '',
+          [CSRF_HEADER]: token || '',
         },
       })
       return res.ok
@@ -87,7 +95,7 @@ async function refreshTokens(): Promise<boolean> {
 }
 
 async function handle<T>(res: Response, retry?: () => Promise<T>): Promise<T> {
-  // Обробка Rate Limit - НЕ робимо retry, просто повертаємо помилку
+  // Rate Limit
   if (res.status === 429) {
     const retryAfter = res.headers.get('retry-after')
     const waitTime = retryAfter ? parseInt(retryAfter, 10) : 60
@@ -96,23 +104,25 @@ async function handle<T>(res: Response, retry?: () => Promise<T>): Promise<T> {
     throw new Error(message)
   }
 
+  // Auth Error (Token Expired)
   if (res.status === 401) {
     const data = await res.json().catch(() => ({}))
-    // New format: { success: false, error: { code, message } }
     const code = data?.error?.code ?? data?.code
     const message = extractErrorMessage(data, 'Unauthorized')
-    // If token expired - try to refresh (only once)
-    if (code === 'TOKEN_EXPIRED' && retry) {
+    
+    // If token expired, try to refresh (once)
+    if ((code === 'TOKEN_EXPIRED' || message.includes('expired')) && retry) {
       const refreshed = await refreshTokens()
       if (refreshed) {
-        await delay(100)
+        await delay(100) // Give time for cookies to settle
         return retry()
       }
     }
-    toast.error(message)
+    // Don't show toast for 401 usually, app redirects to login
     throw new Error(message)
   }
   
+  // Forbidden / CSRF Error
   if (res.status === 403) {
     const text = await res.text()
     let data: any = null
@@ -123,8 +133,10 @@ async function handle<T>(res: Response, retry?: () => Promise<T>): Promise<T> {
     }
     const code = data?.error?.code ?? data?.code
     const message = extractErrorMessage(data, 'Forbidden')
+    
     const isCsrf = code === 'CSRF_INVALID' || /csrf/i.test(message)
-    // If CSRF error - fetch a fresh token and retry once
+    
+    // If CSRF error, get fresh token and retry
     if (isCsrf && retry) {
       await fetchCsrfToken().catch(() => null)
       return retry()
@@ -138,37 +150,30 @@ async function handle<T>(res: Response, retry?: () => Promise<T>): Promise<T> {
   try {
     data = text ? JSON.parse(text) : null
   } catch {
-    // If not JSON, just use text
     if (!res.ok) {
       const message = typeof text === 'string' && text.trim() ? text : 'Request failed'
       toast.error(message)
       throw new Error(message)
     }
-    return text as T
+    return text as unknown as T
   }
 
-  // Handle standardized AppError format: { success: false, error: { code, message, details? } }
+  // Handle standard API response format { success: boolean, data: T, error: ... }
   if (data && typeof data === 'object' && 'success' in data) {
-    const api = data as { 
+    const apiRes = data as { 
       success: boolean
       data?: T
-      error?: { 
-        code?: string
-        message?: string
-        details?: Record<string, any>
-      }
+      error?: { message?: string }
     }
-    if (!api.success) {
-      // Extract message from new AppError format
-      const errorMessage = extractErrorMessage(api.error, 'Request failed')
+    if (!apiRes.success) {
+      const errorMessage = extractErrorMessage(apiRes, 'Request failed')
       toast.error(errorMessage)
       throw new Error(errorMessage)
     }
-    return api.data as T
+    return apiRes.data as T
   }
 
   if (!res.ok) {
-    // Fallback for other error formats
     const errorMessage = extractErrorMessage(data, 'Request failed')
     toast.error(errorMessage)
     throw new Error(errorMessage)
@@ -182,15 +187,17 @@ export async function api<T>(path: string, init: RequestInit = {}): Promise<T> {
     'Content-Type': 'application/json',
     ...(init.headers as Record<string, string> || {}),
   }
+  
   const method = (init.method ?? 'GET').toUpperCase()
   const isMutating = !['GET', 'HEAD', 'OPTIONS'].includes(method)
+  
   if (isMutating) {
     let csrfToken = getCsrfToken()
     if (!csrfToken) {
       try {
         csrfToken = await fetchCsrfToken()
       } catch {
-        // If token fetch fails, let the request surface the error
+        // Ignore error here, request will fail with 403 and be retried by handle()
       }
     }
     if (csrfToken) {
@@ -198,37 +205,44 @@ export async function api<T>(path: string, init: RequestInit = {}): Promise<T> {
     }
   }
   
-  let csrfRetried = false
+  let retried = false
   const makeRequest = async (): Promise<T> => {
     const res = await fetch(`${API_URL}${path}`, {
       credentials: 'include',
       headers,
       ...init,
     })
-    const retry = csrfRetried ? undefined : () => {
-      csrfRetried = true
+    
+    const retry = retried ? undefined : () => {
+      retried = true
+      // Refresh headers (e.g. new CSRF) before retry
+      const newToken = getCsrfToken()
+      if (newToken && isMutating) headers[CSRF_HEADER] = newToken
       return makeRequest()
     }
+    
     return handle<T>(res, retry)
   }
   
   return makeRequest()
 }
 
+// Convenience wrappers matching your existing interface
 export const apiGet = <T>(path: string, signal?: AbortSignal): Promise<T> => 
-  api<T>(path, { ...(signal && { signal }) })
+  api<T>(path, { method: 'GET', ...(signal && { signal }) })
+
 export const apiPost = <T, B = unknown>(path: string, body: B, signal?: AbortSignal): Promise<T> => 
   api<T>(path, { method: 'POST', body: JSON.stringify(body), ...(signal && { signal }) })
+
 export const apiPut = <T, B = unknown>(path: string, body: B, signal?: AbortSignal): Promise<T> => 
   api<T>(path, { method: 'PUT', body: JSON.stringify(body), ...(signal && { signal }) })
+
 export const apiDelete = <T>(path: string, signal?: AbortSignal): Promise<T> => 
   api<T>(path, { method: 'DELETE', ...(signal && { signal }) })
 
-// http object for more ergonomic usage
 export const http = {
   get: <T>(path: string): Promise<T> => apiGet<T>(path),
   post: <T, B = unknown>(path: string, body: B): Promise<T> => apiPost<T, B>(path, body),
   put: <T, B = unknown>(path: string, body: B): Promise<T> => apiPut<T, B>(path, body),
   delete: <T>(path: string): Promise<T> => apiDelete<T>(path),
 }
-

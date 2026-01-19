@@ -8,15 +8,22 @@ const __dirname = path.dirname(__filename)
 
 export default defineConfig({
   plugins: [react()],
-  resolve: { alias: { '@': path.resolve(__dirname, './src') } },
+  resolve: {
+    alias: {
+      '@': path.resolve(__dirname, './src')
+    }
+  },
   build: {
     outDir: 'dist',
     sourcemap: false,
-    minify: 'terser',
+    // Terser is a good default for minification, but 'esbuild' is faster.
+    // Keep 'terser' if you need smaller bundles, switch to 'esbuild' for speed.
+    minify: 'terser', 
   },
   server: {
     port: 5173,
     proxy: {
+      // Proxies /api requests to your backend (Express/NestJS running on port 4000)
       '/api': {
         target: 'http://localhost:4000',
         changeOrigin: true,

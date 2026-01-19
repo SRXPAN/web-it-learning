@@ -1,18 +1,17 @@
 import { useEffect, useRef } from 'react'
 
 /**
- * Хук для створення інтервалу, який правильно працює з React
- * Зберігає останню версію callback без пересоздання інтервалу
+ * Hook for intervals that works correctly with React state/props
  */
 export function useInterval(callback: () => void, delay: number | null): void {
   const savedCallback = useRef(callback)
 
-  // Зберігаємо останню версію callback
+  // Remember the latest callback
   useEffect(() => {
     savedCallback.current = callback
   }, [callback])
 
-  // Налаштовуємо інтервал
+  // Set up the interval
   useEffect(() => {
     if (delay === null) return
 

@@ -1,28 +1,59 @@
 import { memo } from 'react'
-import { ChevronRight } from 'lucide-react'
+import { ChevronRight, Home } from 'lucide-react'
+import { Link } from 'react-router-dom'
 
-type Crumb = { label: string; onClick?: () => void; current?: boolean }
+export type Crumb = { 
+  label: string; 
+  to?: string; 
+  onClick?: () => void; 
+  current?: boolean 
+}
 
 interface BreadcrumbProps {
   items: Crumb[]
 }
 
 function Breadcrumb({ items }: BreadcrumbProps) {
-    return (
-        <nav aria-label="Breadcrumb" className="text-sm text-gray-500 dark:text-gray-400 flex flex-wrap items-center gap-1">
-            {items.map((c,i)=> (
-                <span key={i} className="flex items-center gap-1">
-          {i>0 && <ChevronRight size={14}/>}
-                    {c.current
-                        ? <span className="font-medium">{c.label}</span>
-                        : c.onClick
-                            ? <button onClick={c.onClick} className="hover:underline">{c.label}</button>
-                            : <span>{c.label}</span>
-                    }
-        </span>
-            ))}
-        </nav>
-    )
+  return (
+    <nav aria-label="Breadcrumb" className="flex items-center text-sm text-neutral-500 dark:text-neutral-400">
+      <Link 
+        to="/" 
+        className="flex items-center hover:text-primary-600 dark:hover:text-primary-400 transition-colors"
+        aria-label="Home"
+      >
+        <Home size={16} />
+      </Link>
+      
+      {items.map((crumb, i) => (
+        <div key={i} className="flex items-center">
+          <ChevronRight size={14} className="mx-2 text-neutral-300 dark:text-neutral-600" />
+          
+          {crumb.current ? (
+            <span 
+              className="font-medium text-neutral-900 dark:text-white" 
+              aria-current="page"
+            >
+              {crumb.label}
+            </span>
+          ) : crumb.to ? (
+            <Link 
+              to={crumb.to} 
+              className="hover:text-primary-600 dark:hover:text-primary-400 transition-colors hover:underline decoration-primary-600/30"
+            >
+              {crumb.label}
+            </Link>
+          ) : (
+            <button 
+              onClick={crumb.onClick}
+              className="hover:text-primary-600 dark:hover:text-primary-400 transition-colors hover:underline decoration-primary-600/30"
+            >
+              {crumb.label}
+            </button>
+          )}
+        </div>
+      ))}
+    </nav>
+  )
 }
 
 export default memo(Breadcrumb)

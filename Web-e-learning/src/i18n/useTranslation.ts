@@ -1,9 +1,10 @@
 import { useI18n } from '@/store/i18n'
-import { type TranslationKey } from './types'
+import type { TranslationKey } from './types'
 import { create } from 'zustand'
-import { useEffect } from 'react'
-import { apiGet } from '@/lib/http'
+import { useEffect, useCallback } from 'react'
+import { api } from '@/lib/http'
 import { loadLanguageBundle, type TranslationBundle } from './i18nLoader'
+import type { Lang } from '@elearn/shared'
 
 // API response type
 type BundleResponse = {
@@ -47,8 +48,8 @@ type TranslationsState = {
   initialized: boolean
   error: string | null
   fetchTranslations: (lang: string) => Promise<void>
-  loadLocalBundle: (lang: 'UA' | 'EN' | 'PL') => Promise<void>
-  clearCache: () => void // Function to clear all cached translations
+  loadLocalBundle: (lang: Lang) => Promise<void>
+  clearCache: () => void
 }
 
 export const useTranslationsStore = create<TranslationsState>((set, get) => ({
@@ -60,11 +61,10 @@ export const useTranslationsStore = create<TranslationsState>((set, get) => ({
   error: null,
   
   // Load local bundle (UA.json, EN.json, etc.)
-  loadLocalBundle: async (lang: 'UA' | 'EN' | 'PL') => {
+  loadLocalBundle: async (lang: Lang) => {
     const state = get()
-    if (state.localBundles[lang]) {
-      return // Already loaded
-    }
+    if (state.localBundles[lang]) return // Already loaded
+
     try {
       const bundle = await loadLanguageBundle(lang)
       set(s => ({
@@ -87,33 +87,22 @@ export const useTranslationsStore = create<TranslationsState>((set, get) => ({
     // Try localStorage cache first
     const cachedBundle = loadCachedBundle(lang)
     if (cachedBundle && Object.keys(cachedBundle).length > 0) {
-      if (import.meta.env.DEV) {
-        console.log(`[i18n] 💾 Loaded from localStorage: ${lang} (${Object.keys(cachedBundle).length} keys)`)
-      }
       set(s => ({
         bundles: { ...s.bundles, [lang]: cachedBundle },
         initialized: true
       }))
-      // Still try to fetch fresh data in background (don't block)
-      get().fetchTranslations(lang).catch(() => {})
-      return
+      // Background refresh (optional, removed for MVP to save requests)
+      // return 
     }
     
     set({ loading: true, error: null })
     try {
-      if (import.meta.env.DEV) {
-        console.log(`[i18n] 🌐 Fetching translations from API: ${lang}`)
-      }
-      const response = await apiGet<BundleResponse>(`/i18n/bundle?lang=${lang}`)
-      
+      // Use generic api client
+      const response = await api<BundleResponse>(`/i18n/bundle?lang=${lang}`)
       const bundle = response.bundle || {}
       
       // Save to localStorage
       saveBundleToCache(lang, bundle, response.version)
-      
-      if (import.meta.env.DEV) {
-        console.log(`[i18n] ✅ Loaded ${response.count} keys, version: ${response.version}`)
-      }
       
       set(s => ({
         bundles: { ...s.bundles, [lang]: bundle },
@@ -122,12 +111,10 @@ export const useTranslationsStore = create<TranslationsState>((set, get) => ({
         initialized: true
       }))
     } catch (err) {
-      console.error('[i18n] ❌ Failed to load translations:', err)
-      
-      // Try localStorage as last resort (already checked above, but recheck)
+      // Try fallback to cache again if request failed
       const fallbackCached = loadCachedBundle(lang) || loadCachedBundle('EN')
+      
       if (fallbackCached) {
-        console.log(`[i18n] Using fallback cached bundle`)
         set(s => ({
           bundles: { ...s.bundles, [lang]: fallbackCached },
           loading: false,
@@ -139,12 +126,14 @@ export const useTranslationsStore = create<TranslationsState>((set, get) => ({
       }
     }
   },
+
   clearCache: () => {
-    console.log('[i18n] Clearing translation cache')
-    // Clear localStorage too
     try {
-      const keys = Object.keys(localStorage).filter(k => k.startsWith(STORAGE_KEY_PREFIX) || k.startsWith(STORAGE_VERSION_PREFIX))
-      keys.forEach(k => localStorage.removeItem(k))
+      Object.keys(localStorage).forEach(k => {
+        if (k.startsWith(STORAGE_KEY_PREFIX) || k.startsWith(STORAGE_VERSION_PREFIX)) {
+          localStorage.removeItem(k)
+        }
+      })
     } catch (e) {
       console.warn('[i18n] Failed to clear localStorage cache:', e)
     }
@@ -158,7 +147,7 @@ export function useTranslation() {
   
   // Load local bundle immediately for fast fallback
   useEffect(() => {
-    loadLocalBundle(lang as 'UA' | 'EN' | 'PL')
+    loadLocalBundle(lang as Lang)
   }, [lang, loadLocalBundle])
   
   // Load translations from API on mount and when lang changes
@@ -166,48 +155,39 @@ export function useTranslation() {
     fetchTranslations(lang)
   }, [lang, fetchTranslations])
   
-  const t = (key: TranslationKey): string => {
+  const t = useCallback((key: TranslationKey, defaultValue?: string): string => {
     // 1. Try API bundle for current language (most up-to-date)
     const apiBundle = bundles[lang]
-    if (apiBundle?.[key]) {
-      return apiBundle[key]
-    }
+    if (apiBundle?.[key]) return apiBundle[key]
     
     // 2. Try local bundle for current language (fast fallback)
     const localBundle = localBundles[lang]
-    if (localBundle?.[key]) {
-      return localBundle[key]
-    }
+    if (localBundle?.[key]) return localBundle[key]!
     
-    // 3. Fallback to EN API bundle if different language
+    // 3. Fallback to EN API bundle
     if (lang !== 'EN') {
-      const enApiBundle = bundles['EN'] || loadCachedBundle('EN')
-      if (enApiBundle?.[key]) {
-        return enApiBundle[key]
-      }
+      const enApiBundle = bundles['EN']
+      if (enApiBundle?.[key]) return enApiBundle[key]
     }
     
-    // 4. Fallback to EN local bundle if different language
+    // 4. Fallback to EN local bundle
     if (lang !== 'EN') {
       const enLocalBundle = localBundles['EN']
-      if (enLocalBundle?.[key]) {
-        return enLocalBundle[key]
-      }
+      if (enLocalBundle?.[key]) return enLocalBundle[key]!
     }
     
-    // 5. Return key as last resort (safe fallback - no crash)
-    return key
-  }
+    // 5. Return default value or key as last resort
+    return defaultValue || key
+  }, [lang, bundles, localBundles])
   
   return { t, lang, setLang, loading, initialized }
 }
 
-// Hook to preload all translations
+// Hook to preload all translations (e.g. in Admin Panel)
 export function usePreloadTranslations() {
   const { fetchTranslations } = useTranslationsStore()
   
   useEffect(() => {
-    // Preload all languages
     fetchTranslations('UA')
     fetchTranslations('PL')
     fetchTranslations('EN')

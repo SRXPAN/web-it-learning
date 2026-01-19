@@ -1,381 +1,186 @@
-import { useState, useEffect } from 'react'
-import confetti from 'canvas-confetti'
-import { ChevronRight, Play, FileText, Video, Link as LinkIcon, Code, CheckCircle, XCircle, Timer, Lightbulb, Award, ListChecks, Loader2 } from 'lucide-react'
-import { useTranslation } from '@/i18n/useTranslation'
+import { useState, useEffect, useMemo } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
-import { fetchLesson, type Lesson } from '@/services/lessons'
-import { getLocalizedContent } from '@/utils/materialHelpers'
+import confetti from 'canvas-confetti'
+import { 
+  ChevronRight, Play, FileText, Video, Link as LinkIcon, Code, 
+  CheckCircle, XCircle, Timer, Lightbulb, ListChecks, Loader2 
+} from 'lucide-react'
 
-type ContentType = 'notes' | 'video' | 'quiz' | 'code'
+import { useTranslation } from '@/i18n/useTranslation'
+import { api } from '@/lib/http'
+import type { Material, Lang } from '@elearn/shared'
+
+// --- Types ---
+
+type ContentType = 'text' | 'video' | 'quiz' | 'code' | 'pdf' | 'link'
 type Mode = 'practice' | 'exam'
 
-type Question = {
-  id: string
-  text: string
-  options: string[]
-  correct: number
-  explanation: string
+interface LessonData extends Material {
+  // Додаткові поля, якщо бекенд їх повертає для детального перегляду
+  nextLessonId?: string;
+  prevLessonId?: string;
+  topicName?: string;
 }
 
-type TestCase = {
-  input: string
-  expected: string
-  passed: boolean
+// --- SUB-COMPONENTS ---
+
+const LessonSidebar = ({ 
+  toc, 
+  active, 
+  onChange, 
+  progress 
+}: { 
+  toc: { type: ContentType; label: string; icon: any }[], 
+  active: ContentType, 
+  onChange: (t: ContentType) => void,
+  progress: number
+}) => {
+  const { t } = useTranslation()
+  
+  return (
+    <aside className="card h-max sticky top-24 space-y-6">
+      <div>
+        <h3 className="font-display font-semibold mb-3 text-neutral-900 dark:text-white">
+          {t('lesson.toc', 'Table of Contents')}
+        </h3>
+        <ul className="space-y-1">
+          {toc.map((item, idx) => (
+            <li key={idx}>
+              <button
+                onClick={() => onChange(item.type)}
+                className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-xl transition-all text-sm ${
+                  active === item.type
+                    ? 'bg-primary-50 text-primary-700 dark:bg-primary-900/30 dark:text-primary-300 font-semibold'
+                    : 'text-neutral-600 hover:bg-neutral-100 dark:text-neutral-400 dark:hover:bg-neutral-800'
+                }`}
+              >
+                <item.icon size={18} />
+                <span>{item.label}</span>
+              </button>
+            </li>
+          ))}
+        </ul>
+      </div>
+
+      <div>
+        <div className="flex items-center justify-between mb-2 text-sm">
+          <span className="text-neutral-600 dark:text-neutral-400">{t('lesson.progress', 'Progress')}</span>
+          <span className="font-semibold text-primary-600 dark:text-primary-400">{progress}%</span>
+        </div>
+        <div className="h-2 w-full bg-neutral-100 dark:bg-neutral-800 rounded-full overflow-hidden">
+          <div className="h-full bg-primary-500 transition-all duration-500" style={{ width: `${progress}%` }} />
+        </div>
+      </div>
+    </aside>
+  )
 }
 
-const mockTests: TestCase[] = [
-  { input: '[1,2,3,4,5], target=3', expected: '2', passed: true },
-  { input: '[1,3,5,7,9], target=5', expected: '2', passed: true },
-  { input: '[2,4,6,8], target=7', expected: '-1', passed: false },
-]
+const QuizView = ({ mode, setMode }: { mode: Mode, setMode: (m: Mode) => void }) => {
+  const { t } = useTranslation()
+  const [currentQ, setCurrentQ] = useState(0)
+  const [selected, setSelected] = useState<number | null>(null)
+  const [showExplanation, setShowExplanation] = useState(false)
 
-export default function LessonView() {
-  const { t, lang } = useTranslation()
-  const currentLang = (lang || 'EN').toUpperCase()
-
-  const getLocalizedUrl = (material: { url?: string | null; urlCache?: Record<string, string> | null }) => {
-    if (!material) return ''
-    if (material.urlCache && material.urlCache[currentLang]) return material.urlCache[currentLang]
-    if (material.urlCache && material.urlCache['EN']) return material.urlCache['EN']
-    return material.url || ''
-  }
-
-  const getLocalizedTitle = (material: { title?: string | null; titleCache?: Record<string, string> | null }) => {
-    if (!material) return ''
-    return material.titleCache?.[currentLang] || material.titleCache?.['EN'] || material.title || ''
-  }
-
-  const mockQuestion: Question = {
-    id: 'q1',
-    text: t('lesson.mock.questionText'),
+  // Mock data (should come from API in real app)
+  const question = {
+    text: t('lesson.mock.questionText', 'Time complexity of Binary Search?'),
     options: ['O(n)', 'O(log n)', 'O(n log n)', 'O(1)'],
     correct: 1,
-    explanation: t('lesson.mock.explanation')
-  }
-  const { topicId, lessonId } = useParams()
-  const nav = useNavigate()
-  
-  // API data state
-  const [lesson, setLesson] = useState<Lesson | null>(null)
-  const [loading, setLoading] = useState(true)
-  const [error, setError] = useState<string | null>(null)
-  
-  const [mode, setMode] = useState<Mode>('practice')
-  const [content, setContent] = useState<ContentType>('notes')
-  const [currentQ, setCurrentQ] = useState(0)
-  const [selectedAnswer, setSelectedAnswer] = useState<number | null>(null)
-  const [showExplanation, setShowExplanation] = useState(false)
-  const [timeLeft, setTimeLeft] = useState(120) // секунди для екзамену
-
-  const activeUrl = lesson ? getLocalizedUrl(lesson) : ''
-  const activeTitle = lesson ? getLocalizedTitle(lesson) : ''
-
-  // Fetch lesson data from API
-  useEffect(() => {
-    if (!lessonId) return
-    
-    setLoading(true)
-    setError(null)
-    
-    fetchLesson(lessonId, lang as 'UA' | 'PL' | 'EN')
-      .then(data => {
-        setLesson(data)
-        // Set initial content type based on material type
-        if (data.type === 'video') setContent('video')
-        else if (data.type === 'text') setContent('notes')
-        else setContent('notes')
-      })
-      .catch(err => {
-        setError(err.message || t('common.error'))
-      })
-      .finally(() => setLoading(false))
-  }, [lessonId, lang, t])
-
-  const breadcrumbs = [
-    { label: t('lesson.breadcrumb.algorithms'), onClick: () => nav('/materials') },
-    { label: lesson?.topic?.name || topicId || t('lesson.breadcrumb.search'), onClick: () => nav('/materials'), current: !lessonId },
-    { label: lesson ? getLocalizedContent(lesson, lang).title : lessonId || t('lesson.breadcrumb.binarySearch'), current: true },
-  ]
-  
-  if (loading) {
-    return (
-      <div className="card flex items-center justify-center py-12">
-        <Loader2 className="animate-spin text-primary-600" size={32} />
-      </div>
-    )
-  }
-  
-  if (error) {
-    return (
-      <div className="card">
-        <p className="text-sm text-red-600 dark:text-red-400">{error}</p>
-      </div>
-    )
-  }
-  
-  if (!topicId || !lessonId) {
-    return (
-      <div className="card">
-        <p className="text-sm text-neutral-600 dark:text-neutral-400">
-          {t('lesson.placeholder')} (missing topic/lesson id)
-        </p>
-      </div>
-    )
+    explanation: t('lesson.mock.explanation', 'Divide and conquer approach.')
   }
 
-  const tocItems = [
-    { icon: FileText, label: t('lesson.content.notes'), type: 'notes' as ContentType },
-    { icon: Video, label: t('lesson.content.video'), type: 'video' as ContentType },
-    { icon: LinkIcon, label: 'PDF', type: 'notes' as ContentType },
-    { icon: Code, label: t('lesson.content.quiz'), type: 'quiz' as ContentType },
-    { icon: Code, label: t('lesson.content.code'), type: 'code' as ContentType },
-  ]
-
-  const hints = [
-    t('lesson.hint.sortedOnly'),
-    t('lesson.hint.splitHalf'),
-    t('lesson.hint.complexity'),
-  ]
-
-  const achievements = [t('lesson.achievement.firstQuiz'), t('lesson.achievement.fastAnswer'), t('lesson.achievement.accuracy90')]
-
-  const checklistSteps = [
-    { done: true, label: t('quiz.checklist.reviewMaterials') },
-    { done: true, label: t('quiz.checklist.pickMode') },
-    { done: false, label: t('quiz.checklist.score75') },
-    { done: false, label: t('quiz.checklist.answerAll') },
-  ]
-
-  function handleAnswer() {
-    if (selectedAnswer === null) return
+  const handleAnswer = () => {
     if (mode === 'practice') {
       setShowExplanation(true)
     } else {
-      // Exam mode: just move to next
-      // Celebrate completion on last question
       if (currentQ >= 9) {
-        confetti({
-          particleCount: 100,
-          spread: 70,
-          origin: { y: 0.6 }
-        })
+        confetti({ particleCount: 100, spread: 70, origin: { y: 0.6 } })
       }
-      setCurrentQ(q => q + 1)
-      setSelectedAnswer(null)
+      setCurrentQ(prev => prev + 1)
+      setSelected(null)
     }
   }
 
   return (
-    <div className="space-y-6">
-      {/* Breadcrumbs */}
-      <nav className="flex items-center gap-2 text-sm text-neutral-600 dark:text-neutral-400">
-        {breadcrumbs.map((crumb, idx) => (
-          <span key={idx} className="flex items-center gap-2">
-            {idx > 0 && <ChevronRight size={14} />}
-            {crumb.current ? (
-              <span className="font-semibold text-neutral-900 dark:text-white">{crumb.label}</span>
-            ) : (
-              <button onClick={crumb.onClick} className="hover:text-primary-600 dark:hover:text-primary-400">
-                {crumb.label}
-              </button>
-            )}
-          </span>
-        ))}
-      </nav>
+    <div className="space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-500">
+      {/* Header */}
+      <div className="flex items-center justify-between">
+        <div className="flex gap-2 bg-neutral-100 dark:bg-neutral-800 p-1 rounded-xl">
+          {(['practice', 'exam'] as Mode[]).map(m => (
+            <button
+              key={m}
+              onClick={() => setMode(m)}
+              className={`px-4 py-1.5 rounded-lg text-sm font-medium transition-all ${
+                mode === m 
+                  ? 'bg-white dark:bg-neutral-700 shadow-sm text-neutral-900 dark:text-white' 
+                  : 'text-neutral-500 hover:text-neutral-700 dark:hover:text-neutral-300'
+              }`}
+            >
+              {t(`quiz.mode.${m}` as any, m)}
+            </button>
+          ))}
+        </div>
+        {mode === 'exam' && (
+          <div className="flex items-center gap-2 text-orange-500 font-mono font-medium bg-orange-50 dark:bg-orange-900/20 px-3 py-1 rounded-lg">
+            <Timer size={16} /> 01:59
+          </div>
+        )}
+      </div>
 
-      {/* Mode Toggle */}
-      <div className="flex items-center gap-3">
-        <span className="text-sm font-medium text-neutral-600 dark:text-neutral-400">{t('quiz.mode')}:</span>
-        <div className="flex gap-2">
-          <button
-            onClick={() => setMode('practice')}
-            className={`px-4 py-2 rounded-xl font-semibold transition-all ${
-              mode === 'practice'
-                ? 'bg-primary-600 text-white shadow-neo'
-                : 'bg-neutral-100 text-neutral-600 hover:bg-neutral-200 dark:bg-neutral-800 dark:text-neutral-400 dark:hover:bg-neutral-700'
-            }`}
-          >
-            {t('quiz.practice')}
-          </button>
-          <button
-            onClick={() => setMode('exam')}
-            className={`px-4 py-2 rounded-xl font-semibold transition-all ${
-              mode === 'exam'
-                ? 'bg-accent-600 text-white shadow-neo'
-                : 'bg-neutral-100 text-neutral-600 hover:bg-neutral-200 dark:bg-neutral-800 dark:text-neutral-400 dark:hover:bg-neutral-700'
-            }`}
-          >
-            {t('quiz.exam')}
+      {/* Question Card */}
+      <div className="card border-2 border-primary-100 dark:border-primary-900/30">
+        <div className="mb-6">
+          <span className="text-xs font-bold text-primary-600 dark:text-primary-400 uppercase tracking-wider">
+            {t('quiz.question', 'Question')} {currentQ + 1}
+          </span>
+          <h3 className="text-xl font-bold mt-2 text-neutral-900 dark:text-white">{question.text}</h3>
+        </div>
+
+        <div className="grid gap-3">
+          {question.options.map((opt, idx) => (
+            <button
+              key={idx}
+              onClick={() => setSelected(idx)}
+              className={`p-4 rounded-xl text-left border-2 transition-all flex items-center gap-3 ${
+                selected === idx
+                  ? 'border-primary-600 bg-primary-50 dark:bg-primary-900/20 dark:border-primary-500'
+                  : 'border-neutral-200 dark:border-neutral-800 hover:border-primary-300 dark:hover:border-primary-700'
+              }`}
+            >
+              <div className={`w-6 h-6 rounded-full border-2 flex items-center justify-center text-xs font-bold ${
+                selected === idx ? 'border-primary-600 text-primary-600' : 'border-neutral-300 text-neutral-400'
+              }`}>
+                {String.fromCharCode(65 + idx)}
+              </div>
+              <span className="font-medium text-neutral-700 dark:text-neutral-200">{opt}</span>
+            </button>
+          ))}
+        </div>
+
+        {/* Explanation */}
+        {mode === 'practice' && showExplanation && (
+          <div className="mt-6 p-4 bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-900/50 rounded-xl flex gap-3">
+            <Lightbulb className="text-green-600 shrink-0" size={20} />
+            <div>
+              <p className="font-semibold text-green-800 dark:text-green-300 text-sm mb-1">{t('lesson.explanationTitle', 'Explanation')}</p>
+              <p className="text-green-700 dark:text-green-400 text-sm">{question.explanation}</p>
+            </div>
+          </div>
+        )}
+
+        <div className="mt-8 flex justify-end gap-3">
+          <button className="btn px-8" onClick={handleAnswer} disabled={selected === null}>
+            {t('quiz.answer', 'Submit Answer')}
           </button>
         </div>
       </div>
+    </div>
+  )
+}
 
-      {/* 3-Column Layout */}
-      <div className="grid lg:grid-cols-[280px_1fr_320px] gap-6">
-        {/* Left Sidebar: TOC */}
-        <aside className="card h-max sticky top-24 space-y-6">
-          <div>
-            <h3 className="font-display font-semibold mb-3 text-neutral-900 dark:text-white">{t('lesson.toc')}</h3>
-            <ul className="space-y-2">
-              {tocItems.map((item, idx) => (
-                <li key={idx}>
-                  <button
-                    onClick={() => setContent(item.type)}
-                    className={`w-full flex items-center gap-3 px-3 py-2 rounded-xl transition-all ${
-                      content === item.type
-                        ? 'bg-primary-50 text-primary-700 dark:bg-primary-950 dark:text-primary-300 font-semibold'
-                        : 'text-neutral-600 hover:bg-neutral-100 dark:text-neutral-400 dark:hover:bg-neutral-800'
-                    }`}
-                  >
-                    <item.icon size={18} />
-                    <span className="text-sm">{item.label}</span>
-                  </button>
-                </li>
-              ))}
-            </ul>
-          </div>
-
-          {/* Progress */}
-          <div>
-            <div className="flex items-center justify-between mb-2 text-sm">
-              <span className="text-neutral-600 dark:text-neutral-400">{t('lesson.progress')}</span>
-              <span className="font-semibold text-primary-600 dark:text-primary-400">36%</span>
-            </div>
-            <div className="progress-bar">
-              <div className="progress-fill" style={{ width: '36%' }} />
-            </div>
-            <p className="text-xs text-neutral-500 dark:text-neutral-400 mt-2">
-              {t('lesson.progressRequirement')}
-            </p>
-          </div>
-        </aside>
-
-        {/* Center: Content Area */}
-        <section className="card space-y-6">
-          {/* Content Tabs */}
-          <div className="flex gap-2 flex-wrap">
-            {[t('lesson.content.notes'), t('lesson.content.video'), t('lesson.content.quiz'), t('lesson.content.code')].map((tab, idx) => {
-              const types: ContentType[] = ['notes', 'video', 'quiz', 'code']
-              const isActive = content === types[idx]
-              return (
-                <button
-                  key={tab}
-                  onClick={() => setContent(types[idx])}
-                  className={`px-4 py-2 rounded-xl text-sm font-semibold transition-all ${
-                    isActive
-                      ? 'bg-gradient-to-r from-primary-600 to-accent-500 text-white shadow-neo'
-                      : 'bg-neutral-100 text-neutral-600 hover:bg-neutral-200 dark:bg-neutral-800 dark:text-neutral-400 dark:hover:bg-neutral-700'
-                  }`}
-                >
-                  {tab}
-                </button>
-              )
-            })}
-          </div>
-
-          {/* Quiz Content */}
-          {content === 'quiz' && (
-            <div className="space-y-6">
-              {/* Status Bar */}
-              <div className="flex items-center justify-between p-4 rounded-2xl bg-primary-50 dark:bg-primary-950 border border-primary-200 dark:border-primary-800">
-                <span className="font-semibold text-neutral-900 dark:text-white">
-                  {t('lesson.questionCounter')} {currentQ + 1}/10
-                </span>
-                {mode === 'exam' ? (
-                  <div className="flex items-center gap-2 text-accent-600 dark:text-accent-400">
-                    <Timer size={18} />
-                    <span className="font-bold">{timeLeft}s</span>
-                  </div>
-                ) : (
-                  <span className="text-sm text-neutral-600 dark:text-neutral-400">{t('quiz.explanationImmediate')}</span>
-                )}
-              </div>
-
-              {/* Question */}
-              <div>
-                <h5 className="text-xl font-display font-bold text-neutral-900 dark:text-white mb-6">
-                  {mockQuestion.text}
-                </h5>
-
-                {/* Options */}
-                <div className="grid md:grid-cols-2 gap-3">
-                  {mockQuestion.options.map((opt, idx) => (
-                    <button
-                      key={idx}
-                      onClick={() => setSelectedAnswer(idx)}
-                      className={`p-4 rounded-2xl border-2 text-left transition-all ${
-                        selectedAnswer === idx
-                          ? 'border-primary-600 bg-primary-50 dark:border-primary-500 dark:bg-primary-950'
-                          : 'border-neutral-200 hover:border-primary-400 dark:border-neutral-700 dark:hover:border-primary-600'
-                      }`}
-                    >
-                      <div className="flex items-center gap-3">
-                        <div
-                          className={`w-8 h-8 rounded-lg flex items-center justify-center font-bold ${
-                            selectedAnswer === idx
-                              ? 'bg-primary-600 text-white'
-                              : 'bg-neutral-200 text-neutral-700 dark:bg-neutral-800 dark:text-neutral-400'
-                          }`}
-                        >
-                          {String.fromCharCode(65 + idx)}
-                        </div>
-                        <span className="font-medium text-neutral-900 dark:text-white">{opt}</span>
-                      </div>
-                    </button>
-                  ))}
-                </div>
-              </div>
-
-              {/* Explanation (Practice mode) */}
-              {mode === 'practice' && showExplanation && (
-                <div className="p-4 rounded-2xl bg-green-50 border border-green-200 dark:bg-green-950 dark:border-green-800">
-                  <div className="flex items-start gap-3">
-                    <Lightbulb size={20} className="text-green-600 dark:text-green-400 flex-shrink-0 mt-1" />
-                    <div>
-                      <h6 className="font-semibold text-green-900 dark:text-green-100 mb-1">{t('lesson.explanationTitle')}</h6>
-                      <p className="text-sm text-green-800 dark:text-green-300">{mockQuestion.explanation}</p>
-                    </div>
-                  </div>
-                </div>
-              )}
-
-              {/* Actions */}
-              <div className="flex gap-3">
-                <button className="btn flex-1" onClick={handleAnswer} disabled={selectedAnswer === null}>
-                  {t('quiz.answer')}
-                </button>
-                <button
-                  className="btn-outline"
-                  onClick={() => {
-                    setCurrentQ(q => q + 1)
-                    setSelectedAnswer(null)
-                    setShowExplanation(false)
-                  }}
-                >
-                  {t('quiz.skip')}
-                </button>
-              </div>
-            </div>
-          )}
-
-          {/* Code Practice Content */}
-          {content === 'code' && (
-            <div className="space-y-6">
-              <div className="flex items-center justify-between">
-                <h5 className="text-xl font-display font-bold text-neutral-900 dark:text-white">
-                  binarySearch(arr, x)
-                </h5>
-                <button className="btn">
-                  <Play size={16} className="inline mr-2" />
-                  {t('lesson.run')}
-                </button>
-              </div>
-
-              <div className="grid md:grid-cols-[1fr_300px] gap-4">
-                {/* Code Editor */}
-                <div className="p-4 rounded-2xl bg-neutral-900 text-neutral-100 font-mono text-sm border border-neutral-800">
-                  <pre className="whitespace-pre-wrap">
-{`function binarySearch(arr, target) {
+const CodeView = () => {
+  const { t } = useTranslation()
+  const code = `function binarySearch(arr, target) {
   let left = 0;
   let right = arr.length - 1;
   
@@ -386,226 +191,214 @@ export default function LessonView() {
     else right = mid - 1;
   }
   return -1;
-}`}
-                  </pre>
-                </div>
+}`
 
-                {/* Test Cases */}
-                <div className="space-y-2">
-                  <h6 className="font-semibold text-neutral-900 dark:text-white mb-3">{t('lesson.tests')}</h6>
-                  {mockTests.map((test, idx) => (
-                    <div
-                      key={idx}
-                      className={`p-3 rounded-xl border-2 ${
-                        test.passed
-                          ? 'border-green-200 bg-green-50 dark:border-green-800 dark:bg-green-950'
-                          : 'border-red-200 bg-red-50 dark:border-red-800 dark:bg-red-950'
-                      }`}
-                    >
-                      <div className="flex items-center gap-2 mb-1">
-                        {test.passed ? (
-                          <CheckCircle size={16} className="text-green-600 dark:text-green-400" />
-                        ) : (
-                          <XCircle size={16} className="text-red-600 dark:text-red-400" />
-                        )}
-                        <span className="text-xs font-semibold text-neutral-900 dark:text-white">
-                          {t('lesson.testTitle')} {idx + 1}
-                        </span>
-                      </div>
-                      <p className="text-xs text-neutral-600 dark:text-neutral-400">{test.input}</p>
-                      <p className="text-xs text-neutral-500 dark:text-neutral-500">{t('lesson.test.expected')}: {test.expected}</p>
-                    </div>
-                  ))}
+  return (
+    <div className="space-y-4 animate-in fade-in slide-in-from-bottom-4 duration-500">
+      <div className="flex justify-between items-center">
+        <h3 className="font-mono font-bold text-lg text-neutral-900 dark:text-white">binarySearch.js</h3>
+        <button className="btn btn-sm gap-2">
+          <Play size={14} /> {t('lesson.run', 'Run Code')}
+        </button>
+      </div>
+      
+      <div className="grid lg:grid-cols-2 gap-4">
+        <div className="bg-[#1e1e1e] p-4 rounded-xl font-mono text-sm text-blue-100 overflow-x-auto shadow-inner">
+          <pre>{code}</pre>
+        </div>
+        
+        <div className="space-y-3">
+          <h4 className="font-semibold text-neutral-900 dark:text-white">{t('lesson.tests', 'Test Cases')}</h4>
+          {[
+            { input: '[1,2,3,4,5], 3', expect: '2', pass: true },
+            { input: '[1,5,10], 5', expect: '1', pass: true },
+            { input: '[2,4,6], 5', expect: '-1', pass: false },
+          ].map((test, i) => (
+            <div key={i} className={`p-3 rounded-lg border flex items-center gap-3 ${
+              test.pass 
+                ? 'bg-green-50 dark:bg-green-900/10 border-green-200 dark:border-green-900/30' 
+                : 'bg-red-50 dark:bg-red-900/10 border-red-200 dark:border-red-900/30'
+            }`}>
+              {test.pass 
+                ? <CheckCircle size={18} className="text-green-600" /> 
+                : <XCircle size={18} className="text-red-600" />
+              }
+              <div className="text-xs font-mono text-neutral-700 dark:text-neutral-300">
+                <div className="opacity-70">Input: {test.input}</div>
+                <div>Expected: {test.expect}</div>
+              </div>
+            </div>
+          ))}
+        </div>
+      </div>
+    </div>
+  )
+}
+
+// --- MAIN COMPONENT ---
+
+export default function LessonView() {
+  const { t, lang } = useTranslation()
+  const { lessonId } = useParams()
+  const navigate = useNavigate()
+  
+  const [lesson, setLesson] = useState<LessonData | null>(null)
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState<string | null>(null)
+  const [activeTab, setActiveTab] = useState<ContentType>('text')
+  const [quizMode, setQuizMode] = useState<Mode>('practice')
+
+  useEffect(() => {
+    if (!lessonId) return
+    
+    const fetchLesson = async () => {
+      setLoading(true)
+      try {
+        const data = await api<LessonData>(`/materials/${lessonId}?lang=${lang}`)
+        setLesson(data)
+        
+        // Auto-select tab based on type
+        if (data.type === 'video') setActiveTab('video')
+        else if (data.type === 'quiz') setActiveTab('quiz')
+        else setActiveTab('text')
+        
+      } catch (err) {
+        setError(t('common.loadFailed', 'Failed to load lesson'))
+      } finally {
+        setLoading(false)
+      }
+    }
+    fetchLesson()
+  }, [lessonId, lang, t])
+
+  const tocItems = [
+    { icon: FileText, label: t('lesson.content.notes', 'Notes'), type: 'text' as ContentType },
+    { icon: Video, label: t('lesson.content.video', 'Video'), type: 'video' as ContentType },
+    { icon: Code, label: t('lesson.content.quiz', 'Quiz'), type: 'quiz' as ContentType },
+    { icon: Code, label: t('lesson.content.code', 'Code'), type: 'code' as ContentType },
+  ]
+
+  if (loading) return (
+    <div className="min-h-[60vh] flex items-center justify-center">
+      <Loader2 size={40} className="text-primary-500 animate-spin" />
+    </div>
+  )
+
+  if (error || !lesson) return (
+    <div className="min-h-[60vh] flex flex-col items-center justify-center text-center">
+      <p className="text-red-500 mb-4">{error}</p>
+      <button onClick={() => navigate('/materials')} className="btn">
+        {t('common.back', 'Back to Materials')}
+      </button>
+    </div>
+  )
+
+  return (
+    <div className="max-w-7xl mx-auto px-4 py-6 space-y-6">
+      
+      {/* Breadcrumbs */}
+      <nav className="flex items-center gap-2 text-sm text-neutral-500">
+        <button onClick={() => navigate('/materials')} className="hover:text-primary-600 transition-colors">
+          {t('nav.materials', 'Materials')}
+        </button>
+        <ChevronRight size={14} />
+        <span>{lesson.topicName || t('lesson.placeholder', 'Lesson')}</span>
+        <ChevronRight size={14} />
+        <span className="font-semibold text-neutral-900 dark:text-white truncate max-w-[200px]">
+          {lesson.title}
+        </span>
+      </nav>
+
+      {/* Main Layout */}
+      <div className="grid lg:grid-cols-[260px_1fr_300px] gap-8 items-start">
+        
+        {/* Left Sidebar */}
+        <LessonSidebar 
+          toc={tocItems} 
+          active={activeTab} 
+          onChange={setActiveTab} 
+          progress={35} 
+        />
+
+        {/* Center Content */}
+        <main className="space-y-6 min-w-0">
+          
+          {activeTab === 'text' && (
+            <div className="card prose prose-neutral dark:prose-invert max-w-none animate-in fade-in duration-300">
+              <h1>{lesson.title}</h1>
+              {lesson.content ? (
+                <div dangerouslySetInnerHTML={{ __html: lesson.content }} />
+              ) : (
+                <div className="flex flex-col items-center justify-center py-12 gap-4 bg-neutral-50 dark:bg-neutral-900 rounded-xl">
+                  {lesson.type === 'pdf' ? <FileText size={48} className="text-neutral-300" /> : <LinkIcon size={48} className="text-neutral-300" />}
+                  <a href={lesson.url} target="_blank" rel="noopener noreferrer" className="btn">
+                    {lesson.type === 'pdf' ? t('lesson.openPdf', 'Open PDF') : t('lesson.openLink', 'Open Link')}
+                  </a>
                 </div>
+              )}
+            </div>
+          )}
+
+          {activeTab === 'video' && (
+            <div className="space-y-4 animate-in fade-in duration-300">
+              <div className="aspect-video bg-black rounded-2xl overflow-hidden shadow-lg">
+                {lesson.url && (lesson.url.includes('youtube') || lesson.url.includes('youtu.be')) ? (
+                  <iframe 
+                    src={lesson.url.replace('watch?v=', 'embed/').replace('youtu.be/', 'youtube.com/embed/')}
+                    className="w-full h-full"
+                    allowFullScreen
+                    title={lesson.title}
+                  />
+                ) : (
+                  <video src={lesson.url} controls className="w-full h-full" />
+                )}
+              </div>
+              <div className="card">
+                <h2 className="text-2xl font-bold mb-2">{lesson.title}</h2>
+                <p className="text-neutral-600 dark:text-neutral-400">{lesson.description}</p>
               </div>
             </div>
           )}
 
-          {/* Notes/Video placeholder */}
-          {content === 'notes' && (
-            <div className="space-y-6">
-              {/* Translation Warning */}
-              {lesson?.meta && lesson.meta.requestedLang !== lesson.meta.contentLang && (
-                <div className="bg-yellow-50 border-l-4 border-yellow-400 p-4 rounded-lg dark:bg-yellow-950 dark:border-yellow-500">
-                  <div className="flex items-start">
-                    <div className="flex-shrink-0">
-                      <svg className="h-5 w-5 text-yellow-400" viewBox="0 0 20 20" fill="currentColor">
-                        <path fillRule="evenodd" d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92zM11 13a1 1 0 11-2 0 1 1 0 012 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z" clipRule="evenodd" />
-                      </svg>
-                    </div>
-                    <div className="ml-3">
-                      <p className="text-sm text-yellow-700 dark:text-yellow-300">
-                        ⚠️ {t('lesson.translationWarning.unavailable')} ({lesson.meta.requestedLang}). {t('lesson.translationWarning.showingOriginal')} ({lesson.meta.contentLang}).
-                      </p>
-                    </div>
-                  </div>
-                </div>
-              )}
-              
-              {/* Lesson Title */}
-              <h2 className="text-2xl font-display font-bold text-neutral-900 dark:text-white">
-                {lesson ? activeTitle : t('lesson.placeholder')}
-              </h2>
-              
-              {/* Lesson Content */}
-              {lesson?.content ? (
-                <div className="prose prose-neutral dark:prose-invert max-w-none">
-                  <div 
-                    className="whitespace-pre-wrap text-neutral-700 dark:text-neutral-300"
-                    dangerouslySetInnerHTML={{ __html: getLocalizedContent(lesson, lang).content || lesson.content || '' }}
-                  />
-                </div>
-              ) : lesson?.url ? (
-                <div className="flex flex-col items-center gap-4 py-8">
-                  {lesson.type === 'pdf' ? (
-                    <>
-                      <FileText size={48} className="text-primary-600 dark:text-primary-400" />
-                      <a 
-                        href={activeUrl || lesson.url || ''} 
-                        target="_blank" 
-                        rel="noopener noreferrer"
-                        className="btn"
-                      >
-                        {t('lesson.openPdf')}
-                      </a>
-                    </>
-                  ) : lesson.type === 'link' ? (
-                    <>
-                      <LinkIcon size={48} className="text-primary-600 dark:text-primary-400" />
-                      <a 
-                        href={activeUrl || lesson.url || ''} 
-                        target="_blank" 
-                        rel="noopener noreferrer"
-                        className="btn"
-                      >
-                        {t('lesson.openLink')}
-                      </a>
-                    </>
-                  ) : (
-                    <p className="text-neutral-600 dark:text-neutral-400">
-                      {t('lesson.noContent')}
-                    </p>
-                  )}
-                </div>
-              ) : (
-                <p className="text-center py-12 text-neutral-600 dark:text-neutral-400">
-                  {t('lesson.noContent')}
-                </p>
-              )}
-            </div>
-          )}
+          {activeTab === 'quiz' && <QuizView mode={quizMode} setMode={setQuizMode} />}
           
-          {content === 'video' && (
-            <div className="space-y-6">
-              {/* Lesson Title */}
-              <h2 className="text-2xl font-display font-bold text-neutral-900 dark:text-white">
-                {lesson ? activeTitle : t('lesson.placeholder')}
-              </h2>
-              
-              {/* Video Player */}
-              {lesson && activeUrl && lesson.type === 'video' ? (
-                <div className="aspect-video rounded-2xl overflow-hidden bg-neutral-900">
-                  {(() => {
-                    const videoUrl = activeUrl || ''
-                    if (videoUrl.includes('youtube.com') || videoUrl.includes('youtu.be')) {
-                      return (
-                        <iframe
-                          src={videoUrl.replace('watch?v=', 'embed/').replace('youtu.be/', 'youtube.com/embed/')}
-                          className="w-full h-full"
-                          allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
-                          allowFullScreen
-                        />
-                      )
-                    }
-                    return (
-                      <video
-                        src={videoUrl}
-                        controls
-                        className="w-full h-full"
-                      />
-                    )
-                  })()}
-                </div>
-              ) : (
-                <div className="text-center py-12">
-                  <Video size={48} className="mx-auto mb-4 text-neutral-400" />
-                  <p className="text-neutral-600 dark:text-neutral-400">
-                    {t('lesson.noVideo')}
-                  </p>
-                </div>
-              )}
-            </div>
-          )}
-        </section>
+          {activeTab === 'code' && <CodeView />}
 
-        {/* Right Sidebar: Help Panel */}
-        <aside className="space-y-6">
-          {/* Hints */}
-          <div className="card">
-            <div className="flex items-center gap-2 mb-4">
-              <Lightbulb size={20} className="text-primary-600 dark:text-primary-400" />
-              <h3 className="font-display font-semibold text-neutral-900 dark:text-white">{t('quiz.hints')}</h3>
+        </main>
+
+        {/* Right Sidebar: Helpers */}
+        <aside className="space-y-6 hidden lg:block sticky top-24">
+          
+          <div className="card bg-amber-50 dark:bg-amber-900/10 border-amber-100 dark:border-amber-900/30">
+            <div className="flex items-center gap-2 mb-3 text-amber-700 dark:text-amber-400 font-bold">
+              <Lightbulb size={18} />
+              <h3>{t('quiz.hints', 'Hints')}</h3>
             </div>
-            <ul className="space-y-2">
-              {hints.map((hint, idx) => (
-                <li key={idx} className="flex items-start gap-2 text-sm text-neutral-600 dark:text-neutral-400">
-                  <span className="text-primary-600 dark:text-primary-400">•</span>
-                  <span>{hint}</span>
-                </li>
-              ))}
+            <ul className="space-y-2 text-sm text-amber-800 dark:text-amber-200/80">
+              <li className="flex gap-2"><span>•</span> {t('lesson.hint.sortedOnly', 'Sorted arrays only')}</li>
+              <li className="flex gap-2"><span>•</span> {t('lesson.hint.complexity', 'O(log n)')}</li>
             </ul>
           </div>
 
-          {/* Achievements */}
           <div className="card">
-            <div className="flex items-center gap-2 mb-4">
-              <Award size={20} className="text-primary-600 dark:text-primary-400" />
-              <h3 className="font-display font-semibold text-neutral-900 dark:text-white">{t('dashboard.achievements')}</h3>
+            <div className="flex items-center gap-2 mb-3 font-bold text-neutral-900 dark:text-white">
+              <ListChecks size={18} className="text-primary-500" />
+              <h3>{t('quiz.checklist', 'Checklist')}</h3>
             </div>
-            <div className="flex flex-wrap gap-2">
-              {achievements.map((ach, idx) => (
-                <span
-                  key={idx}
-                  className="badge"
-                >
-                  {ach}
-                </span>
-              ))}
-            </div>
+            <ul className="space-y-2 text-sm">
+              <li className="flex items-center gap-2 text-neutral-600 dark:text-neutral-400">
+                <CheckCircle size={14} className="text-green-500" />
+                <span className="line-through decoration-neutral-400">{t('quiz.checklist.reviewMaterials', 'Review notes')}</span>
+              </li>
+              <li className="flex items-center gap-2 text-neutral-900 dark:text-neutral-200">
+                <div className="w-3.5 h-3.5 rounded-full border-2 border-neutral-300 dark:border-neutral-600" />
+                <span>{t('quiz.checklist.score75', 'Score 75%')}</span>
+              </li>
+            </ul>
           </div>
 
-          {/* Checklist */}
-          <div className="card">
-            <div className="flex items-center gap-2 mb-4">
-              <ListChecks size={20} className="text-primary-600 dark:text-primary-400" />
-              <h3 className="font-display font-semibold text-neutral-900 dark:text-white">{t('quiz.checklist')}</h3>
-            </div>
-            <ol className="space-y-2">
-              {checklistSteps.map((step, idx) => (
-                <li key={idx} className="flex items-center gap-3">
-                  <div
-                    className={`w-6 h-6 rounded-lg flex items-center justify-center text-xs font-bold ${
-                      step.done
-                        ? 'bg-green-100 text-green-700 dark:bg-green-950 dark:text-green-300'
-                        : 'bg-neutral-100 text-neutral-400 dark:bg-neutral-800 dark:text-neutral-600'
-                    }`}
-                  >
-                    {step.done ? '✓' : idx + 1}
-                  </div>
-                  <span
-                    className={`text-sm ${
-                      step.done
-                        ? 'line-through text-neutral-400 dark:text-neutral-600'
-                        : 'text-neutral-700 dark:text-neutral-300'
-                    }`}
-                  >
-                    {step.label}
-                  </span>
-                </li>
-              ))}
-            </ol>
-          </div>
         </aside>
+
       </div>
     </div>
   )

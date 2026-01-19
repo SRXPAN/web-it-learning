@@ -18,7 +18,7 @@ import {
   CheckCircle,
   XCircle,
 } from 'lucide-react'
-import { Loading } from '@/components/Loading'
+import { Loading } from '@/components/Skeleton'
 
 interface UserDetails {
   id: string

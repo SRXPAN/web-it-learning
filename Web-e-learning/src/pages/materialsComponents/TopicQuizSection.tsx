@@ -1,24 +1,12 @@
 import { useState, useEffect, useMemo, useCallback } from 'react'
 import {
-  Trophy,
-  CheckCircle2,
-  XCircle,
-  Clock,
-  Sparkles,
-  ChevronRight,
-  Award,
-  Target,
-  Lock,
-  Loader2,
-  HelpCircle,
-  ArrowRight,
-  RotateCcw,
+  Trophy, CheckCircle2, XCircle, Clock, Sparkles, ChevronRight,
+  Award, Target, Lock, Loader2, HelpCircle, ArrowRight, RotateCcw
 } from 'lucide-react'
-import { fetchQuiz, submitQuizAttempt } from '@/services/quiz'
+
+import { api } from '@/lib/http'
 import { useTranslation } from '@/i18n/useTranslation'
-import { localize } from '@/utils/localize'
-import { logQuizAttempt } from '@/utils/activity'
-import type { Quiz, Question, QuizLite, Lang, LocalizedString } from '@elearn/shared'
+import type { Quiz, QuizLite, Lang, LocalizedString } from '@elearn/shared'
 
 interface TopicQuizSectionProps {
   quizzes: QuizLite[]
@@ -32,9 +20,14 @@ interface TopicQuizSectionProps {
 
 type QuizState = 'locked' | 'ready' | 'in-progress' | 'completed'
 
+// Helper for localization inside component to avoid external utils
+const getLocalizedText = (json: LocalizedString | undefined | null, fallback: string, lang: Lang) => {
+  if (!json) return fallback
+  return json[lang] || json['EN'] || fallback
+}
+
 export function TopicQuizSection({
   quizzes,
-  topicName,
   allMaterialsViewed,
   materialsCount,
   viewedCount,
@@ -42,20 +35,32 @@ export function TopicQuizSection({
   onQuizComplete,
 }: TopicQuizSectionProps) {
   const { t } = useTranslation()
-  const [selectedQuizId, setSelectedQuizId] = useState<string | null>(null)
   const [quiz, setQuiz] = useState<Quiz | null>(null)
   const [loading, setLoading] = useState(false)
+  
+  // Quiz Session State
+  const [quizStarted, setQuizStarted] = useState(false)
   const [currentQuestion, setCurrentQuestion] = useState(0)
   const [answers, setAnswers] = useState<Record<string, string>>({})
+  const [timeLeft, setTimeLeft] = useState(0)
+  
+  // Results State
   const [showResults, setShowResults] = useState(false)
   const [score, setScore] = useState(0)
   const [correctIds, setCorrectIds] = useState<Record<string, string>>({})
-  const [timeLeft, setTimeLeft] = useState(0)
-  const [quizStarted, setQuizStarted] = useState(false)
 
-  // Timer
+  // Determine UI state
+  const quizState: QuizState = useMemo(() => {
+    if (!allMaterialsViewed) return 'locked'
+    if (showResults) return 'completed'
+    if (quizStarted) return 'in-progress'
+    return 'ready'
+  }, [allMaterialsViewed, showResults, quizStarted])
+
+  // Timer Logic
   useEffect(() => {
     if (!quizStarted || timeLeft <= 0 || showResults) return
+    
     const timer = setInterval(() => {
       setTimeLeft((prev) => {
         if (prev <= 1) {
@@ -65,29 +70,22 @@ export function TopicQuizSection({
         return prev - 1
       })
     }, 1000)
+    
     return () => clearInterval(timer)
   }, [quizStarted, timeLeft, showResults])
-
-  const quizState: QuizState = useMemo(() => {
-    if (!allMaterialsViewed) return 'locked'
-    if (showResults) return 'completed'
-    if (quizStarted) return 'in-progress'
-    return 'ready'
-  }, [allMaterialsViewed, showResults, quizStarted])
 
   const loadQuiz = useCallback(async (quizId: string) => {
     setLoading(true)
     try {
-      const data = await fetchQuiz(quizId)
+      const data = await api<Quiz>(`/quizzes/${quizId}?lang=${lang}`)
       setQuiz(data)
       setTimeLeft(data.durationSec)
-      setSelectedQuizId(quizId)
     } catch (e) {
       console.error('Failed to load quiz:', e)
     } finally {
       setLoading(false)
     }
-  }, [])
+  }, [lang])
 
   const startQuiz = useCallback(() => {
     if (quiz) {
@@ -112,27 +110,33 @@ export function TopicQuizSection({
     }))
 
     try {
-      const result = await submitQuizAttempt(quiz.id, { 
-        answers: answerArray, 
-        lang,
-        token: quiz.token 
-      })
+      setLoading(true)
+      // Submit attempt
+      const result = await api<{ correct: number, correctMap: Record<string, string>, passed: boolean }>(
+        `/quizzes/${quiz.id}/submit`, 
+        {
+          method: 'POST',
+          body: JSON.stringify({ answers: answerArray })
+        }
+      )
+      
       setScore(result.correct)
       setCorrectIds(result.correctMap || {})
       setShowResults(true)
       setQuizStarted(false)
 
-      const passed = result.correct >= quiz.questions.length * 0.75
-      logQuizAttempt()
-      onQuizComplete?.(passed)
+      if (result.passed) {
+        onQuizComplete?.(true)
+      }
     } catch (e) {
       console.error('Failed to submit quiz:', e)
+    } finally {
+      setLoading(false)
     }
-  }, [quiz, answers, onQuizComplete, lang])
+  }, [quiz, answers, onQuizComplete])
 
   const resetQuiz = useCallback(() => {
     setQuiz(null)
-    setSelectedQuizId(null)
     setQuizStarted(false)
     setShowResults(false)
     setAnswers({})
@@ -146,331 +150,264 @@ export function TopicQuizSection({
     return `${mins}:${secs.toString().padStart(2, '0')}`
   }
 
-  // No quizzes available
+  // If no quizzes exist for this topic
   if (quizzes.length === 0) return null
 
   const progress = materialsCount > 0 ? Math.round((viewedCount / materialsCount) * 100) : 0
 
   return (
-    <div className="mt-6 rounded-2xl border-2 border-dashed border-gray-200 dark:border-gray-700 bg-gradient-to-br from-gray-50 to-blue-50/30 dark:from-gray-800/50 dark:to-blue-900/20 p-5">
-      {/* Header */}
-      <div className="flex items-center gap-3 mb-4">
-        <div className={`w-10 h-10 rounded-xl flex items-center justify-center ${
+    <div className="mt-8 rounded-2xl border border-neutral-200 dark:border-neutral-800 bg-white dark:bg-neutral-900 overflow-hidden shadow-sm animate-in fade-in slide-in-from-bottom-4 duration-500">
+      
+      {/* Header Banner */}
+      <div className="bg-gradient-to-r from-primary-50 to-primary-100/50 dark:from-primary-900/10 dark:to-primary-900/5 px-6 py-4 border-b border-primary-100 dark:border-primary-900/30 flex items-center gap-4">
+        <div className={`w-12 h-12 rounded-xl flex items-center justify-center shrink-0 shadow-sm ${
           quizState === 'locked' 
-            ? 'bg-gray-200 dark:bg-gray-700' 
+            ? 'bg-neutral-200 dark:bg-neutral-800 text-neutral-400' 
             : quizState === 'completed'
-            ? 'bg-green-100 dark:bg-green-900/50'
-            : 'bg-gradient-to-br from-blue-500 to-purple-600'
+            ? 'bg-green-100 dark:bg-green-900 text-green-600'
+            : 'bg-primary-600 text-white'
         }`}>
-          {quizState === 'locked' ? (
-            <Lock className="w-5 h-5 text-gray-400" />
-          ) : quizState === 'completed' ? (
-            <Award className="w-5 h-5 text-green-600 dark:text-green-400" />
-          ) : (
-            <Trophy className="w-5 h-5 text-white" />
-          )}
+          {quizState === 'locked' ? <Lock size={20} /> : 
+           quizState === 'completed' ? <Award size={24} /> : 
+           <Trophy size={24} />}
         </div>
+        
         <div className="flex-1">
-          <h3 className="font-semibold text-gray-900 dark:text-white">
-            {t('quiz.title') || 'Тест для закріплення'}
+          <h3 className="text-lg font-bold text-neutral-900 dark:text-white">
+            {t('quiz.title', 'Quiz Section')}
           </h3>
-          <p className="text-xs text-gray-500 dark:text-gray-400">
+          <p className="text-sm text-neutral-500 dark:text-neutral-400">
             {quizState === 'locked' 
-              ? `${t('materials.progress') || 'Прогрес'}: ${viewedCount}/${materialsCount} (${progress}%)`
+              ? t('materials.progress', 'Complete materials to unlock')
               : quizState === 'completed'
-              ? `${t('quiz.completed') || 'Завершено'}: ${score}/${quiz?.questions.length || 0}`
-              : `${quizzes.length} ${quizzes.length === 1 ? 'тест' : 'тести'}`
+              ? `${t('quiz.result', 'Result')}: ${score}/${quiz?.questions.length || 0}`
+              : `${quizzes.length} ${t('search.quizzes', 'quizzes available')}`
             }
           </p>
         </div>
       </div>
 
-      {/* Locked State */}
-      {quizState === 'locked' && (
-        <div className="text-center py-4">
-          <div className="w-full bg-gray-200 dark:bg-gray-700 rounded-full h-2 mb-3">
-            <div 
-              className="bg-gradient-to-r from-blue-500 to-purple-600 h-2 rounded-full transition-all duration-500"
-              style={{ width: `${progress}%` }}
-            />
-          </div>
-          <p className="text-sm text-gray-600 dark:text-gray-400">
-            {t('materials.viewAllMaterials') || 'Перегляньте всі матеріали, щоб розблокувати тест'}
-          </p>
-          <p className="text-xs text-gray-400 mt-1">
-            {t('materials.remaining') || 'Залишилось'}: {materialsCount - viewedCount} {materialsCount - viewedCount === 1 ? 'матеріал' : 'матеріалів'}
-          </p>
-        </div>
-      )}
-
-      {/* Ready State - Quiz Selection */}
-      {quizState === 'ready' && !quiz && (
-        <div className="space-y-2">
-          {quizzes.map((q) => {
-            const quizTitle = localize(q.titleJson as LocalizedString, q.title, lang)
-            return (
-              <button
-                key={q.id}
-                onClick={() => loadQuiz(q.id)}
-                disabled={loading}
-                className="w-full flex items-center justify-between p-3 rounded-xl bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 hover:border-blue-400 dark:hover:border-blue-500 hover:shadow-md transition-all group"
-              >
-                <div className="flex items-center gap-3">
-                  <Target className="w-5 h-5 text-blue-500" />
-                  <span className="font-medium text-gray-900 dark:text-white">{quizTitle}</span>
-                </div>
-                <div className="flex items-center gap-2">
-                  <span className="text-xs text-gray-400 flex items-center gap-1">
-                    <Clock className="w-3.5 h-3.5" />
-                    {Math.floor(q.durationSec / 60)} хв
-                  </span>
-                  <ChevronRight className="w-4 h-4 text-gray-400 group-hover:text-blue-500 transition-colors" />
-                </div>
-              </button>
-            )
-          })}
-        </div>
-      )}
-
-      {/* Ready State - Quiz Preview */}
-      {quizState === 'ready' && quiz && !quizStarted && (
-        <div className="space-y-4">
-          <div className="flex items-center justify-between p-4 bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700">
-            <div>
-              <h4 className="font-semibold text-gray-900 dark:text-white">
-                {localize(quiz.titleJson as LocalizedString, quiz.title, lang)}
-              </h4>
-              <p className="text-sm text-gray-500 mt-1">
-                {quiz.questions.length} {t('quiz.question') || 'питань'} • {Math.floor(quiz.durationSec / 60)} хв
-              </p>
+      <div className="p-6">
+        {/* 1. Locked State */}
+        {quizState === 'locked' && (
+          <div className="text-center py-2">
+            <div className="w-full bg-neutral-100 dark:bg-neutral-800 rounded-full h-2.5 mb-4 overflow-hidden">
+              <div 
+                className="bg-neutral-400 h-full rounded-full transition-all duration-500"
+                style={{ width: `${progress}%` }}
+              />
             </div>
-            <div className="flex items-center gap-2">
-              <button
-                onClick={resetQuiz}
-                className="p-2 rounded-lg text-gray-400 hover:text-gray-600 hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors"
-              >
-                <RotateCcw className="w-4 h-4" />
-              </button>
-            </div>
-          </div>
-
-          <div className="flex items-center gap-3 p-3 bg-blue-50 dark:bg-blue-900/30 rounded-xl">
-            <Sparkles className="w-5 h-5 text-blue-500" />
-            <p className="text-sm text-blue-700 dark:text-blue-300">
-              {t('quiz.hint.practice') || 'Для проходження потрібно набрати ≥75%'}
+            <p className="text-neutral-600 dark:text-neutral-400 mb-1 font-medium">
+              {viewedCount} / {materialsCount} {t('materials.materialsViewed', 'materials viewed')}
+            </p>
+            <p className="text-xs text-neutral-400">
+              {t('quiz.hint.reviewMaterials', 'Review all materials to unlock the quiz')}
             </p>
           </div>
+        )}
 
-          <button
-            onClick={startQuiz}
-            className="w-full py-3 px-4 bg-gradient-to-r from-blue-500 to-purple-600 hover:from-blue-600 hover:to-purple-700 text-white font-semibold rounded-xl shadow-lg shadow-blue-500/25 hover:shadow-blue-500/40 transition-all flex items-center justify-center gap-2"
-          >
-            <Trophy className="w-5 h-5" />
-            {t('quiz.start') || 'Почати тест'}
-          </button>
-        </div>
-      )}
-
-      {/* In Progress State */}
-      {quizState === 'in-progress' && quiz && (
-        <div className="space-y-4">
-          {/* Timer & Progress */}
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-2">
-              <span className="text-sm font-medium text-gray-600 dark:text-gray-400">
-                {t('quiz.question') || 'Питання'} {currentQuestion + 1} / {quiz.questions.length}
-              </span>
-            </div>
-            <div className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg ${
-              timeLeft < 30 ? 'bg-red-100 dark:bg-red-900/50 text-red-600 dark:text-red-400' : 'bg-gray-100 dark:bg-gray-800 text-gray-600 dark:text-gray-400'
-            }`}>
-              <Clock className="w-4 h-4" />
-              <span className="font-mono font-medium">{formatTime(timeLeft)}</span>
-            </div>
-          </div>
-
-          {/* Progress Bar */}
-          <div className="w-full bg-gray-200 dark:bg-gray-700 rounded-full h-1.5">
-            <div 
-              className="bg-gradient-to-r from-blue-500 to-purple-600 h-1.5 rounded-full transition-all duration-300"
-              style={{ width: `${((currentQuestion + 1) / quiz.questions.length) * 100}%` }}
-            />
-          </div>
-
-          {/* Question */}
-          {quiz.questions[currentQuestion] && (
-            <QuestionCard
-              question={quiz.questions[currentQuestion]}
-              selectedOption={answers[quiz.questions[currentQuestion].id]}
-              onSelect={(optionId) => handleAnswer(quiz.questions[currentQuestion].id, optionId)}
-              lang={lang}
-            />
-          )}
-
-          {/* Navigation */}
-          <div className="flex items-center justify-between pt-2">
-            <button
-              onClick={() => setCurrentQuestion((p) => Math.max(0, p - 1))}
-              disabled={currentQuestion === 0}
-              className="px-4 py-2 text-sm font-medium text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
-            >
-              {t('common.back') || 'Назад'}
-            </button>
-
-            {currentQuestion < quiz.questions.length - 1 ? (
-              <button
-                onClick={() => setCurrentQuestion((p) => p + 1)}
-                disabled={!answers[quiz.questions[currentQuestion].id]}
-                className="px-4 py-2 bg-blue-500 hover:bg-blue-600 disabled:bg-gray-300 dark:disabled:bg-gray-700 text-white font-medium rounded-lg transition-colors flex items-center gap-2"
-              >
-                {t('quiz.next') || 'Далі'}
-                <ArrowRight className="w-4 h-4" />
-              </button>
-            ) : (
-              <button
-                onClick={handleSubmit}
-                disabled={Object.keys(answers).length < quiz.questions.length}
-                className="px-4 py-2 bg-gradient-to-r from-green-500 to-emerald-600 hover:from-green-600 hover:to-emerald-700 disabled:from-gray-300 disabled:to-gray-400 dark:disabled:from-gray-700 dark:disabled:to-gray-600 text-white font-medium rounded-lg transition-all flex items-center gap-2"
-              >
-                {t('quiz.finish') || 'Завершити'}
-                <CheckCircle2 className="w-4 h-4" />
-              </button>
-            )}
-          </div>
-        </div>
-      )}
-
-      {/* Completed State */}
-      {quizState === 'completed' && quiz && (
-        <div className="space-y-4">
-          <div className={`text-center py-6 rounded-xl ${
-            score >= quiz.questions.length * 0.75
-              ? 'bg-green-50 dark:bg-green-900/30'
-              : 'bg-orange-50 dark:bg-orange-900/30'
-          }`}>
-            <div className={`inline-flex items-center justify-center w-16 h-16 rounded-full mb-3 ${
-              score >= quiz.questions.length * 0.75
-                ? 'bg-green-100 dark:bg-green-800'
-                : 'bg-orange-100 dark:bg-orange-800'
-            }`}>
-              {score >= quiz.questions.length * 0.75 ? (
-                <Award className="w-8 h-8 text-green-600 dark:text-green-400" />
-              ) : (
-                <Target className="w-8 h-8 text-orange-600 dark:text-orange-400" />
-              )}
-            </div>
-            <h4 className={`text-2xl font-bold ${
-              score >= quiz.questions.length * 0.75
-                ? 'text-green-600 dark:text-green-400'
-                : 'text-orange-600 dark:text-orange-400'
-            }`}>
-              {score} / {quiz.questions.length}
-            </h4>
-            <p className="text-sm text-gray-600 dark:text-gray-400 mt-1">
-              {score >= quiz.questions.length * 0.75
-                ? t('quiz.congratulations') || 'Вітаємо! Тест пройдено!'
-                : t('quiz.tryAgainMessage') || 'Спробуйте ще раз'}
-            </p>
-          </div>
-
-          {/* Show answers */}
-          <div className="space-y-3 max-h-64 overflow-y-auto">
-            {quiz.questions.map((q, idx) => {
-              const questionText = localize(q.textJson as LocalizedString, q.text, lang)
-              const isCorrect = answers[q.id] === correctIds[q.id]
+        {/* 2. Ready State (List or Preview) */}
+        {quizState === 'ready' && !quiz && (
+          <div className="space-y-3">
+            {quizzes.map((q) => {
+              const quizTitle = getLocalizedText(q.titleJson, q.title, lang)
               return (
-                <div key={q.id} className={`p-3 rounded-xl border ${
-                  isCorrect 
-                    ? 'border-green-200 dark:border-green-800 bg-green-50 dark:bg-green-900/30'
-                    : 'border-red-200 dark:border-red-800 bg-red-50 dark:bg-red-900/30'
-                }`}>
-                  <div className="flex items-start gap-2">
-                    {isCorrect ? (
-                      <CheckCircle2 className="w-5 h-5 text-green-500 shrink-0 mt-0.5" />
-                    ) : (
-                      <XCircle className="w-5 h-5 text-red-500 shrink-0 mt-0.5" />
-                    )}
-                    <div className="flex-1 min-w-0">
-                      <p className="text-sm font-medium text-gray-900 dark:text-white">
-                        {idx + 1}. {questionText}
-                      </p>
-                      {q.explanation && (
-                        <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
-                          {localize(q.explanationJson as LocalizedString, q.explanation, lang)}
-                        </p>
-                      )}
+                <button
+                  key={q.id}
+                  onClick={() => loadQuiz(q.id)}
+                  disabled={loading}
+                  className="w-full flex items-center justify-between p-4 rounded-xl border border-neutral-200 dark:border-neutral-800 hover:border-primary-500 dark:hover:border-primary-500 hover:bg-primary-50/50 dark:hover:bg-primary-900/10 transition-all group text-left"
+                >
+                  <div className="flex items-center gap-3">
+                    <div className="p-2 bg-primary-100 dark:bg-primary-900/30 rounded-lg text-primary-600 dark:text-primary-400">
+                      <Target size={18} />
                     </div>
+                    <span className="font-semibold text-neutral-900 dark:text-white">{quizTitle}</span>
                   </div>
-                </div>
+                  <div className="flex items-center gap-3 text-sm text-neutral-500">
+                    <span className="flex items-center gap-1.5 bg-neutral-100 dark:bg-neutral-800 px-2 py-1 rounded-md">
+                      <Clock size={14} />
+                      {Math.ceil(q.durationSec / 60)} min
+                    </span>
+                    <ChevronRight size={16} className="group-hover:text-primary-500 transition-colors" />
+                  </div>
+                </button>
               )
             })}
           </div>
+        )}
 
-          <button
-            onClick={resetQuiz}
-            className="w-full py-2.5 px-4 border border-gray-200 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-800 text-gray-700 dark:text-gray-300 font-medium rounded-xl transition-colors flex items-center justify-center gap-2"
-          >
-            <RotateCcw className="w-4 h-4" />
-            {t('quiz.tryAgain') || 'Спробувати ще раз'}
-          </button>
-        </div>
-      )}
+        {/* 2.1 Quiz Loaded Preview */}
+        {quizState === 'ready' && quiz && !quizStarted && (
+          <div className="space-y-6">
+            <div className="bg-primary-50 dark:bg-primary-900/20 p-4 rounded-xl border border-primary-100 dark:border-primary-900/50 flex gap-3">
+              <Sparkles className="text-primary-600 dark:text-primary-400 shrink-0 mt-0.5" size={20} />
+              <div>
+                <h4 className="font-semibold text-primary-900 dark:text-primary-100 text-sm">
+                  {t('quiz.hint.practice', 'Ready to start?')}
+                </h4>
+                <p className="text-sm text-primary-700 dark:text-primary-300 mt-1">
+                  {t('quiz.checklist.score75', 'You need to score at least 75% to pass.')}
+                </p>
+              </div>
+            </div>
 
-      {/* Loading */}
-      {loading && (
-        <div className="flex items-center justify-center py-8">
-          <Loader2 className="w-6 h-6 text-blue-500 animate-spin" />
-        </div>
-      )}
+            <div className="flex gap-3">
+              <button
+                onClick={resetQuiz}
+                className="btn-outline px-4"
+              >
+                {t('common.back', 'Back')}
+              </button>
+              <button
+                onClick={startQuiz}
+                className="btn flex-1 flex items-center justify-center gap-2"
+              >
+                <PlayIcon />
+                {t('quiz.start', 'Start Quiz')}
+              </button>
+            </div>
+          </div>
+        )}
+
+        {/* 3. In Progress */}
+        {quizState === 'in-progress' && quiz && (
+          <div className="space-y-6">
+            {/* Progress & Timer */}
+            <div className="flex items-center justify-between">
+              <span className="text-sm font-bold text-neutral-500 uppercase tracking-wider">
+                {t('quiz.question', 'Question')} {currentQuestion + 1} / {quiz.questions.length}
+              </span>
+              <div className={`flex items-center gap-2 px-3 py-1.5 rounded-lg font-mono font-medium text-sm ${
+                timeLeft < 30 ? 'bg-red-100 text-red-600 dark:bg-red-900/30 dark:text-red-400' : 'bg-neutral-100 text-neutral-600 dark:bg-neutral-800 dark:text-neutral-300'
+              }`}>
+                <Clock size={14} />
+                {formatTime(timeLeft)}
+              </div>
+            </div>
+
+            {/* Progress Bar */}
+            <div className="h-2 w-full bg-neutral-100 dark:bg-neutral-800 rounded-full overflow-hidden">
+              <div 
+                className="h-full bg-primary-500 transition-all duration-300 ease-out"
+                style={{ width: `${((currentQuestion + 1) / quiz.questions.length) * 100}%` }}
+              />
+            </div>
+
+            {/* Question Card */}
+            {quiz.questions[currentQuestion] && (
+              <QuestionCard
+                question={quiz.questions[currentQuestion]}
+                selectedOption={answers[quiz.questions[currentQuestion].id]}
+                onSelect={(optId) => handleAnswer(quiz.questions[currentQuestion].id, optId)}
+                lang={lang}
+              />
+            )}
+
+            {/* Navigation */}
+            <div className="flex justify-between pt-2">
+              <button
+                onClick={() => setCurrentQuestion(p => Math.max(0, p - 1))}
+                disabled={currentQuestion === 0}
+                className="btn-outline text-sm"
+              >
+                {t('common.back', 'Back')}
+              </button>
+
+              {currentQuestion < quiz.questions.length - 1 ? (
+                <button
+                  onClick={() => setCurrentQuestion(p => p + 1)}
+                  className="btn text-sm flex items-center gap-2"
+                >
+                  {t('quiz.next', 'Next')}
+                  <ArrowRight size={16} />
+                </button>
+              ) : (
+                <button
+                  onClick={handleSubmit}
+                  disabled={loading}
+                  className="btn bg-green-600 hover:bg-green-700 text-white text-sm flex items-center gap-2"
+                >
+                  {loading && <Loader2 size={16} className="animate-spin" />}
+                  {t('quiz.finish', 'Finish')}
+                  <CheckCircle2 size={16} />
+                </button>
+              )}
+            </div>
+          </div>
+        )}
+
+        {/* 4. Completed */}
+        {quizState === 'completed' && quiz && (
+          <div className="space-y-6 text-center">
+            <div className={`py-8 rounded-2xl border-2 border-dashed ${
+              score >= quiz.questions.length * 0.75
+                ? 'bg-green-50 border-green-200 dark:bg-green-900/10 dark:border-green-900/30'
+                : 'bg-orange-50 border-orange-200 dark:bg-orange-900/10 dark:border-orange-900/30'
+            }`}>
+              <div className={`w-20 h-20 mx-auto rounded-full flex items-center justify-center mb-4 ${
+                score >= quiz.questions.length * 0.75 ? 'bg-green-100 text-green-600' : 'bg-orange-100 text-orange-600'
+              }`}>
+                {score >= quiz.questions.length * 0.75 ? <Trophy size={40} /> : <Target size={40} />}
+              </div>
+              
+              <h3 className="text-2xl font-bold text-neutral-900 dark:text-white mb-1">
+                {score >= quiz.questions.length * 0.75 ? t('quiz.congratulations', 'Congratulations!') : t('quiz.tryAgain', 'Keep Practicing')}
+              </h3>
+              <p className="text-neutral-500 dark:text-neutral-400">
+                You scored <span className="font-bold text-neutral-900 dark:text-white">{score}</span> out of {quiz.questions.length}
+              </p>
+            </div>
+
+            <button onClick={resetQuiz} className="btn-outline w-full flex items-center justify-center gap-2">
+              <RotateCcw size={18} />
+              {t('quiz.tryAgain', 'Try Again')}
+            </button>
+          </div>
+        )}
+
+        {/* Loading Overlay */}
+        {loading && !quizStarted && (
+          <div className="absolute inset-0 bg-white/80 dark:bg-neutral-900/80 flex items-center justify-center z-10 backdrop-blur-sm">
+            <Loader2 className="w-8 h-8 text-primary-500 animate-spin" />
+          </div>
+        )}
+      </div>
     </div>
   )
 }
 
-// Question Card Component
-interface QuestionCardProps {
-  question: Question
-  selectedOption?: string
-  onSelect: (optionId: string) => void
-  lang: Lang
-}
-
-function QuestionCard({ question, selectedOption, onSelect, lang }: QuestionCardProps) {
-  const questionText = localize(question.textJson as LocalizedString, question.text, lang)
-
+function QuestionCard({ question, selectedOption, onSelect, lang }: { question: any, selectedOption?: string, onSelect: (id: string) => void, lang: Lang }) {
+  const text = getLocalizedText(question.textJson, question.text, lang)
+  
   return (
-    <div className="bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700 p-4">
-      <div className="flex items-start gap-3 mb-4">
-        <HelpCircle className="w-5 h-5 text-blue-500 shrink-0 mt-0.5" />
-        <p className="text-gray-900 dark:text-white font-medium">{questionText}</p>
-      </div>
-
-      <div className="space-y-2">
-        {question.options.map((option) => {
-          const optionText = localize(option.textJson as LocalizedString, option.text, lang)
-          const isSelected = selectedOption === option.id
-
+    <div className="space-y-4">
+      <h4 className="text-lg font-bold text-neutral-900 dark:text-white leading-snug">
+        {text}
+      </h4>
+      <div className="grid gap-3">
+        {question.options.map((opt: any) => {
+          const optText = getLocalizedText(opt.textJson, opt.text, lang)
+          const isSelected = selectedOption === opt.id
+          
           return (
             <button
-              key={option.id}
-              onClick={() => onSelect(option.id)}
-              className={`w-full p-3 rounded-lg border-2 text-left transition-all ${
+              key={opt.id}
+              onClick={() => onSelect(opt.id)}
+              className={`p-4 rounded-xl border-2 text-left transition-all ${
                 isSelected
-                  ? 'border-blue-500 bg-blue-50 dark:bg-blue-900/30'
-                  : 'border-gray-200 dark:border-gray-700 hover:border-gray-300 dark:hover:border-gray-600'
+                  ? 'border-primary-600 bg-primary-50 dark:bg-primary-900/20 dark:border-primary-500'
+                  : 'border-neutral-200 dark:border-neutral-800 hover:border-primary-300 dark:hover:border-primary-700 bg-white dark:bg-neutral-800'
               }`}
             >
               <div className="flex items-center gap-3">
                 <div className={`w-5 h-5 rounded-full border-2 flex items-center justify-center shrink-0 ${
-                  isSelected
-                    ? 'border-blue-500 bg-blue-500'
-                    : 'border-gray-300 dark:border-gray-600'
+                  isSelected ? 'border-primary-600 bg-primary-600' : 'border-neutral-300 dark:border-neutral-600'
                 }`}>
                   {isSelected && <div className="w-2 h-2 rounded-full bg-white" />}
                 </div>
-                <span className={`text-sm ${
-                  isSelected ? 'text-blue-700 dark:text-blue-300' : 'text-gray-700 dark:text-gray-300'
-                }`}>
-                  {optionText}
+                <span className={`text-sm font-medium ${isSelected ? 'text-primary-700 dark:text-primary-300' : 'text-neutral-700 dark:text-neutral-300'}`}>
+                  {optText}
                 </span>
               </div>
             </button>
@@ -481,4 +418,9 @@ function QuestionCard({ question, selectedOption, onSelect, lang }: QuestionCard
   )
 }
 
-export default TopicQuizSection
+// Simple Icon component for the "Start" button
+const PlayIcon = () => (
+  <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor" xmlns="http://www.w3.org/2000/svg">
+    <path d="M5 3L19 12L5 21V3Z" />
+  </svg>
+)

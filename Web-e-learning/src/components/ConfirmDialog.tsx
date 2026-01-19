@@ -1,11 +1,12 @@
 // src/components/ConfirmDialog.tsx
-import React, { useEffect, useRef, useCallback } from 'react'
+import React, { useEffect, useRef, useCallback, useState } from 'react'
 import { AlertTriangle, Info, AlertCircle, CheckCircle, X, LucideIcon } from 'lucide-react'
 import { useTranslation } from '@/i18n/useTranslation'
+import { createPortal } from 'react-dom'
 
 type DialogVariant = 'danger' | 'warning' | 'info' | 'success'
 
-interface ConfirmDialogProps {
+export interface ConfirmDialogProps {
   isOpen: boolean
   onClose: () => void
   onConfirm: () => void | Promise<void>
@@ -16,7 +17,6 @@ interface ConfirmDialogProps {
   cancelText?: string
   variant?: DialogVariant
   isLoading?: boolean
-  loading?: boolean
 }
 
 const variantConfig: Record<DialogVariant, {
@@ -24,41 +24,38 @@ const variantConfig: Record<DialogVariant, {
   iconBg: string
   iconColor: string
   buttonBg: string
-  buttonHover: string
+  buttonText: string
 }> = {
   danger: {
     icon: AlertTriangle,
     iconBg: 'bg-red-100 dark:bg-red-900/30',
     iconColor: 'text-red-600 dark:text-red-400',
-    buttonBg: 'bg-red-600',
-    buttonHover: 'hover:bg-red-700',
+    buttonBg: 'bg-red-600 hover:bg-red-700 focus:ring-red-500',
+    buttonText: 'text-white',
   },
   warning: {
     icon: AlertCircle,
     iconBg: 'bg-yellow-100 dark:bg-yellow-900/30',
     iconColor: 'text-yellow-600 dark:text-yellow-400',
-    buttonBg: 'bg-yellow-600',
-    buttonHover: 'hover:bg-yellow-700',
+    buttonBg: 'bg-yellow-500 hover:bg-yellow-600 focus:ring-yellow-500',
+    buttonText: 'text-white',
   },
   info: {
     icon: Info,
     iconBg: 'bg-blue-100 dark:bg-blue-900/30',
     iconColor: 'text-blue-600 dark:text-blue-400',
-    buttonBg: 'bg-blue-600',
-    buttonHover: 'hover:bg-blue-700',
+    buttonBg: 'bg-primary-600 hover:bg-primary-700 focus:ring-primary-500',
+    buttonText: 'text-white',
   },
   success: {
     icon: CheckCircle,
     iconBg: 'bg-green-100 dark:bg-green-900/30',
     iconColor: 'text-green-600 dark:text-green-400',
-    buttonBg: 'bg-green-600',
-    buttonHover: 'hover:bg-green-700',
+    buttonBg: 'bg-green-600 hover:bg-green-700 focus:ring-green-500',
+    buttonText: 'text-white',
   },
 }
 
-/**
- * Діалог підтвердження дій
- */
 export function ConfirmDialog({
   isOpen,
   onClose,
@@ -70,76 +67,64 @@ export function ConfirmDialog({
   cancelText,
   variant = 'danger',
   isLoading = false,
-  loading = false,
 }: ConfirmDialogProps) {
   const { t } = useTranslation()
-  const dialogRef = useRef<HTMLDialogElement>(null)
   const confirmButtonRef = useRef<HTMLButtonElement>(null)
   
-  const resolvedConfirmText = confirmText ?? t('dialog.confirm')
-  const resolvedCancelText = cancelText ?? t('dialog.cancel')
-  const actualLoading = isLoading || loading
+  const resolvedConfirmText = confirmText ?? t('common.confirm')
+  const resolvedCancelText = cancelText ?? t('common.cancel')
   const actualDescription = message || description
-  
   const config = variantConfig[variant]
   const Icon = config.icon
 
-  // Відкриваємо/закриваємо діалог
   useEffect(() => {
-    const dialog = dialogRef.current
-    if (!dialog) return
-
     if (isOpen) {
-      dialog.showModal()
-      // Фокус на кнопку скасування для безпеки
-      confirmButtonRef.current?.focus()
+      document.body.style.overflow = 'hidden'
+      // Focus management: focus cancel button by default for safety
+      setTimeout(() => confirmButtonRef.current?.focus(), 50)
     } else {
-      dialog.close()
+      document.body.style.overflow = ''
     }
+    return () => { document.body.style.overflow = '' }
   }, [isOpen])
 
-  // Закриваємо по Escape
   const handleKeyDown = useCallback((e: React.KeyboardEvent) => {
-    if (e.key === 'Escape' && !isLoading) {
-      onClose()
-    }
+    if (e.key === 'Escape' && !isLoading) onClose()
   }, [onClose, isLoading])
 
-  // Закриваємо при кліку на backdrop
-  const handleBackdropClick = useCallback((e: React.MouseEvent) => {
-    if (e.target === dialogRef.current && !isLoading) {
-      onClose()
-    }
-  }, [onClose, isLoading])
-
-  const handleConfirm = useCallback(async () => {
+  const handleConfirm = async () => {
     await onConfirm()
-    onClose()
-  }, [onConfirm, onClose])
+    if (!isLoading) onClose()
+  }
 
   if (!isOpen) return null
 
-  return (
-    <dialog
-      ref={dialogRef}
+  return createPortal(
+    <div 
+      className="fixed inset-0 z-[100] flex items-center justify-center p-4 sm:p-6"
       onKeyDown={handleKeyDown}
-      onClick={handleBackdropClick}
-      className="fixed inset-0 z-[100] bg-transparent p-0 m-0 max-w-none max-h-none w-full h-full backdrop:bg-black/50 backdrop:backdrop-blur-sm"
     >
-      <div className="fixed inset-0 flex items-center justify-center p-4">
-        <div 
-          className="bg-white dark:bg-neutral-900 rounded-2xl shadow-xl max-w-md w-full animate-in zoom-in-95 duration-200"
-          onClick={(e) => e.stopPropagation()}
-        >
-          {/* Header */}
-          <div className="flex items-start gap-4 p-6 pb-4">
-            <div className={`p-3 rounded-full ${config.iconBg}`}>
-              <Icon className={config.iconColor} size={24} />
+      {/* Backdrop */}
+      <div 
+        className="absolute inset-0 bg-neutral-900/50 backdrop-blur-sm animate-in fade-in duration-200" 
+        onClick={!isLoading ? onClose : undefined}
+      />
+
+      {/* Dialog Panel */}
+      <div 
+        className="relative w-full max-w-md bg-white dark:bg-neutral-900 rounded-3xl shadow-2xl ring-1 ring-neutral-200 dark:ring-neutral-800 scale-100 animate-in zoom-in-95 duration-200 overflow-hidden"
+        role="dialog"
+        aria-modal="true"
+      >
+        <div className="p-6">
+          <div className="flex items-start gap-4">
+            <div className={`flex-shrink-0 p-3 rounded-2xl ${config.iconBg}`}>
+              <Icon className={`w-6 h-6 ${config.iconColor}`} />
             </div>
-            <div className="flex-1 min-w-0">
-              <h2 className="text-lg font-semibold text-neutral-900 dark:text-neutral-100">
+            <div className="flex-1 pt-1">
+              <h3 className="text-lg font-display font-semibold text-neutral-900 dark:text-white leading-6">
                 {title}
-              </h2>
+              </h3>
               {actualDescription && (
                 <p className="mt-2 text-sm text-neutral-600 dark:text-neutral-400">
                   {actualDescription}
@@ -149,49 +134,57 @@ export function ConfirmDialog({
             <button
               onClick={onClose}
               disabled={isLoading}
-              className="p-1.5 rounded-lg text-neutral-400 hover:text-neutral-600 hover:bg-neutral-100 dark:hover:text-neutral-300 dark:hover:bg-neutral-800 transition-colors disabled:opacity-50"
-              aria-label={t('dialog.close')}
+              className="flex-shrink-0 -mr-2 -mt-2 p-2 text-neutral-400 hover:text-neutral-500 hover:bg-neutral-100 dark:hover:bg-neutral-800 rounded-full transition-colors"
             >
               <X size={20} />
             </button>
           </div>
 
-          {/* Actions */}
-          <div className="flex gap-3 p-6 pt-4 border-t border-neutral-200 dark:border-neutral-800">
+          <div className="mt-8 flex gap-3 justify-end">
             <button
+              type="button"
               onClick={onClose}
-              disabled={actualLoading}
-              className="flex-1 px-4 py-2.5 rounded-xl font-medium text-neutral-700 dark:text-neutral-300 bg-neutral-100 dark:bg-neutral-800 hover:bg-neutral-200 dark:hover:bg-neutral-700 transition-colors disabled:opacity-50"
+              disabled={isLoading}
+              className="btn-outline px-4 py-2.5 text-sm font-medium"
             >
               {resolvedCancelText}
             </button>
             <button
               ref={confirmButtonRef}
+              type="button"
               onClick={handleConfirm}
-              disabled={actualLoading}
-              className={`flex-1 px-4 py-2.5 rounded-xl font-medium text-white ${config.buttonBg} ${config.buttonHover} transition-colors disabled:opacity-50 flex items-center justify-center gap-2`}
+              disabled={isLoading}
+              className={`
+                px-5 py-2.5 rounded-xl text-sm font-medium shadow-sm transition-all
+                focus:outline-none focus:ring-2 focus:ring-offset-2 dark:focus:ring-offset-neutral-900
+                disabled:opacity-70 disabled:cursor-not-allowed
+                ${config.buttonBg} ${config.buttonText}
+                flex items-center gap-2
+              `}
             >
-              {actualLoading ? (
-                <>
-                  <svg className="animate-spin h-4 w-4" viewBox="0 0 24 24">
-                    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" fill="none" />
-                    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
-                  </svg>
-                  {t('common.processing')}
-                </>
-              ) : (
-                resolvedConfirmText
+              {isLoading && (
+                <svg className="animate-spin -ml-1 mr-1 h-4 w-4 text-white" fill="none" viewBox="0 0 24 24">
+                  <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                  <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
+                </svg>
               )}
+              {resolvedConfirmText}
             </button>
           </div>
         </div>
       </div>
-    </dialog>
+    </div>,
+    document.body
   )
 }
-
-// Hook для зручного використання
-
+/**
+ * Hook for using the ConfirmDialog imperatively
+ * Example:
+ * const { confirm, Dialog } = useConfirmDialog({ title: 'Sure?' })
+ * const handleDelete = async () => {
+ * if (await confirm()) deleteItem()
+ * }
+ */
 interface UseConfirmDialogOptions {
   title: string
   description?: string
@@ -201,8 +194,8 @@ interface UseConfirmDialogOptions {
 }
 
 export function useConfirmDialog(options: UseConfirmDialogOptions) {
-  const [isOpen, setIsOpen] = React.useState(false)
-  const [isLoading, setIsLoading] = React.useState(false)
+  const [isOpen, setIsOpen] = useState(false)
+  const [isLoading, setIsLoading] = useState(false)
   const resolveRef = useRef<((value: boolean) => void) | null>(null)
 
   const confirm = useCallback(() => {

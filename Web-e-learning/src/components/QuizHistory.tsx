@@ -1,8 +1,10 @@
 import { useEffect, useState } from 'react'
 import { http } from '@/lib/http'
-import { Trophy, Clock, CheckCircle, XCircle, Loader2, History } from 'lucide-react'
+import { Trophy, Clock, CheckCircle, XCircle, History, ArrowRight } from 'lucide-react'
 import { Link } from 'react-router-dom'
 import { useTranslation } from '@/i18n/useTranslation'
+import { EmptyQuizHistory } from './EmptyState'
+import { SkeletonList } from './Skeletons'
 
 interface QuizAttempt {
   quizId: string
@@ -29,34 +31,48 @@ export default function QuizHistory() {
   const [error, setError] = useState<string | null>(null)
 
   useEffect(() => {
+    let mounted = true
+    
     async function fetchHistory() {
       try {
         setLoading(true)
         const data = await http.get<QuizHistoryResponse>(`/quiz/user/history?limit=5&lang=${lang}`)
-        const list = Array.isArray(data?.data) ? data.data : []
-        setHistory(list)
+        if (mounted) {
+          const list = Array.isArray(data?.data) ? data.data : []
+          setHistory(list)
+        }
       } catch (e) {
-        setError(t('quiz.error.historyLoadFailed'))
-        console.error(e)
+        if (mounted) {
+          setError(t('quiz.error.historyLoadFailed', 'Failed to load history'))
+          console.error(e)
+        }
       } finally {
-        setLoading(false)
+        if (mounted) setLoading(false)
       }
     }
+    
     fetchHistory()
-  }, [lang]) // Refetch when language changes
+    
+    return () => { mounted = false }
+  }, [lang, t])
 
   const formatDate = (dateString: string) => {
-    const date = new Date(dateString)
-    const locale = lang === 'UA' ? 'uk-UA' : lang === 'PL' ? 'pl-PL' : 'en-US'
-    return date.toLocaleDateString(locale, {
-      day: 'numeric',
-      month: 'short',
-      hour: '2-digit',
-      minute: '2-digit'
-    })
+    try {
+      const date = new Date(dateString)
+      const locale = lang === 'UA' ? 'uk-UA' : lang === 'PL' ? 'pl-PL' : 'en-US'
+      return date.toLocaleDateString(locale, {
+        day: 'numeric',
+        month: 'short',
+        hour: '2-digit',
+        minute: '2-digit'
+      })
+    } catch {
+      return dateString
+    }
   }
 
   const getScoreColor = (correct: number, total: number) => {
+    if (total === 0) return 'text-neutral-500'
     const percentage = (correct / total) * 100
     if (percentage >= 80) return 'text-green-600 dark:text-green-400'
     if (percentage >= 60) return 'text-yellow-600 dark:text-yellow-400'
@@ -65,24 +81,22 @@ export default function QuizHistory() {
 
   if (loading) {
     return (
-      <div className="card">
-        <div className="flex items-center gap-2 mb-4">
+      <div className="card space-y-4">
+        <div className="flex items-center gap-2 mb-2">
           <History size={20} className="text-primary-600 dark:text-primary-400" />
-          <h3 className="text-lg font-display font-semibold">{t('dashboard.recentActivity')}</h3>
+          <h3 className="text-lg font-display font-semibold">{t('dashboard.recentActivity', 'Recent Activity')}</h3>
         </div>
-        <div className="flex justify-center py-8">
-          <Loader2 size={24} className="animate-spin text-primary-500" />
-        </div>
+        <SkeletonList count={3} />
       </div>
     )
   }
 
   if (error) {
     return (
-      <div className="card">
-        <div className="flex items-center gap-2 mb-4">
-          <History size={20} className="text-primary-600 dark:text-primary-400" />
-          <h3 className="text-lg font-display font-semibold">{t('dashboard.recentActivity')}</h3>
+      <div className="card border-red-100 dark:border-red-900/30">
+        <div className="flex items-center gap-2 mb-2 text-red-600 dark:text-red-400">
+          <History size={20} />
+          <h3 className="text-lg font-display font-semibold">{t('dashboard.recentActivity', 'Recent Activity')}</h3>
         </div>
         <p className="text-neutral-500 text-sm">{error}</p>
       </div>
@@ -94,83 +108,76 @@ export default function QuizHistory() {
       <div className="card">
         <div className="flex items-center gap-2 mb-4">
           <History size={20} className="text-primary-600 dark:text-primary-400" />
-          <h3 className="text-lg font-display font-semibold">{t('dashboard.recentActivity')}</h3>
+          <h3 className="text-lg font-display font-semibold">{t('dashboard.recentActivity', 'Recent Activity')}</h3>
         </div>
-        <div className="text-center py-8">
-          <Trophy size={40} className="mx-auto mb-3 text-neutral-300" />
-          <p className="text-neutral-500">{t('quiz.noHistory')}</p>
-          <Link to="/materials" className="btn mt-4 inline-flex">
-            {t('dashboard.startLearning')}
-          </Link>
-        </div>
+        <EmptyQuizHistory className="py-8" />
       </div>
     )
   }
 
   return (
     <div className="card">
-      <div className="flex items-center justify-between mb-4">
+      <div className="flex items-center justify-between mb-6">
         <div className="flex items-center gap-2">
-          <History size={20} className="text-primary-600 dark:text-primary-400" />
-          <h3 className="text-lg font-display font-semibold">{t('dashboard.recentActivity')}</h3>
+          <div className="p-2 bg-primary-100 dark:bg-primary-900/30 rounded-lg text-primary-600 dark:text-primary-400">
+            <History size={20} />
+          </div>
+          <h3 className="text-lg font-display font-semibold">{t('dashboard.recentActivity', 'Recent Activity')}</h3>
         </div>
-        <Link to="/quiz" className="text-sm text-primary-600 hover:text-primary-700 dark:text-primary-400">
-          {t('dashboard.allQuizzes')} →
+        <Link 
+          to="/quiz" 
+          className="text-sm font-medium text-primary-600 hover:text-primary-700 dark:text-primary-400 flex items-center gap-1 hover:underline"
+        >
+          {t('dashboard.allQuizzes', 'All Quizzes')} 
+          <ArrowRight size={14} />
         </Link>
       </div>
 
-      <div className="space-y-3">
+      <div className="space-y-4">
         {history.map((attempt) => {
-          const percentage = Math.round((attempt.correct / attempt.total) * 100)
+          const percentage = attempt.total > 0 ? Math.round((attempt.correct / attempt.total) * 100) : 0
           
           return (
             <div
               key={`${attempt.quizId}-${attempt.lastAttempt}`}
-              className="p-4 rounded-xl bg-neutral-50 dark:bg-neutral-800/50 hover:bg-neutral-100 dark:hover:bg-neutral-800 transition-colors"
+              className="group p-4 rounded-xl bg-neutral-50 dark:bg-neutral-800/50 hover:bg-neutral-100 dark:hover:bg-neutral-800 transition-colors border border-transparent hover:border-neutral-200 dark:hover:border-neutral-700"
             >
-              <div className="flex items-center justify-between gap-4">
+              <div className="flex items-center justify-between gap-4 mb-3">
                 <div className="flex-1 min-w-0">
-                  <h4 className="font-medium text-neutral-900 dark:text-white truncate">
+                  <h4 className="font-medium text-neutral-900 dark:text-white truncate group-hover:text-primary-600 dark:group-hover:text-primary-400 transition-colors">
                     {attempt.quizTitle}
                   </h4>
-                  <div className="flex items-center gap-3 mt-1 text-sm text-neutral-500">
+                  <div className="flex items-center gap-3 mt-1 text-xs text-neutral-500">
                     <span className="flex items-center gap-1">
-                      <Clock size={14} />
+                      <Clock size={12} />
                       {formatDate(attempt.lastAttempt)}
                     </span>
                   </div>
                 </div>
                 
-                <div className="flex items-center gap-3">
+                <div className="flex items-center gap-3 shrink-0">
                   <div className="text-right">
-                    <div className={`text-lg font-bold ${getScoreColor(attempt.correct, attempt.total)}`}>
+                    <div className={`text-base font-bold tabular-nums ${getScoreColor(attempt.correct, attempt.total)}`}>
                       {attempt.correct}/{attempt.total}
-                    </div>
-                    <div className="text-xs text-neutral-500">
-                      {percentage}%
                     </div>
                   </div>
                   
-                  <div className={`w-10 h-10 rounded-full flex items-center justify-center ${
+                  <div className={`w-8 h-8 rounded-full flex items-center justify-center shrink-0 ${
                     percentage >= 80 
-                      ? 'bg-green-100 dark:bg-green-900/50' 
+                      ? 'bg-green-100 text-green-600 dark:bg-green-900/30 dark:text-green-400' 
                       : percentage >= 60 
-                      ? 'bg-yellow-100 dark:bg-yellow-900/50'
-                      : 'bg-red-100 dark:bg-red-900/50'
+                      ? 'bg-yellow-100 text-yellow-600 dark:bg-yellow-900/30 dark:text-yellow-400'
+                      : 'bg-red-100 text-red-600 dark:bg-red-900/30 dark:text-red-400'
                   }`}>
-                    {percentage >= 60 ? (
-                      <CheckCircle size={20} className={getScoreColor(attempt.correct, attempt.total)} />
-                    ) : (
-                      <XCircle size={20} className={getScoreColor(attempt.correct, attempt.total)} />
-                    )}
+                    {percentage >= 60 ? <CheckCircle size={16} /> : <XCircle size={16} />}
                   </div>
                 </div>
               </div>
               
               {/* Progress bar */}
-              <div className="mt-3 h-1.5 bg-neutral-200 dark:bg-neutral-700 rounded-full overflow-hidden">
+              <div className="h-1.5 bg-neutral-200 dark:bg-neutral-700 rounded-full overflow-hidden w-full">
                 <div
-                  className={`h-full rounded-full transition-all ${
+                  className={`h-full rounded-full transition-all duration-500 ${
                     percentage >= 80 
                       ? 'bg-green-500' 
                       : percentage >= 60 

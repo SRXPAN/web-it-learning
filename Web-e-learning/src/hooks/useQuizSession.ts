@@ -1,61 +1,51 @@
 import { useEffect, useMemo, useState } from 'react'
 import { useInterval } from '@/utils/useInterval'
-import { type Quiz, type SubmitResult } from '@/services/quiz'
-import { safeGetJSON, safeSetJSON, safeRemove, STORAGE_KEYS } from '@/utils/storage'
+import type { Quiz, QuizSubmitResult } from '@elearn/shared'
+
+type QuizMode = 'practice' | 'exam'
 
 type Params = {
   quiz?: Quiz
-  mode: 'practice' | 'exam'
-  onSubmit: (answers: { questionId: string; optionId: string }[]) => Promise<SubmitResult | void>
+  mode: QuizMode
+  onSubmit: (answers: { questionId: string; optionId: string }[]) => Promise<QuizSubmitResult | void>
 }
-
-type Attempt = { quizId: string; score: number; total: number; ts: number }
-type QuizProgress = { selectedMap: Record<string, string>; idx: number; left: number }
 
 export function useQuizSession({ quiz, mode, onSubmit }: Params) {
   const [idx, setIdx] = useState(0)
-  const [score, setScore] = useState(0)
   const [left, setLeft] = useState(0)
   const [finished, setFinished] = useState(false)
+  const [submitting, setSubmitting] = useState(false)
+  
+  // State for answers and results
   const [selectedMap, setSelectedMap] = useState<Record<string, string>>({})
   const [correctMap, setCorrectMap] = useState<Record<string, string>>({})
   const [explanationMap, setExplanationMap] = useState<Record<string, string>>({})
+  
+  // UI State
   const [showExplanation, setShowExplanation] = useState(false)
-  const [attemptHistory, setAttemptHistory] = useState<Attempt[]>([])
+  const [score, setScore] = useState(0)
 
-  // Load quiz progress / history
+  // Initialize session when quiz loads
   useEffect(() => {
-    if (!quiz) return
-    
-    const defaultProgress: QuizProgress = { selectedMap: {}, idx: 0, left: quiz.durationSec }
-    const saved = safeGetJSON<QuizProgress>(STORAGE_KEYS.QUIZ_PROGRESS(quiz.id), defaultProgress)
-    
-    setSelectedMap(saved.selectedMap || {})
-    setIdx(saved.idx || 0)
-    setLeft(saved.left || quiz.durationSec)
-    
-    const history = safeGetJSON<Attempt[]>(STORAGE_KEYS.QUIZ_HISTORY, [])
-    setAttemptHistory(history)
-    
-    setFinished(false)
-    setScore(0)
-    setCorrectMap({})
-    setExplanationMap({})
-    setShowExplanation(false)
-  }, [quiz])
+    if (quiz) {
+      setLeft(quiz.durationSec)
+      setIdx(0)
+      setFinished(false)
+      setSelectedMap({})
+      setCorrectMap({})
+      setExplanationMap({})
+      setShowExplanation(false)
+      setScore(0)
+    }
+  }, [quiz?.id]) // Re-init only if ID changes
 
-  // Autosave progress
-  useEffect(() => {
-    if (!quiz) return
-    safeSetJSON(STORAGE_KEYS.QUIZ_PROGRESS(quiz.id), { selectedMap, idx, left })
-  }, [quiz, selectedMap, idx, left])
-
-  // Timer
+  // Timer logic
   useInterval(() => {
     if (!quiz || finished || mode === 'practice') return
+    
     setLeft((s) => {
       if (s <= 1) {
-        finish(true)
+        finish(true) // Auto-submit on timeout
         return 0
       }
       return s - 1
@@ -66,63 +56,65 @@ export function useQuizSession({ quiz, mode, onSubmit }: Params) {
     () => (quiz ? quiz.questions.filter((q) => !selectedMap[q.id]).length : 0),
     [quiz, selectedMap]
   )
-  const lowTime = mode === 'exam' && left <= 15
+  
+  const lowTime = mode === 'exam' && left <= 30 // Warning at 30s
 
-  const selectOption = (questionId: string, optionId: string) =>
-    setSelectedMap((s) => ({ ...s, [questionId]: optionId }))
+  const selectOption = (questionId: string, optionId: string) => {
+    if (finished) return
+    setSelectedMap((prev) => ({ ...prev, [questionId]: optionId }))
+  }
 
-  const next = async () => {
+  const next = () => {
     if (!quiz) return
     setShowExplanation(false)
-    if (idx === quiz.questions.length - 1) {
-      await finish(true)
-    } else {
+    if (idx < quiz.questions.length - 1) {
       setIdx((i) => i + 1)
+    } else {
+      // If it's the last question in practice mode, maybe finish?
+      // Or just stay there. For now, let's just finish if exam.
+      if (mode === 'exam') finish(true)
     }
   }
 
-  const skip = () => {
-    setShowExplanation(false)
-    if (!quiz) return
-    if (idx < quiz.questions.length - 1) setIdx((i) => i + 1)
+  const prev = () => {
+    if (idx > 0) {
+      setShowExplanation(false)
+      setIdx((i) => i - 1)
+    }
   }
 
   const finish = async (submit: boolean) => {
-    if (!quiz || finished) return
-    setFinished(true)
-    if (submit) {
-      const answers = quiz.questions
-        .map((q) => ({ questionId: q.id, optionId: selectedMap[q.id] ?? '' }))
-        .filter((a) => a.optionId)
-      const res = await onSubmit(answers)
-      if (res) {
-        if (typeof res.correct === 'number') setScore(res.correct)
-        const m = res.correctMap || res.correctIds
-        const ex = res.solutions
-        if (m && typeof m === 'object') setCorrectMap(m)
-        if (ex && typeof ex === 'object') setExplanationMap(ex)
+    if (!quiz || finished || submitting) return
+    
+    setSubmitting(true)
+    
+    try {
+      if (submit) {
+        const answers = quiz.questions
+          .map((q) => ({ questionId: q.id, optionId: selectedMap[q.id] ?? '' }))
+          .filter((a) => a.optionId) // Filter out unanswered if any (though usually backend handles)
         
-        const history = safeGetJSON<Attempt[]>(STORAGE_KEYS.QUIZ_HISTORY, [])
-        const nextHistory = [
-          { quizId: quiz.id, score: res.correct ?? 0, total: quiz.questions.length, ts: Date.now() },
-          ...history,
-        ].slice(0, 10)
-        safeSetJSON(STORAGE_KEYS.QUIZ_HISTORY, nextHistory)
-        setAttemptHistory(nextHistory)
+        const res = await onSubmit(answers)
+        
+        if (res) {
+          setFinished(true)
+          setScore(res.correct)
+          
+          if (res.correctMap) setCorrectMap(res.correctMap)
+          if (res.solutions) setExplanationMap(res.solutions)
+        }
+      } else {
+        // Just quit without submitting
+        setFinished(true)
       }
+    } finally {
+      setSubmitting(false)
     }
-    safeRemove(STORAGE_KEYS.QUIZ_PROGRESS(quiz.id))
   }
 
-  const handleAnswer = async () => {
-    if (!quiz) return
-    const q = quiz.questions[idx]
-    if (!selectedMap[q.id]) return
-    if (mode === 'practice') {
-      setShowExplanation(true)
-    } else {
-      await next()
-    }
+  const checkAnswer = () => {
+    if (mode !== 'practice') return
+    setShowExplanation(true)
   }
 
   const reset = () => {
@@ -135,25 +127,25 @@ export function useQuizSession({ quiz, mode, onSubmit }: Params) {
     setCorrectMap({})
     setExplanationMap({})
     setShowExplanation(false)
-    safeRemove(STORAGE_KEYS.QUIZ_PROGRESS(quiz.id))
   }
 
   return {
     idx,
-    score,
+    setIdx, // Expose setter for direct navigation
     left,
+    score,
     finished,
+    submitting,
     selectedMap,
     correctMap,
     explanationMap,
     showExplanation,
-    attemptHistory,
     unansweredCount,
     lowTime,
     selectOption,
-    handleAnswer,
+    checkAnswer,
     next,
-    skip,
+    prev,
     finish,
     reset,
     setShowExplanation,

@@ -22,7 +22,7 @@ import {
   Eye,
   Mail,
 } from 'lucide-react'
-import { Loading } from '@/components/Loading'
+import { Loading } from '@/components/Skeleton'
 import ConfirmDialog, { ConfirmDialog as BaseConfirmDialog } from '@/components/ConfirmDialog'
 import { Pagination } from '@/components/admin/Pagination'
 import { PageHeader } from '@/components/admin/PageHeader'

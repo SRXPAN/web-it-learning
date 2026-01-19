@@ -1,7 +1,4 @@
-/**
- * Dashboard UI Components
- * Reusable components for the main dashboard page
- */
+// src/components/dashboard/DashboardComponents.tsx
 import { LucideIcon, Play, FileText, Target } from 'lucide-react'
 import { useTranslation } from '@/i18n/useTranslation'
 
@@ -12,8 +9,11 @@ import { useTranslation } from '@/i18n/useTranslation'
 export function ProgressBar({ value }: { value: number }) {
   const v = Math.max(0, Math.min(100, Math.round(value)))
   return (
-    <div className="progress-bar">
-      <div className="progress-fill" style={{ width: `${v}%` }} />
+    <div className="progress-bar h-2 bg-neutral-200 dark:bg-neutral-800 rounded-full overflow-hidden">
+      <div 
+        className="progress-fill h-full bg-gradient-to-r from-primary-600 to-accent-500 rounded-full transition-all duration-500 ease-out" 
+        style={{ width: `${v}%` }} 
+      />
     </div>
   )
 }
@@ -31,9 +31,9 @@ interface StatCardProps {
 
 export function StatCard({ icon: Icon, label, value, sub }: StatCardProps) {
   return (
-    <div className="card group hover:scale-105">
+    <div className="card group hover:scale-105 transition-transform duration-200">
       <div className="flex items-center gap-3">
-        <div className="p-2.5 rounded-xl bg-gradient-to-br from-primary-600 to-primary-700 transition-transform group-hover:scale-110">
+        <div className="p-2.5 rounded-xl bg-gradient-to-br from-primary-600 to-primary-700 transition-transform group-hover:scale-110 shrink-0">
           <Icon size={20} className="text-white" />
         </div>
         <div>
@@ -59,11 +59,11 @@ interface CourseCardProps {
 export function CourseCard({ name, step, progress }: CourseCardProps) {
   const { t } = useTranslation()
   return (
-    <div className="card hover:shadow-neo-lg">
+    <div className="card hover:shadow-neo-lg transition-shadow duration-200">
       <div className="space-y-3">
         <div>
-          <h4 className="font-display font-semibold text-neutral-900 dark:text-white">{name}</h4>
-          <p className="text-sm text-neutral-500 dark:text-neutral-400">{step}</p>
+          <h4 className="font-display font-semibold text-neutral-900 dark:text-white truncate">{name}</h4>
+          <p className="text-sm text-neutral-500 dark:text-neutral-400 truncate">{step}</p>
         </div>
 
         <div className="space-y-2">
@@ -75,11 +75,11 @@ export function CourseCard({ name, step, progress }: CourseCardProps) {
         </div>
 
         <div className="flex gap-2">
-          <button className="btn flex-1">
+          <button className="btn flex-1 py-2 text-sm">
             <Play size={16} className="inline mr-1" />
             {t('common.continue')}
           </button>
-          <button className="btn-outline">
+          <button className="btn-outline py-2 text-sm">
             <FileText size={16} className="inline mr-1" />
             {t('nav.materials')}
           </button>
@@ -104,9 +104,9 @@ export function WeakSpotItem({ topic, advice }: WeakSpotItemProps) {
       <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-accent-600 to-accent-700 flex items-center justify-center flex-shrink-0">
         <Target size={16} className="text-white" />
       </div>
-      <div className="flex-1">
-        <div className="font-semibold text-sm text-neutral-900 dark:text-white">{topic}</div>
-        <div className="text-xs text-neutral-600 dark:text-neutral-400">{advice}</div>
+      <div className="flex-1 min-w-0">
+        <div className="font-semibold text-sm text-neutral-900 dark:text-white truncate">{topic}</div>
+        <div className="text-xs text-neutral-600 dark:text-neutral-400 line-clamp-2">{advice}</div>
       </div>
     </li>
   )
@@ -125,13 +125,15 @@ export function StreakDay({ active, day }: StreakDayProps) {
   return (
     <div className="flex flex-col items-center gap-1">
       <div
-        className={`w-8 h-8 rounded-lg transition-all ${
+        className={`w-8 h-8 rounded-lg transition-all flex items-center justify-center ${
           active
-            ? 'bg-gradient-to-br from-primary-600 to-primary-700 shadow-neo'
+            ? 'bg-gradient-to-br from-primary-600 to-primary-700 shadow-neo text-white'
             : 'bg-neutral-200 dark:bg-neutral-800'
         }`}
-      />
-      <span className="text-xs text-neutral-500 dark:text-neutral-400">{day}</span>
+      >
+        {active && <div className="w-2 h-2 bg-white rounded-full" />}
+      </div>
+      <span className="text-xs text-neutral-500 dark:text-neutral-400 font-medium">{day}</span>
     </div>
   )
 }
@@ -148,14 +150,14 @@ interface AchievementBadgeProps {
 export function AchievementBadge({ name, earned }: AchievementBadgeProps) {
   return (
     <div
-      className={`flex items-center gap-2 p-2 rounded-xl transition-all ${
+      className={`flex items-center gap-2 p-2 rounded-xl transition-all border ${
         earned
-          ? 'bg-gradient-to-br from-yellow-50 to-amber-50 dark:from-yellow-950 dark:to-amber-950 border border-yellow-200 dark:border-yellow-800'
-          : 'bg-neutral-100 dark:bg-neutral-800 opacity-50'
+          ? 'bg-gradient-to-br from-yellow-50 to-amber-50 dark:from-yellow-950/30 dark:to-amber-950/30 border-yellow-200 dark:border-yellow-800'
+          : 'bg-neutral-100 dark:bg-neutral-800 border-transparent opacity-50 grayscale'
       }`}
     >
-      <span className={earned ? 'grayscale-0' : 'grayscale'}>🏆</span>
-      <span className={`text-xs font-medium ${earned ? 'text-yellow-700 dark:text-yellow-300' : 'text-neutral-500'}`}>
+      <span className="text-lg">🏆</span>
+      <span className={`text-xs font-medium ${earned ? 'text-yellow-700 dark:text-yellow-400' : 'text-neutral-500'}`}>
         {name}
       </span>
     </div>
@@ -175,7 +177,7 @@ interface SectionHeaderProps {
 export function SectionHeader({ icon: Icon, title, iconColorClass = 'from-primary-600 to-primary-700' }: SectionHeaderProps) {
   return (
     <div className="flex items-center gap-3 mb-4">
-      <div className={`p-2 rounded-xl bg-gradient-to-br ${iconColorClass}`}>
+      <div className={`p-2 rounded-xl bg-gradient-to-br ${iconColorClass} shrink-0`}>
         <Icon size={20} className="text-white" />
       </div>
       <h3 className="text-lg font-display font-bold text-neutral-900 dark:text-white">{title}</h3>

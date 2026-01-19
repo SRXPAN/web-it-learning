@@ -1,332 +1,389 @@
-import { useAuth } from '@/auth/AuthContext'
-import { Star, Trophy, Target, TrendingUp, Clock, Flame, Zap, Users, BookOpen, Play, FileText, Award, LucideIcon } from 'lucide-react'
-import { useEffect, useState, useCallback } from 'react'
-import { useTranslation } from '@/i18n/useTranslation'
-import { getTodayGoals, saveDailyGoals, getGoalText, DailyGoal } from '@/utils/dailyGoals'
-import { getTodayWeakSpots, getTodayTip, getWeakSpotText, getTipText } from '@/utils/weakSpots'
-import { logGoalComplete } from '@/utils/activity'
-import { useActivityTracker } from '@/hooks/useActivityTracker'
-import QuizHistory from '@/components/QuizHistory'
-import { http } from '@/lib/http'
+import { useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
-import {
-  ProgressBar,
-  StatCard,
-  CourseCard,
-  WeakSpotItem,
-  StreakDay,
-  AchievementBadge,
-  SectionHeader,
+import { 
+  Flame, Target, Clock, BookOpen, Trophy, Zap, 
+  Users, Play, FileText, Award, CheckCircle 
+} from 'lucide-react'
+
+import { useAuth } from '@/auth/AuthContext'
+import { useTranslation } from '@/i18n/useTranslation'
+import { useActivityTracker } from '@/hooks/useActivityTracker'
+import { api } from '@/lib/http'
+import { SkeletonDashboard } from '@/components/Skeletons'
+import QuizHistory from '@/components/QuizHistory'
+import { 
+  ProgressBar, 
+  StatCard, 
+  StreakDay 
 } from '@/components/dashboard/DashboardComponents'
 
-export default function Dashboard(){
+// Типи даних, які очікуємо від бекенду
+interface DashboardData {
+  stats: {
+    streak: { current: number; longest: number; history: boolean[] };
+    activity: { timeSpent: number; quizAttempts: number }; // за 7 днів
+  };
+  recentTopics: Array<{
+    id: string;
+    name: string;
+    slug: string;
+    progress: number;
+    totalMaterials: number;
+    viewedMaterials: number;
+  }>;
+  dailyGoals: Array<{
+    id: string;
+    text: string;
+    isCompleted: boolean;
+  }>;
+  weakSpots: Array<{
+    topic: string;
+    advice: string;
+  }>;
+  tipOfTheDay: string;
+  achievements: Array<{
+    id: string;
+    name: string;
+    earned: boolean;
+  }>;
+}
+
+export default function Dashboard() {
   const { user } = useAuth()
   const { t, lang } = useTranslation()
-  useActivityTracker() // Трекінг активності
-  
+  useActivityTracker() // Активуємо пінг активності
+
+  const [data, setData] = useState<DashboardData | null>(null)
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState<string | null>(null)
+
+  // Розрахунок рівня (візуальний)
   const xp = user?.xp ?? 0
   const level = Math.floor(xp / 100) + 1
-  const nextLevelAt = level * 100
   const progressToNext = Math.min(100, Math.round(((xp % 100) / 100) * 100))
 
-  // Continue Learning - дані з API
-  interface RecentTopic {
-    id: string
-    name: string
-    nameJson: Record<string, string> | null
-    slug: string
-    progress: number
-    totalMaterials: number
-    viewedMaterials: number
-  }
-  const [recentTopics, setRecentTopics] = useState<RecentTopic[]>([])
-  const [loadingTopics, setLoadingTopics] = useState(true)
-
-  // Streak та активність з API
-  const [streakData, setStreakData] = useState<{ 
-    current: number
-    longest: number
-    lastActiveDate: string | null
-    weekDays: boolean[]
-  }>({ current: 0, longest: 0, lastActiveDate: null, weekDays: [false, false, false, false, false, false, false] })
-  const [last7DaysStats, setLast7DaysStats] = useState({ timeHours: '0.0', attempts: 0 })
-
   const streakDays = [
-    t('dashboard.weekday.mon'),
-    t('dashboard.weekday.tue'),
-    t('dashboard.weekday.wed'),
-    t('dashboard.weekday.thu'),
-    t('dashboard.weekday.fri'),
-    t('dashboard.weekday.sat'),
-    t('dashboard.weekday.sun'),
+    t('dashboard.weekday.mon', 'Mon'),
+    t('dashboard.weekday.tue', 'Tue'),
+    t('dashboard.weekday.wed', 'Wed'),
+    t('dashboard.weekday.thu', 'Thu'),
+    t('dashboard.weekday.fri', 'Fri'),
+    t('dashboard.weekday.sat', 'Sat'),
+    t('dashboard.weekday.sun', 'Sun'),
   ]
 
-  const achievements = [
-    { id: 1, name: t('dashboard.achievement.firstQuiz'), earned: true },
-    { id: 2, name: t('dashboard.achievement.weekStreak'), earned: true },
-    { id: 3, name: t('dashboard.achievement.fastAnswer'), earned: false },
-    { id: 4, name: t('dashboard.achievement.sqlMaster'), earned: false },
-  ]
-
-  const [goals, setGoals] = useState<DailyGoal[]>([])
-  const [weakSpots, setWeakSpots] = useState<{ topic: string; advice: string }[]>([])
-  const [dailyTip, setDailyTip] = useState<string>('')
-
-  // Завантаження даних з API
   useEffect(() => {
-    async function loadData() {
+    let mounted = true
+
+    async function loadDashboard() {
       try {
-        // Спочатку записуємо візит (для streak)
-        await http.post('/progress/visit', {})
+        setLoading(true)
+        // В реальності ти можеш зробити один запит GET /dashboard/summary
+        // або кілька паралельних, як тут:
+        const response = await api<DashboardData>(`/dashboard/summary?lang=${lang}`)
         
-        // Завантаження останніх тем паралельно зі streak
-        const [topicsRes, streakRes, activityRes] = await Promise.all([
-          http.get<{ topics: RecentTopic[] }>('/progress/recent-topics?limit=2'),
-          http.get<{ current: number; longest: number; lastActiveDate: string | null }>('/progress/streak'),
-          http.get<Array<{ date: string; timeSpent: number; quizAttempts: number }>>('/progress/activity?days=7'),
-        ])
-        
-        setRecentTopics(topicsRes.topics)
-        
-        // Обробка streak та weekDays
-        const today = new Date()
-        const weekDays: boolean[] = []
-        const activityDates = new Set(activityRes.map(a => a.date.split('T')[0]))
-        
-        // Визначаємо день тижня (0 = неділя, потрібно пн = 0)
-        const todayDayOfWeek = (today.getDay() + 6) % 7 // Пн=0, Вт=1, ..., Нд=6
-        
-        // Заповнюємо масив активності для кожного дня тижня
-        for (let i = 0; i < 7; i++) {
-          const dayDate = new Date(today)
-          dayDate.setDate(today.getDate() - todayDayOfWeek + i)
-          const dateStr = dayDate.toISOString().split('T')[0]
-          weekDays.push(activityDates.has(dateStr))
+        if (mounted) {
+          setData(response)
         }
-        
-        setStreakData({
-          current: streakRes.current,
-          longest: streakRes.longest,
-          lastActiveDate: streakRes.lastActiveDate,
-          weekDays,
-        })
-        
-        // Статистика за 7 днів
-        const totalTime = activityRes.reduce((sum, a) => sum + a.timeSpent, 0)
-        const totalAttempts = activityRes.reduce((sum, a) => sum + a.quizAttempts, 0)
-        setLast7DaysStats({
-          timeHours: (totalTime / 3600).toFixed(1),
-          attempts: totalAttempts,
-        })
       } catch (err) {
-        console.error('Failed to load dashboard data:', err)
+        console.error('Dashboard load failed:', err)
+        if (mounted) setError('Failed to load dashboard data')
       } finally {
-        setLoadingTopics(false)
+        if (mounted) setLoading(false)
       }
     }
+
+    loadDashboard()
+    return () => { mounted = false }
+  }, [lang]) // Перезавантажуємо при зміні мови, щоб отримати перекладені дані
+
+  // Функція для відмітки цілі як виконаної (оптимістичний UI)
+  const toggleGoal = async (goalId: string, currentState: boolean) => {
+    if (!data) return
     
-    loadData()
-  }, [])
+    // Optimistic update
+    setData(prev => prev ? ({
+      ...prev,
+      dailyGoals: prev.dailyGoals.map(g => g.id === goalId ? { ...g, isCompleted: !currentState } : g)
+    }) : null)
 
-  // Ініціалізація goals
-  useEffect(() => {
-    const todayGoals = getTodayGoals()
-    setGoals(todayGoals)
-  }, [])
-
-  // Зберігання goals при зміні
-  useEffect(() => {
-    if (goals.length > 0) {
-      // Перевіряємо чи щось змінилося на "done"
-      const previousGoalsStr = localStorage.getItem('daily_goals')
-      const previousGoals: DailyGoal[] = previousGoalsStr ? JSON.parse(previousGoalsStr) : []
-      goals.forEach(g => {
-        const prev = previousGoals.find((p) => p.id === g.id)
-        if (g.done && (!prev || !prev.done)) {
-          logGoalComplete()
-        }
-      })
-      
-      saveDailyGoals(goals)
+    try {
+      await api(`/progress/goals/${goalId}/toggle`, { method: 'POST' })
+    } catch {
+      // Revert if failed
+      setData(prev => prev ? ({
+        ...prev,
+        dailyGoals: prev.dailyGoals.map(g => g.id === goalId ? { ...g, isCompleted: currentState } : g)
+      }) : null)
     }
-  }, [goals])
+  }
 
-  // Оновлення weakSpots та tips при зміні мови
-  useEffect(() => {
-    const spots = getTodayWeakSpots()
-    setWeakSpots(spots.map(s => getWeakSpotText(s, lang)))
-    
-    const tip = getTodayTip()
-    setDailyTip(getTipText(tip, lang))
-  }, [lang])
+  if (loading) return <SkeletonDashboard />
+  
+  if (error) {
+    return (
+      <div className="card text-center py-12">
+        <p className="text-red-500 mb-4">{t('common.loadFailed', 'Failed to load data')}</p>
+        <button onClick={() => window.location.reload()} className="btn">
+          {t('common.retry', 'Retry')}
+        </button>
+      </div>
+    )
+  }
+
+  if (!data) return null
 
   return (
-    <div className="space-y-6">
-      {/* Hero Panel */}
-      <div className="card">
-        <div className="grid md:grid-cols-[1fr_auto] gap-6">
-          {/* Left: Avatar + Greeting + Level */}
-          <div className="flex items-center gap-4">
-            <div className="w-16 h-16 rounded-2xl bg-gradient-to-br from-primary-600 to-accent-500 flex items-center justify-center flex-shrink-0">
-              <span className="text-2xl font-display font-bold text-white">
+    <div className="space-y-6 animate-in fade-in duration-500">
+      
+      {/* 1. Hero Section */}
+      <div className="card bg-white dark:bg-neutral-900 border-neutral-100 dark:border-neutral-800">
+        <div className="grid md:grid-cols-[1fr_auto] gap-6 items-center">
+          <div className="flex items-center gap-5">
+            <div className="w-16 h-16 sm:w-20 sm:h-20 rounded-2xl bg-gradient-to-br from-primary-600 to-accent-500 flex items-center justify-center shadow-lg shadow-primary-500/20">
+              <span className="text-3xl font-display font-bold text-white">
                 {user?.name?.charAt(0).toUpperCase() || 'U'}
               </span>
             </div>
             <div className="flex-1">
-              <h1 className="text-2xl font-display font-bold text-neutral-900 dark:text-white">
-                {t('dashboard.welcome')}, {user?.name || 'Student'}!
+              <h1 className="text-2xl sm:text-3xl font-display font-bold text-neutral-900 dark:text-white">
+                {t('dashboard.welcome', 'Welcome')}, {user?.name}!
               </h1>
-              <p className="text-sm text-neutral-600 dark:text-neutral-400 mb-2">
-                {t('dashboard.level')} {level} • {xp} XP
-              </p>
-              <div className="space-y-1">
-                <div className="flex items-center justify-between text-xs">
-                  <span className="text-neutral-500 dark:text-neutral-400">{t('dashboard.nextLevel')}</span>
-                  <span className="font-semibold text-primary-600 dark:text-primary-400">{progressToNext}%</span>
+              <div className="mt-2 flex items-center gap-4 text-sm text-neutral-600 dark:text-neutral-400">
+                <span className="px-2 py-0.5 rounded-md bg-neutral-100 dark:bg-neutral-800 font-medium">
+                  {t('dashboard.level', 'Lvl')} {level}
+                </span>
+                <span>{xp} XP</span>
+              </div>
+              <div className="mt-3 max-w-xs space-y-1">
+                <div className="flex justify-between text-xs font-medium text-neutral-500">
+                  <span>{t('dashboard.nextLevel', 'Next Level')}</span>
+                  <span>{progressToNext}%</span>
                 </div>
-                <ProgressBar value={progressToNext} />
+                <ProgressBar value={progressToNext} className="h-2" />
               </div>
             </div>
           </div>
 
-          {/* Right: Stats */}
-          <div className="grid grid-cols-3 gap-3">
-            <StatCard icon={Flame} label={t('dashboard.streak')} value={streakData.current} sub={t('dashboard.days')}/>
-            <StatCard icon={Target} label={t('dashboard.attempts')} value={last7DaysStats.attempts} sub={t('dashboard.last7days')}/>
-            <StatCard icon={Clock} label={t('dashboard.time')} value={`${last7DaysStats.timeHours}h`} sub={t('dashboard.last7days')}/>
+          <div className="grid grid-cols-3 gap-3 w-full md:w-auto">
+            <StatCard 
+              icon={Flame} 
+              label={t('dashboard.streak', 'Streak')} 
+              value={data.stats.streak.current} 
+              sub={t('dashboard.days', 'days')}
+              color="text-orange-500"
+              bgColor="bg-orange-50 dark:bg-orange-900/20"
+            />
+            <StatCard 
+              icon={Target} 
+              label={t('dashboard.attempts', 'Attempts')} 
+              value={data.stats.activity.quizAttempts} 
+              sub={t('dashboard.last7days', '7 days')}
+              color="text-blue-500"
+              bgColor="bg-blue-50 dark:bg-blue-900/20"
+            />
+            <StatCard 
+              icon={Clock} 
+              label={t('dashboard.time', 'Time')} 
+              value={`${(data.stats.activity.timeSpent / 3600).toFixed(1)}h`} 
+              sub={t('dashboard.last7days', '7 days')}
+              color="text-green-500"
+              bgColor="bg-green-50 dark:bg-green-900/20"
+            />
           </div>
         </div>
       </div>
 
-      {/* 3-Column Layout */}
-      <div className="grid lg:grid-cols-[1fr_400px] gap-6">
-        {/* Left: Main Content */}
+      <div className="grid lg:grid-cols-[1fr_380px] gap-6">
+        
+        {/* LEFT COLUMN */}
         <div className="space-y-6">
-          {/* Continue Learning - показуємо тільки якщо є переглянуті теми */}
-          {!loadingTopics && recentTopics.length > 0 && (
-            <div className="card">
-              <h2 className="text-xl font-display font-bold text-neutral-900 dark:text-white mb-4">
-                {t('dashboard.continueLearning')}
+          
+          {/* 2. Continue Learning */}
+          {data.recentTopics.length > 0 && (
+            <div className="space-y-4">
+              <h2 className="text-xl font-display font-bold text-neutral-900 dark:text-white px-1">
+                {t('dashboard.continueLearning', 'Continue Learning')}
               </h2>
-              <div className="grid md:grid-cols-2 gap-4">
-                {recentTopics.map(topic => {
-                  const topicName = topic.nameJson?.[lang] || topic.name
-                  return (
-                    <div key={topic.id} className="card hover:shadow-neo-lg">
-                      <div className="space-y-3">
-                        <div>
-                          <h4 className="font-display font-semibold text-neutral-900 dark:text-white">{topicName}</h4>
-                          <p className="text-sm text-neutral-500 dark:text-neutral-400">
-                            {topic.viewedMaterials}/{topic.totalMaterials} {t('materials.materialsViewed')}
-                          </p>
-                        </div>
-                        
-                        <div className="space-y-2">
-                          <div className="flex items-center justify-between text-xs text-neutral-600 dark:text-neutral-400">
-                            <span>{t('materials.progress')}</span>
-                            <span className="font-semibold">{topic.progress}%</span>
-                          </div>
-                          <ProgressBar value={topic.progress} />
-                        </div>
-
-                        <div className="flex gap-2">
-                          <Link to={`/materials?topic=${topic.slug}`} className="btn flex-1">
-                            <Play size={16} className="inline mr-1"/>{t('common.continue')}
+              <div className="grid sm:grid-cols-2 gap-4">
+                {data.recentTopics.map(topic => (
+                  <div key={topic.id} className="card group hover:border-primary-200 dark:hover:border-primary-800 transition-colors">
+                    <div className="flex flex-col h-full">
+                      <div className="mb-4">
+                        <h4 className="font-display font-semibold text-lg text-neutral-900 dark:text-white line-clamp-1 group-hover:text-primary-600 dark:group-hover:text-primary-400 transition-colors">
+                          {topic.name}
+                        </h4>
+                        <p className="text-sm text-neutral-500 mt-1">
+                          {topic.viewedMaterials}/{topic.totalMaterials} {t('materials.materialsViewed', 'materials')}
+                        </p>
+                      </div>
+                      
+                      <div className="mt-auto space-y-4">
+                        <ProgressBar value={topic.progress} className="h-1.5" />
+                        <div className="flex gap-3">
+                          <Link 
+                            to={`/materials?topic=${topic.slug}`} 
+                            className="btn btn-sm flex-1 flex items-center justify-center gap-2"
+                          >
+                            <Play size={16} fill="currentColor" />
+                            {t('common.continue', 'Continue')}
                           </Link>
-                          <Link to="/materials" className="btn-outline">
-                            <FileText size={16} className="inline mr-1"/>{t('nav.materials')}
+                          <Link 
+                            to="/materials" 
+                            className="btn-outline btn-sm px-3"
+                            aria-label={t('materials.all', 'All materials')}
+                          >
+                            <FileText size={16} />
                           </Link>
                         </div>
                       </div>
                     </div>
-                  )
-                })}
+                  </div>
+                ))}
               </div>
             </div>
           )}
 
-          {/* Weak Spots */}
+          {/* 3. Daily Goals */}
           <div className="card">
-            <h2 className="text-xl font-display font-bold text-neutral-900 dark:text-white mb-4">
-              {t('dashboard.recommended')}
-            </h2>
-            <ul className="space-y-2 mb-4">
-              {weakSpots.map((spot, idx) => (
-                <WeakSpotItem key={idx} {...spot} />
-              ))}
-            </ul>
-
-            {/* Motivational Banner */}
-            <div className="p-4 rounded-2xl bg-gradient-to-br from-accent-50 to-primary-50 dark:from-accent-950 dark:to-primary-950 border border-accent-200 dark:border-accent-800">
-              <div className="flex items-center gap-3">
-                <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-accent-600 to-accent-700 flex items-center justify-center">
-                  <Zap size={20} className="text-white"/>
-                </div>
-                <div>
-                  <div className="font-semibold text-sm text-neutral-900 dark:text-white">
-                    💡 {t('dashboard.tipOfDay')}
-                  </div>
-                  <div className="text-xs text-neutral-600 dark:text-neutral-400">
-                    {dailyTip}
-                  </div>
-                </div>
+            <div className="flex items-center gap-3 mb-5">
+              <div className="p-2 bg-green-100 dark:bg-green-900/30 rounded-lg text-green-600 dark:text-green-400">
+                <Target size={20} />
               </div>
-            </div>
-          </div>
-
-          {/* Daily Goals */}
-          <div className="card">
-            <div className="flex items-center gap-2 mb-4">
-              <Target size={20} className="text-primary-600 dark:text-primary-400"/>
               <h3 className="text-lg font-display font-semibold text-neutral-900 dark:text-white">
-                {t('dashboard.dailyGoals')}
+                {t('dashboard.dailyGoals', 'Daily Goals')}
               </h3>
             </div>
-            <ul className="space-y-2">
-              {goals.map(g=> (
-                <li key={g.id} className="flex items-center justify-between p-3 rounded-2xl bg-neutral-50 dark:bg-neutral-900 hover:bg-neutral-100 dark:hover:bg-neutral-800 transition-colors">
-                  <label className="flex items-center gap-3 cursor-pointer flex-1">
+            
+            <ul className="space-y-3">
+              {data.dailyGoals.map(g => (
+                <li 
+                  key={g.id} 
+                  className={`flex items-center justify-between p-3 rounded-xl border transition-all duration-200 ${
+                    g.isCompleted 
+                      ? 'bg-green-50/50 border-green-100 dark:bg-green-900/10 dark:border-green-900/30' 
+                      : 'bg-white border-neutral-100 dark:bg-neutral-800/50 dark:border-neutral-800'
+                  }`}
+                >
+                  <label className="flex items-center gap-3 cursor-pointer flex-1 select-none">
+                    <div className={`w-5 h-5 rounded border flex items-center justify-center transition-colors ${
+                      g.isCompleted
+                        ? 'bg-green-500 border-green-500 text-white'
+                        : 'border-neutral-300 dark:border-neutral-600 hover:border-green-500'
+                    }`}>
+                      {g.isCompleted && <CheckCircle size={14} />}
+                    </div>
                     <input 
                       type="checkbox" 
-                      checked={g.done} 
-                      onChange={()=> setGoals(s=> s.map(x=> x.id===g.id ? {...x, done:!x.done} : x))}
-                      className="rounded-lg"
+                      className="hidden"
+                      checked={g.isCompleted} 
+                      onChange={() => toggleGoal(g.id, g.isCompleted)}
                     />
-                    <span className={`font-medium ${g.done ? 'line-through text-neutral-400 dark:text-neutral-600' : 'text-neutral-700 dark:text-neutral-300'}`}>
-                      {getGoalText(g.templateId, lang)}
+                    <span className={`font-medium transition-colors ${
+                      g.isCompleted 
+                        ? 'text-green-700 dark:text-green-400 line-through decoration-green-500/30' 
+                        : 'text-neutral-700 dark:text-neutral-200'
+                    }`}>
+                      {g.text}
                     </span>
                   </label>
-                  <span className={`text-xs font-semibold px-3 py-1 rounded-full ${
-                    g.done 
-                      ? 'bg-green-100 text-green-700 dark:bg-green-950 dark:text-green-300' 
-                      : 'bg-neutral-200 text-neutral-600 dark:bg-neutral-800 dark:text-neutral-400'
-                  }`}>
-                    {g.done ? t('dashboard.done') : t('dashboard.pending')}
-                  </span>
                 </li>
               ))}
             </ul>
           </div>
+
+          {/* 4. Weak Spots */}
+          {data.weakSpots.length > 0 && (
+            <div className="card bg-gradient-to-br from-white to-red-50/30 dark:from-neutral-900 dark:to-red-900/10 border-red-100 dark:border-red-900/20">
+              <div className="flex items-center gap-2 mb-4">
+                <h3 className="text-lg font-display font-semibold text-neutral-900 dark:text-white">
+                  {t('dashboard.recommended', 'Recommended Review')}
+                </h3>
+              </div>
+              <div className="space-y-3">
+                {data.weakSpots.map((spot, idx) => (
+                  <div key={idx} className="p-4 bg-white dark:bg-neutral-900 rounded-xl border border-red-100 dark:border-red-900/30 shadow-sm">
+                    <div className="flex gap-3">
+                      <div className="mt-1 text-red-500">
+                        <Zap size={18} />
+                      </div>
+                      <div>
+                        <h4 className="font-semibold text-neutral-900 dark:text-white">{spot.topic}</h4>
+                        <p className="text-sm text-neutral-600 dark:text-neutral-400 mt-1">{spot.advice}</p>
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
         </div>
 
-        {/* Right: Sidebar */}
+        {/* RIGHT COLUMN (Sidebar) */}
         <div className="space-y-6">
-          {/* Achievements */}
+          
+          {/* 5. Streak Calendar */}
           <div className="card">
-            <div className="flex items-center gap-2 mb-4">
-              <Award size={20} className="text-primary-600 dark:text-primary-400"/>
-              <h3 className="text-lg font-display font-semibold text-neutral-900 dark:text-white">
-                {t('dashboard.achievements')}
+            <div className="flex items-center gap-3 mb-4">
+              <div className="p-2 bg-orange-100 dark:bg-orange-900/30 rounded-lg text-orange-600 dark:text-orange-400">
+                <Flame size={20} />
+              </div>
+              <div>
+                <h3 className="text-lg font-display font-semibold text-neutral-900 dark:text-white leading-tight">
+                  {data.stats.streak.current} {t('dashboard.days', 'Day Streak')}
+                </h3>
+                <p className="text-xs text-neutral-500">
+                  {t('dashboard.keepStreak', 'Keep it up!')}
+                </p>
+              </div>
+            </div>
+            <div className="flex justify-between items-center bg-neutral-50 dark:bg-neutral-800/50 p-3 rounded-xl">
+              {streakDays.map((day, idx) => (
+                <StreakDay 
+                  key={idx} 
+                  day={day} 
+                  active={data.stats.streak.history[idx]} 
+                />
+              ))}
+            </div>
+          </div>
+
+          {/* 6. Tip of the Day */}
+          <div className="card bg-accent-50 dark:bg-accent-900/10 border-accent-100 dark:border-accent-900/30">
+            <div className="flex gap-3">
+              <div className="shrink-0">
+                <span className="text-2xl">💡</span>
+              </div>
+              <div>
+                <h4 className="font-bold text-accent-900 dark:text-accent-100 text-sm mb-1">
+                  {t('dashboard.tipOfDay', 'Tip of the Day')}
+                </h4>
+                <p className="text-sm text-accent-800 dark:text-accent-200/80 leading-relaxed">
+                  {data.tipOfTheDay}
+                </p>
+              </div>
+            </div>
+          </div>
+
+          {/* 7. Achievements (Mini) */}
+          <div className="card">
+            <div className="flex items-center justify-between mb-4">
+              <h3 className="font-display font-semibold text-neutral-900 dark:text-white flex items-center gap-2">
+                <Award size={18} className="text-purple-500" />
+                {t('dashboard.achievements', 'Achievements')}
               </h3>
+              <Link to="/profile" className="text-xs text-primary-600 hover:underline">
+                {t('common.view', 'View All')}
+              </Link>
             </div>
             <div className="flex flex-wrap gap-2">
-              {achievements.map(ach => (
+              {data.achievements.slice(0, 4).map(ach => (
                 <span 
-                  key={ach.id} 
-                  className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-semibold transition-all ${
+                  key={ach.id}
+                  className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md text-xs font-medium border ${
                     ach.earned
-                      ? 'bg-primary-100 text-primary-700 border border-primary-200 dark:bg-primary-950 dark:text-primary-300 dark:border-primary-800'
-                      : 'bg-neutral-100 text-neutral-400 border border-neutral-200 dark:bg-neutral-900 dark:text-neutral-600 dark:border-neutral-800 opacity-50'
+                      ? 'bg-purple-50 text-purple-700 border-purple-100 dark:bg-purple-900/20 dark:text-purple-300 dark:border-purple-800'
+                      : 'bg-neutral-50 text-neutral-400 border-neutral-100 dark:bg-neutral-900 dark:text-neutral-600 dark:border-neutral-800 grayscale opacity-60'
                   }`}
                 >
                   {ach.earned ? '🏆' : '🔒'} {ach.name}
@@ -335,69 +392,36 @@ export default function Dashboard(){
             </div>
           </div>
 
-          {/* Streak Calendar */}
-          <div className="card">
-            <div className="flex items-center gap-2 mb-4">
-              <Flame size={20} className="text-primary-600 dark:text-primary-400"/>
-              <h3 className="text-lg font-display font-semibold text-neutral-900 dark:text-white">
-                {t('dashboard.streak')} — {streakData.current} {t('dashboard.days')}
-              </h3>
-            </div>
-            <div className="flex justify-between">
-              {streakDays.map((day, idx) => (
-                <StreakDay key={idx} day={day} active={streakData.weekDays[idx]} />
-              ))}
-            </div>
-            <p className="text-xs text-neutral-500 dark:text-neutral-400 mt-3 text-center">
-              {t('dashboard.keepStreak')}
-            </p>
-          </div>
-
-          {/* Quiz History */}
+          {/* 8. Recent History */}
           <QuizHistory />
 
-          {/* Community */}
+          {/* 9. Quick Links */}
           <div className="card">
-            <div className="flex items-center gap-2 mb-4">
-              <Users size={20} className="text-primary-600 dark:text-primary-400"/>
-              <h3 className="text-lg font-display font-semibold text-neutral-900 dark:text-white">
-                {t('dashboard.community')}
-              </h3>
+            <h3 className="font-display font-semibold text-neutral-900 dark:text-white mb-3">
+              {t('dashboard.quickLinks', 'Quick Links')}
+            </h3>
+            <div className="space-y-2">
+              <Link to="/materials" className="flex items-center gap-3 p-2.5 rounded-xl hover:bg-neutral-50 dark:hover:bg-neutral-800 text-neutral-600 dark:text-neutral-300 transition-colors">
+                <div className="w-8 h-8 rounded-lg bg-blue-100 dark:bg-blue-900/30 text-blue-600 flex items-center justify-center">
+                  <BookOpen size={16} />
+                </div>
+                <span className="font-medium">{t('nav.materials', 'Materials')}</span>
+              </Link>
+              <Link to="/quiz" className="flex items-center gap-3 p-2.5 rounded-xl hover:bg-neutral-50 dark:hover:bg-neutral-800 text-neutral-600 dark:text-neutral-300 transition-colors">
+                <div className="w-8 h-8 rounded-lg bg-purple-100 dark:bg-purple-900/30 text-purple-600 flex items-center justify-center">
+                  <Trophy size={16} />
+                </div>
+                <span className="font-medium">{t('nav.quiz', 'Quizzes')}</span>
+              </Link>
+              <Link to="/community" className="flex items-center gap-3 p-2.5 rounded-xl hover:bg-neutral-50 dark:hover:bg-neutral-800 text-neutral-600 dark:text-neutral-300 transition-colors">
+                <div className="w-8 h-8 rounded-lg bg-pink-100 dark:bg-pink-900/30 text-pink-600 flex items-center justify-center">
+                  <Users size={16} />
+                </div>
+                <span className="font-medium">{t('dashboard.community', 'Community')}</span>
+              </Link>
             </div>
-            <a 
-              href="/community" 
-              className="flex items-center justify-between p-3 rounded-2xl bg-primary-50 hover:bg-primary-100 dark:bg-primary-950 dark:hover:bg-primary-900 text-primary-700 dark:text-primary-300 font-medium transition-colors group"
-            >
-              <span>{t('dashboard.goToCourseChat')}</span>
-              <div className="w-8 h-8 rounded-lg bg-primary-600 dark:bg-primary-700 flex items-center justify-center group-hover:scale-110 transition-transform">
-                <Users size={16} className="text-white"/>
-              </div>
-            </a>
           </div>
 
-          {/* Quick Links */}
-          <div className="card">
-            <h3 className="text-lg font-display font-semibold text-neutral-900 dark:text-white mb-4">
-              {t('dashboard.quickLinks')}
-            </h3>
-            <ul className="space-y-2">
-              <li>
-                <a href="/materials" className="flex items-center gap-3 p-3 rounded-2xl bg-primary-50 hover:bg-primary-100 dark:bg-primary-950 dark:hover:bg-primary-900 text-primary-700 dark:text-primary-300 font-medium transition-colors">
-                  <BookOpen size={20}/> {t('nav.materials')}
-                </a>
-              </li>
-              <li>
-                <a href="/quiz" className="flex items-center gap-3 p-3 rounded-2xl bg-accent-50 hover:bg-accent-100 dark:bg-accent-950 dark:hover:bg-accent-900 text-accent-700 dark:text-accent-300 font-medium transition-colors">
-                  <Trophy size={20}/> {t('nav.quiz')}
-                </a>
-              </li>
-              <li>
-                <a href="/leaderboard" className="flex items-center gap-3 p-3 rounded-2xl bg-green-50 hover:bg-green-100 dark:bg-green-950 dark:hover:bg-green-900 text-green-700 dark:text-green-300 font-medium transition-colors">
-                  <TrendingUp size={20}/> {t('nav.leaderboard')}
-                </a>
-              </li>
-            </ul>
-          </div>
         </div>
       </div>
     </div>

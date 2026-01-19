@@ -1,6 +1,76 @@
 // src/components/ErrorBoundary.tsx
-import React, { Component, ErrorInfo, ReactNode } from 'react'
+import { Component, ErrorInfo, ReactNode } from 'react'
 import { AlertTriangle, RefreshCw, Home } from 'lucide-react'
+import { useTranslation } from '@/i18n/useTranslation'
+
+interface ErrorViewProps {
+  error: Error | null
+  errorInfo: ErrorInfo | null
+  onReset: () => void
+}
+
+/**
+ * Functional component for rendering the error UI.
+ * Allows usage of hooks like useTranslation inside the class-based boundary.
+ */
+function ErrorView({ error, errorInfo, onReset }: ErrorViewProps) {
+  const { t } = useTranslation()
+
+  const handleGoHome = () => {
+    window.location.href = '/'
+  }
+
+  return (
+    <div className="min-h-screen flex items-center justify-center bg-neutral-50 dark:bg-neutral-950 p-4">
+      <div className="card max-w-md w-full text-center shadow-2xl border-red-100 dark:border-red-900/30">
+        <div className="w-16 h-16 mx-auto mb-6 rounded-full bg-red-100 dark:bg-red-900/20 flex items-center justify-center">
+          <AlertTriangle className="w-8 h-8 text-red-600 dark:text-red-400" />
+        </div>
+        
+        <h1 className="text-2xl font-display font-bold text-neutral-900 dark:text-white mb-2">
+          {t('error.title', 'Something went wrong')}
+        </h1>
+        
+        <p className="text-neutral-600 dark:text-neutral-400 mb-8">
+          {t('error.description', 'An unexpected error occurred. Please try again or return to the dashboard.')}
+        </p>
+
+        {import.meta.env.DEV && error && (
+          <details className="mb-8 text-left group">
+            <summary className="cursor-pointer text-sm font-medium text-neutral-500 hover:text-neutral-700 dark:hover:text-neutral-300 transition-colors list-none flex items-center gap-2">
+              <span className="group-open:rotate-90 transition-transform">▶</span>
+              Developer Details
+            </summary>
+            <div className="mt-2 p-4 bg-neutral-100 dark:bg-neutral-900 rounded-xl text-xs overflow-auto max-h-60 border border-neutral-200 dark:border-neutral-800 font-mono">
+              <p className="font-bold text-red-600 mb-2">{error.message}</p>
+              <pre className="whitespace-pre-wrap text-neutral-600 dark:text-neutral-400">
+                {errorInfo?.componentStack}
+              </pre>
+            </div>
+          </details>
+        )}
+
+        <div className="flex flex-col sm:flex-row gap-3 justify-center">
+          <button
+            onClick={onReset}
+            className="btn-outline flex items-center justify-center gap-2"
+          >
+            <RefreshCw size={18} />
+            {t('common.tryAgain', 'Try Again')}
+          </button>
+          
+          <button
+            onClick={handleGoHome}
+            className="btn bg-red-600 hover:bg-red-700 text-white flex items-center justify-center gap-2 border-transparent"
+          >
+            <Home size={18} />
+            {t('nav.dashboard', 'Go Home')}
+          </button>
+        </div>
+      </div>
+    </div>
+  )
+}
 
 interface Props {
   children: ReactNode
@@ -14,8 +84,8 @@ interface State {
 }
 
 /**
- * Error Boundary компонент для перехоплення помилок в React дереві
- * Запобігає падінню всього додатку при помилці в компоненті
+ * Error Boundary Component
+ * Catches JavaScript errors anywhere in their child component tree.
  */
 export class ErrorBoundary extends Component<Props, State> {
   public state: State = {
@@ -31,25 +101,14 @@ export class ErrorBoundary extends Component<Props, State> {
   public componentDidCatch(error: Error, errorInfo: ErrorInfo): void {
     this.setState({ errorInfo })
     
-    // Тут можна додати логування в Sentry або інший сервіс
-    console.error('ErrorBoundary caught an error:', error, errorInfo)
+    // Log to console in development
+    console.error('Uncaught error:', error, errorInfo)
     
-    // TODO: Інтегрувати з Sentry
-    // if (typeof Sentry !== 'undefined') {
-    //   Sentry.captureException(error, { extra: { errorInfo } })
-    // }
+    // Future: Integrate Sentry or other logging service here
   }
 
   private handleReset = (): void => {
     this.setState({ hasError: false, error: null, errorInfo: null })
-  }
-
-  private handleReload = (): void => {
-    window.location.reload()
-  }
-
-  private handleGoHome = (): void => {
-    window.location.href = '/'
   }
 
   public render(): ReactNode {
@@ -59,51 +118,11 @@ export class ErrorBoundary extends Component<Props, State> {
       }
 
       return (
-        <div className="min-h-screen flex items-center justify-center bg-neutral-50 dark:bg-neutral-950 p-4">
-          <div className="max-w-md w-full bg-white dark:bg-neutral-900 rounded-2xl shadow-neo p-8 text-center">
-            <div className="w-16 h-16 mx-auto mb-6 rounded-full bg-red-100 dark:bg-red-900/20 flex items-center justify-center">
-              <AlertTriangle className="w-8 h-8 text-red-600 dark:text-red-400" />
-            </div>
-            
-            <h1 className="text-2xl font-display font-bold text-neutral-900 dark:text-white mb-2">
-              Щось пішло не так
-            </h1>
-            
-            <p className="text-neutral-600 dark:text-neutral-400 mb-6">
-              Виникла неочікувана помилка. Спробуйте оновити сторінку або повернутися на головну.
-            </p>
-
-            {process.env.NODE_ENV === 'development' && this.state.error && (
-              <details className="mb-6 text-left">
-                <summary className="cursor-pointer text-sm text-neutral-500 hover:text-neutral-700 dark:hover:text-neutral-300">
-                  Деталі помилки (dev only)
-                </summary>
-                <pre className="mt-2 p-3 bg-neutral-100 dark:bg-neutral-800 rounded-lg text-xs overflow-auto max-h-40">
-                  {this.state.error.message}
-                  {this.state.errorInfo?.componentStack}
-                </pre>
-              </details>
-            )}
-
-            <div className="flex gap-3 justify-center">
-              <button
-                onClick={this.handleReset}
-                className="px-4 py-2 rounded-xl bg-neutral-100 hover:bg-neutral-200 dark:bg-neutral-800 dark:hover:bg-neutral-700 text-neutral-700 dark:text-neutral-300 font-medium transition-colors flex items-center gap-2"
-              >
-                <RefreshCw size={16} />
-                Спробувати знову
-              </button>
-              
-              <button
-                onClick={this.handleGoHome}
-                className="px-4 py-2 rounded-xl bg-primary-600 hover:bg-primary-700 text-white font-medium transition-colors flex items-center gap-2"
-              >
-                <Home size={16} />
-                На головну
-              </button>
-            </div>
-          </div>
-        </div>
+        <ErrorView 
+          error={this.state.error} 
+          errorInfo={this.state.errorInfo} 
+          onReset={this.handleReset} 
+        />
       )
     }
 
@@ -112,11 +131,11 @@ export class ErrorBoundary extends Component<Props, State> {
 }
 
 /**
- * Хук для програмного виклику помилки (тестування)
+ * Helper hook to trigger an error for testing purposes
  */
 export function useErrorTrigger(): () => void {
   return () => {
-    throw new Error('Manual error trigger for testing ErrorBoundary')
+    throw new Error('Test error triggered manually')
   }
 }
 

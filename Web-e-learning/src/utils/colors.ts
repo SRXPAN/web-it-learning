@@ -1,9 +1,3 @@
-/**
- * Gradient color palette for consistent UI styling
- * These constants are defined outside components to prevent
- * unnecessary re-creation on each render
- */
-
 export interface GradientColor {
   from: string
   to: string
@@ -26,9 +20,6 @@ export const LANG_GRADIENT_COLORS: readonly GradientColor[] = [
 
 /**
  * Get gradient color by index (cycles through available colors)
- * @param index - Item index
- * @param colors - Color palette to use
- * @returns Gradient color object with from/to classes
  */
 export function getGradientColor(
   index: number,

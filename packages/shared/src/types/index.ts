@@ -1,3 +1,5 @@
+// packages/shared/src/types/index.ts
+
 // ============================================
 // LOCALIZATION HELPER TYPES
 // ============================================
@@ -8,10 +10,6 @@ export interface LocalizedString {
   EN?: string
 }
 
-/**
- * Тип для мультимовних JSON полів у базі даних
- * Використовується для nameJson, descJson, etc.
- */
 export interface LocalizedObject {
   UA: string
   PL: string
@@ -64,14 +62,11 @@ export interface Material {
   id: string
   title: string
   titleJson?: LocalizedString
-  titleCache?: Record<string, string> | null
   type: MaterialType
   url?: string
-  urlCache?: Record<string, string> | null
   fileId?: string
   content?: string
   contentJson?: LocalizedString
-  contentCache?: Record<string, string> | null
   lang?: Lang
   status?: Status
   tags?: string[]
@@ -194,40 +189,24 @@ export interface ApiSuccess<T = unknown> {
 // TRANSLATION TYPES (for Prisma JSON fields)
 // ============================================
 
-/**
- * Структура для зберігання перекладів в JSON полях Prisma
- * Використовується в nameJson, descJson, titleJson, textJson тощо
- */
 export interface TranslationJson {
   UA: string
   PL: string
   EN: string
 }
 
-/**
- * Partial версія для опціональних полів
- */
 export type PartialTranslationJson = Partial<TranslationJson>
 
-/**
- * Структура для перекладів weak spots
- */
 export interface WeakSpotTranslationJson {
   topic: TranslationJson
   advice: TranslationJson
 }
 
-/**
- * Структура для перекладів achievements
- */
 export interface AchievementTranslationJson {
   name: TranslationJson
   description: TranslationJson
 }
 
-/**
- * Хелпер для отримання перекладу з JSON поля
- */
 export function getTranslation(
   json: TranslationJson | PartialTranslationJson | null | undefined,
   lang: Lang,

@@ -19,7 +19,7 @@ import {
   Globe,
   Search,
 } from 'lucide-react'
-import { Loading } from '@/components/Loading'
+import { Loading } from '@/components/Skeleton'
 import { PageHeader } from '@/components/admin/PageHeader'
 
 type TopicWithChildren = AdminTopic & {

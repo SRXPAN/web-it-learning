@@ -1,4 +1,4 @@
-import { Lang } from '@/store/i18n'
+import { Lang } from '@elearn/shared'
 
 export type WeakSpotTemplate = {
   id: string

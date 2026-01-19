@@ -1,26 +1,25 @@
-import { memo } from 'react'
-
 interface ProgressBarProps {
-  current: number
-  total: number
+  value?: number // 0 to 100
+  current?: number
+  total?: number
+  className?: string
 }
 
-export const ProgressBar = memo(function ProgressBar({ current, total }: ProgressBarProps) {
-  const percent = total > 0 ? Math.round((current / total) * 100) : 0
+export const ProgressBar = ({ value, current, total, className = '' }: ProgressBarProps) => {
+  let percentage = 0
+  
+  if (typeof value === 'number') {
+    percentage = value
+  } else if (current !== undefined && total !== undefined && total > 0) {
+    percentage = Math.round((current / total) * 100)
+  }
+
   return (
-    <div className="w-full">
-      <div className="flex justify-between text-[11px] mb-1 font-medium text-gray-500 dark:text-gray-400">
-        <span>Прогрес</span>
-        <span>
-          {percent}% ({current}/{total})
-        </span>
-      </div>
-      <div className="h-1.5 w-full bg-gray-200/80 dark:bg-gray-800 rounded-full overflow-hidden">
-        <div
-          className="h-full bg-blue-600 rounded-full transition-all duration-500 ease-out"
-          style={{ width: `${percent}%` }}
-        />
-      </div>
+    <div className={`h-1.5 w-full bg-neutral-100 dark:bg-neutral-800 rounded-full overflow-hidden ${className}`}>
+      <div 
+        className="h-full bg-blue-500 rounded-full transition-all duration-500 ease-out" 
+        style={{ width: `${Math.min(100, Math.max(0, percentage))}%` }} 
+      />
     </div>
   )
-})
+}

@@ -1,64 +1,80 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
-import { markMaterialSeen, isMaterialSeen } from '@/utils/progress'
-import { logMaterialView } from '@/utils/activity'
-import Breadcrumb from '@/components/Breadcrumb'
-import { useTranslation } from '@/i18n/useTranslation'
+import { useSearchParams } from 'react-router-dom'
+
 import useCatalogStore from '@/store/catalog'
-import { localize, Lang } from '@/utils/localize'
+import { useTranslation } from '@/i18n/useTranslation'
+import { api } from '@/lib/http'
+import type { Material, Topic, Category } from '@elearn/shared'
+
 import {
-  type TopicNode,
-  type Material,
-  type Tab,
-  type Category,
   DEFAULT_CAT,
   getCategoryLabel,
   TopicSidebar,
   DashboardView,
-} from './materialsComponents'
-import { MaterialsHeader } from './materialsComponents/MaterialsHeader'
-import { TopicView } from './materialsComponents/TopicView'
-import { MaterialModal } from './materialsComponents/MaterialModal'
+} from '@/pages/materialsComponents/materialsComponents'
+import { MaterialsHeader } from '@/pages/materialsComponents/MaterialsHeader'
+import { TopicView } from '@/pages/materialsComponents/TopicView'
+import { MaterialModal } from '@/pages/materialsComponents/MaterialModal'
+import { SkeletonDashboard } from '@/components/Skeletons'
+
+export type Tab = 'ALL' | 'PDF' | 'VIDEO' | 'TEXT' | 'LINK'
 
 export default function Materials() {
-  const { topics: roots, loadTopics } = useCatalogStore()
-  const [loading, setLoading] = useState(false)
-  const [activeCat, setActiveCat] = useState<Category>(DEFAULT_CAT)
-  const [activeTopicId, setActiveTopicId] = useState<string | null>(null)
-  const [activeSubId, setActiveSubId] = useState<string | null>(null)
+  const { topics: roots, loadTopics, loading } = useCatalogStore()
+  const { t, lang } = useTranslation()
+  const [searchParams, setSearchParams] = useSearchParams()
+  
+  // State from URL or defaults
+  const activeCat = (searchParams.get('cat') as Category) || DEFAULT_CAT
+  const activeTopicId = searchParams.get('topic')
+  const activeSubId = searchParams.get('sub')
+  
   const [tab, setTab] = useState<Tab>('ALL')
   const [query, setQuery] = useState('')
-  const { lang } = useTranslation()
-  const [initialized, setInitialized] = useState(false)
   
-  // Модальне вікно
+  // Modal State
   const [selectedMaterial, setSelectedMaterial] = useState<Material | null>(null)
   
-  // Тригер для оновлення UI після позначки матеріалу
-  const [progressVersion, setProgressVersion] = useState(0)
-
+  // Load topics on mount/lang change
   useEffect(() => {
-    setLoading(true)
-    // Pass lang to load localized topics from API
-    loadTopics(lang as 'UA' | 'PL' | 'EN').catch(console.error).finally(() => setLoading(false))
+    loadTopics(lang as 'UA' | 'PL' | 'EN')
   }, [loadTopics, lang])
 
-  // Ініціалізація один раз після завантаження тем
-  useEffect(() => {
-    if (!initialized && roots.length) {
-      const firstCat = (roots[0].category ?? DEFAULT_CAT) as Category
-      setActiveCat(firstCat)
+  // --- Helpers for Navigation ---
 
-      const topicsForCat = roots.filter(
-        (r) => (r.category ?? DEFAULT_CAT) === firstCat
-      )
-      if (topicsForCat[0]) setActiveTopicId(topicsForCat[0].id)
+  const setActiveCat = (cat: Category) => {
+    setSearchParams(prev => {
+      const newParams = new URLSearchParams(prev)
+      newParams.set('cat', cat)
+      newParams.delete('topic')
+      newParams.delete('sub')
+      return newParams
+    })
+  }
 
-      setInitialized(true)
-    }
-  }, [roots, initialized])
+  const setActiveTopicId = (id: string | null) => {
+    setSearchParams(prev => {
+      const newParams = new URLSearchParams(prev)
+      if (id) newParams.set('topic', id)
+      else newParams.delete('topic')
+      newParams.delete('sub')
+      return newParams
+    })
+  }
+
+  const setActiveSubId = (id: string | null) => {
+    setSearchParams(prev => {
+      const newParams = new URLSearchParams(prev)
+      if (id) newParams.set('sub', id)
+      else newParams.delete('sub')
+      return newParams
+    })
+  }
+
+  // --- Derived State ---
 
   const categories = useMemo(() => {
-    const map = new Map<Category, TopicNode[]>()
+    const map = new Map<Category, Topic[]>()
     roots.forEach((r) => {
       const key = (r.category ?? DEFAULT_CAT) as Category
       const arr = map.get(key) || []
@@ -70,22 +86,21 @@ export default function Materials() {
 
   const catTopics = categories.get(activeCat) || []
 
-  // При зміні категорії – вибираємо перший розділ цієї категорії
+  // Auto-select first topic if none selected but category has topics
   useEffect(() => {
-    if (!catTopics.length) {
-      setActiveTopicId(null)
-      setActiveSubId(null)
-      return
+    if (!activeTopicId && catTopics.length > 0 && !loading) {
+      // Don't auto-select on mobile to show dashboard view first
+      if (window.innerWidth >= 1024) { 
+        setActiveTopicId(catTopics[0].id)
+      }
     }
-    if (activeTopicId && catTopics.some((t) => t.id === activeTopicId)) return
-    setActiveTopicId(catTopics[0].id)
-    setActiveSubId(null)
-  }, [activeCat, catTopics, activeTopicId])
+  }, [activeCat, catTopics, activeTopicId, loading])
 
   const activeTopic = useMemo(
     () => catTopics.find((t) => t.id === activeTopicId) || null,
     [catTopics, activeTopicId]
   )
+  
   const activeSub = useMemo(
     () => activeTopic?.children?.find((c) => c.id === activeSubId) || null,
     [activeTopic, activeSubId]
@@ -93,101 +108,73 @@ export default function Materials() {
 
   const isDashboardView = !activeTopic
 
+  // --- Handlers ---
+
   const filteredMaterials = useCallback((list: Material[]) => {
-    // Не фільтруємо за lang, бо маємо мультимовну систему через titleCache/contentCache
-    const byTab = tab === 'ALL' ? list : list.filter((m) => m.type === tab)
+    let result = list
+    
+    // Filter by Tab
+    if (tab !== 'ALL') {
+      result = result.filter((m) => m.type === tab)
+    }
+    
+    // Filter by Query
     const q = query.trim().toLowerCase()
-    return q ? byTab.filter((m) => m.title.toLowerCase().includes(q)) : byTab
+    if (q) {
+      result = result.filter((m) => m.title.toLowerCase().includes(q))
+    }
+    
+    return result
   }, [tab, query])
 
-  // Відкриття матеріалу в модальному вікні
-  const openMaterial = useCallback((m: Material) => {
-    setSelectedMaterial(m)
-  }, [])
-
-  // Закриття модального вікна
-  const closeMaterial = useCallback(() => {
-    setSelectedMaterial(null)
-  }, [])
-
-  // Позначка матеріалу як переглянутого (з оновленням UI)
-  const handleMarkComplete = useCallback((materialId: string) => {
-    if (!isMaterialSeen(materialId)) {
-      markMaterialSeen(materialId)
-      logMaterialView()
-      // Тригер оновлення UI
-      setProgressVersion((v) => v + 1)
-    }
-  }, [])
-
-  const handleSelectTopic = useCallback((topicId: string) => {
-    setActiveTopicId(topicId)
-    setActiveSubId(null)
-  }, [])
-
-  const handleSelectSub = useCallback((topicId: string, subId: string) => {
-    setActiveTopicId(topicId)
-    setActiveSubId(subId)
-  }, [])
-
-  const crumbs = useMemo(() => {
-    const items: { label: string; onClick?: () => void; current?: boolean }[] = [
-      {
-        label: getCategoryLabel(activeCat, lang as Lang),
-        onClick: () => {
-          setActiveTopicId(catTopics[0]?.id ?? null)
-          setActiveSubId(null)
-        },
-      },
-    ]
-    if (activeTopic) {
-      const topicName = localize((activeTopic as any).nameJson, activeTopic.name, lang as Lang)
-      items.push({
-        label: topicName,
-        onClick: () => setActiveSubId(null),
-        current: !activeSub,
+  const handleMarkComplete = useCallback(async (materialId: string) => {
+    try {
+      await api('/progress/material', {
+        method: 'POST',
+        body: JSON.stringify({ materialId })
       })
+      // Reload topics to update progress bars
+      // (Optimistic update could be implemented in store for better UX)
+      loadTopics(lang as any)
+    } catch (e) {
+      console.error('Failed to mark material as complete', e)
     }
-    if (activeSub) {
-      const subName = localize((activeSub as any).nameJson, activeSub.name, lang as Lang)
-      items.push({ label: subName, current: true })
-    }
-    return items
-  }, [activeCat, catTopics, activeTopic, activeSub, lang])
+  }, [loadTopics, lang])
 
   return (
     <>
-      <div className="min-h-screen bg-gradient-to-br from-gray-50 via-gray-50 to-blue-50/30 dark:from-[#0f1115] dark:via-[#0f1115] dark:to-[#0f1115] px-3 sm:px-4 md:px-6 lg:px-8 py-5 md:py-6">
-        <div className="max-w-7xl mx-auto space-y-5 md:space-y-6">
+      <div className="min-h-screen bg-neutral-50 dark:bg-neutral-950 px-4 md:px-8 py-6 transition-colors duration-300">
+        <div className="max-w-7xl mx-auto space-y-6">
+          
           <MaterialsHeader
             activeCat={activeCat}
             categories={categories}
             onCategoryChange={setActiveCat}
           />
 
-          <div className="grid lg:grid-cols-[280px_1fr] gap-5 lg:gap-6 items-start">
+          <div className="grid lg:grid-cols-[280px_1fr] gap-6 items-start">
+            
             <TopicSidebar
               catTopics={catTopics}
               activeTopicId={activeTopicId}
               activeSubId={activeSubId}
               loading={loading}
-              onSelectTopic={handleSelectTopic}
-              onSelectSub={handleSelectSub}
+              onSelectTopic={setActiveTopicId}
+              onSelectSub={(topicId, subId) => {
+                setActiveTopicId(topicId)
+                setActiveSubId(subId)
+              }}
             />
 
-            <main className="space-y-5">
-              <Breadcrumb items={crumbs} />
+            <main className="space-y-6 min-w-0">
+              {/* Breadcrumbs can be added here if needed, but sidebar + header usually enough */}
 
-              {loading ? (
-                <div className="animate-pulse space-y-4">
-                  <div className="h-28 sm:h-32 rounded-2xl md:rounded-3xl bg-white dark:bg-gray-900" />
-                  <div className="h-52 sm:h-64 rounded-2xl md:rounded-3xl bg-white dark:bg-gray-900" />
-                </div>
+              {loading && !roots.length ? (
+                <SkeletonDashboard />
               ) : isDashboardView ? (
-                <DashboardView catTopics={catTopics} />
+                <DashboardView catTopics={catTopics} onSelectTopic={setActiveTopicId} />
               ) : (
                 <TopicView
-                  key={progressVersion} // Ключ для примусового оновлення
                   activeTopic={activeTopic}
                   activeSub={activeSub}
                   tab={tab}
@@ -195,8 +182,7 @@ export default function Materials() {
                   query={query}
                   setQuery={setQuery}
                   filteredMaterials={filteredMaterials}
-                  openMaterial={openMaterial}
-                  progressVersion={progressVersion}
+                  openMaterial={setSelectedMaterial}
                 />
               )}
             </main>
@@ -208,8 +194,7 @@ export default function Materials() {
       {selectedMaterial && (
         <MaterialModal
           material={selectedMaterial}
-          lang={lang as Lang}
-          onClose={closeMaterial}
+          onClose={() => setSelectedMaterial(null)}
           onMarkComplete={handleMarkComplete}
         />
       )}
