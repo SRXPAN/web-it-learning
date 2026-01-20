@@ -440,6 +440,7 @@
   "admin.action": "Дії",
   "admin.editUser": "Редагувати користувача",
   "admin.deleteUser": "Видалити користувача",
+  "admin.deleteUserWarning": "Це дія є незворотною. Користувач буде видален з системи.",
   "admin.confirmDeleteUser": "Ви впевнені, що хочете видалити цього користувача?",
   "admin.materials": "Матеріали",
   "admin.topics": "Теми",

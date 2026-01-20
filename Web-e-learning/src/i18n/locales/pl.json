@@ -440,6 +440,7 @@
   "admin.actions": "Akcje",
   "admin.editUser": "Edytuj użytkownika",
   "admin.deleteUser": "Usuń użytkownika",
+  "admin.deleteUserWarning": "Ta akcja jest nieodwracalna. Użytkownik zostanie usunięty z systemu.",
   "admin.confirmDeleteUser": "Czy na pewno chcesz usunąć tego użytkownika?",
   "admin.materials": "Materiały",
   "admin.topics": "Tematy",

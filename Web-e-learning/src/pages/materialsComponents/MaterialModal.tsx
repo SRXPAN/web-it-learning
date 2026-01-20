@@ -3,16 +3,28 @@ import { X, AlignLeft, Link as LinkIcon, Video, FileText } from 'lucide-react'
 import { useTranslation } from '@/i18n/useTranslation'
 import { api } from '@/lib/http'
 import { LoadingButton } from '@/components/LoadingButton'
-import type { Material, Lang } from '@elearn/shared'
+import type { Material, Lang, LocalizedString } from '@elearn/shared'
 
 interface MaterialModalProps {
   isOpen: boolean
   onClose: () => void
-  onSave: () => void // Callback to refresh parent list
-  lessonId: string // ID теми/уроку, до якого додається матеріал
-  type: string // 'TEXT' | 'VIDEO' | 'PDF' | 'LINK'
-  material?: Material | null // Якщо є - редагування, інакше - створення
-  lang: Lang // Поточна мова інтерфейсу для дефолтного заповнення
+  onSave: () => void
+  lessonId: string
+  type: string
+  material?: Material | null
+  lang: Lang
+}
+
+interface FormState {
+  titleJson: LocalizedString
+  contentJson: LocalizedString
+  urlJson: LocalizedString
+}
+
+const EMPTY_FORM: FormState = {
+  titleJson: { UA: '', PL: '', EN: '' },
+  contentJson: { UA: '', PL: '', EN: '' },
+  urlJson: { UA: '', PL: '', EN: '' }
 }
 
 export const MaterialModal: React.FC<MaterialModalProps> = ({
@@ -21,60 +33,85 @@ export const MaterialModal: React.FC<MaterialModalProps> = ({
   onSave,
   lessonId,
   type,
-  material,
-  lang
+  material
 }) => {
   const { t } = useTranslation()
-  const [title, setTitle] = useState('')
-  const [content, setContent] = useState('')
+  const [form, setForm] = useState<FormState>(EMPTY_FORM)
   const [isLoading, setIsLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
-  // Визначаємо тип контенту для UI
   const isText = type.toUpperCase() === 'TEXT'
+  const languages: Lang[] = ['UA', 'PL', 'EN']
 
+  // Заповнення форми при відкритті
   useEffect(() => {
     if (isOpen) {
-      // Заповнюємо форму даними матеріалу або очищаємо
       if (material) {
-        setTitle(material.title || '')
-        setContent(material.content || material.url || '')
+        setForm({
+          titleJson: material.titleJson || EMPTY_FORM.titleJson,
+          contentJson: material.contentJson || EMPTY_FORM.contentJson,
+          urlJson: material.url ? { UA: material.url, PL: material.url, EN: material.url } : EMPTY_FORM.urlJson
+        })
       } else {
-        setTitle('')
-        setContent('')
+        setForm(EMPTY_FORM)
       }
       setError(null)
     }
   }, [isOpen, material])
+
+  const handleFieldChange = (field: 'titleJson' | 'contentJson' | 'urlJson', langKey: Lang, value: string) => {
+    setForm(prev => ({
+      ...prev,
+      [field]: {
+        ...prev[field],
+        [langKey]: value
+      }
+    }))
+  }
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     setIsLoading(true)
     setError(null)
 
+    // Перевірка обов'язкових полів
+    const hasTitle = Object.values(form.titleJson).some(v => v?.trim())
+    const hasContent = isText 
+      ? Object.values(form.contentJson).some(v => v?.trim())
+      : Object.values(form.urlJson).some(v => v?.trim())
+
+    if (!hasTitle) {
+      setError('Назва матеріалу обов\'язкова на хоча б одній мові')
+      setIsLoading(false)
+      return
+    }
+    if (!hasContent) {
+      setError(isText ? 'Контент обов\'язковий на хоча б одній мові' : 'URL обов\'язковий на хоча б одній мові')
+      setIsLoading(false)
+      return
+    }
+
     try {
-      // Формуємо payload.
-      // Для MVP дублюємо контент для всіх мов, якщо це створення.
-      // В ідеалі бекенд має приймати просто title/content, а кеші будувати сам.
-      const payload = {
+      const payload: Record<string, any> = {
         topicId: lessonId,
         type: type.toUpperCase(),
-        title, // Бекенд має оновити titleCache для поточної мови або дефолтної
-        [isText ? 'content' : 'url']: content,
-        // Опціонально: передаємо кеші, якщо бекенд їх вимагає явно
-        titleCache: { [lang]: title, EN: title }, 
-        ...(isText 
-          ? { contentCache: { [lang]: content, EN: content } } 
-          : { urlCache: { [lang]: content, EN: content } }
-        )
+        titleJson: form.titleJson
+      }
+
+      if (isText) {
+        payload.contentJson = form.contentJson
+      } else {
+        payload.urlJson = form.urlJson
       }
 
       if (material?.id) {
+        // Редагування
         await api(`/editor/materials/${material.id}`, {
           method: 'PUT',
           body: JSON.stringify(payload)
         })
       } else {
+        // Створення
         await api('/editor/materials', {
           method: 'POST',
           body: JSON.stringify(payload)
@@ -85,7 +122,7 @@ export const MaterialModal: React.FC<MaterialModalProps> = ({
       onClose()
     } catch (err: any) {
       console.error(err)
-      setError(err.message || t('common.error'))
+      setError(err.message || 'Помилка при збереженні матеріалу')
     } finally {
       setIsLoading(false)
     }
@@ -102,12 +139,11 @@ export const MaterialModal: React.FC<MaterialModalProps> = ({
 
   if (!isOpen) return null
 
-  // Іконка в залежності від типу
   const Icon = isText ? AlignLeft : type.toUpperCase() === 'VIDEO' ? Video : type.toUpperCase() === 'PDF' ? FileText : LinkIcon
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4 animate-in fade-in duration-200">
-      <div className="bg-white dark:bg-neutral-900 rounded-2xl w-full max-w-lg shadow-2xl border border-neutral-200 dark:border-neutral-800 flex flex-col max-h-[90vh]">
+      <div className="bg-white dark:bg-neutral-900 rounded-2xl w-full max-w-2xl shadow-2xl border border-neutral-200 dark:border-neutral-800 flex flex-col max-h-[90vh]">
         
         {/* Header */}
         <div className="flex items-center justify-between p-5 border-b border-neutral-100 dark:border-neutral-800">
@@ -136,53 +172,64 @@ export const MaterialModal: React.FC<MaterialModalProps> = ({
             </div>
           )}
 
+          {/* Назва матеріалу на трьох мовах */}
           <div>
-            <label className="block text-sm font-semibold text-neutral-700 dark:text-neutral-300 mb-1.5">
+            <label className="block text-sm font-semibold text-neutral-700 dark:text-neutral-300 mb-2">
               {t('editor.label.title')} <span className="text-red-500">*</span>
+              <span className="text-xs font-normal text-neutral-500 ml-1">(На всіх мовах)</span>
             </label>
-            <input
-              className="w-full rounded-xl border border-neutral-200 dark:border-neutral-700 bg-white dark:bg-neutral-800 px-3 py-2.5 text-neutral-900 dark:text-white focus:ring-2 focus:ring-primary-500/20 focus:border-primary-500 outline-none transition-all"
-              value={title}
-              onChange={(e) => setTitle(e.target.value)}
-              placeholder="Ex: Introduction to Binary Search"
-              required
-              disabled={isLoading}
-            />
+            <div className="space-y-2 p-3 bg-neutral-50 dark:bg-neutral-800/50 rounded-lg border border-neutral-200 dark:border-neutral-700">
+              {languages.map(langKey => (
+                <div key={langKey} className="flex items-center gap-2">
+                  <span className="w-10 text-xs font-bold text-neutral-500 uppercase">{langKey}</span>
+                  <input
+                    className="flex-1 rounded-lg border border-neutral-200 dark:border-neutral-600 bg-white dark:bg-neutral-700 px-3 py-2 text-sm text-neutral-900 dark:text-white focus:ring-2 focus:ring-primary-500/20 focus:border-primary-500 outline-none transition-all"
+                    value={form.titleJson[langKey] || ''}
+                    onChange={(e) => handleFieldChange('titleJson', langKey, e.target.value)}
+                    placeholder={`Назва матеріалу ${langKey === 'UA' ? 'українською' : langKey === 'PL' ? 'польською' : 'англійською'}`}
+                    disabled={isLoading}
+                  />
+                </div>
+              ))}
+            </div>
           </div>
 
+          {/* Контент або URL на трьох мовах */}
           <div>
-            <label className="block text-sm font-semibold text-neutral-700 dark:text-neutral-300 mb-1.5">
+            <label className="block text-sm font-semibold text-neutral-700 dark:text-neutral-300 mb-2">
               {isText ? t('editor.label.content') : t('editor.label.url')} <span className="text-red-500">*</span>
+              <span className="text-xs font-normal text-neutral-500 ml-1">(На всіх мовах)</span>
             </label>
-            
-            {isText ? (
-              <textarea
-                className="w-full rounded-xl border border-neutral-200 dark:border-neutral-700 bg-white dark:bg-neutral-800 px-3 py-2.5 text-neutral-900 dark:text-white focus:ring-2 focus:ring-primary-500/20 focus:border-primary-500 outline-none transition-all min-h-[200px] font-mono text-sm"
-                value={content}
-                onChange={(e) => setContent(e.target.value)}
-                placeholder="# Markdown is supported..."
-                required
-                disabled={isLoading}
-              />
-            ) : (
-              <div className="relative">
-                <input
-                  className="w-full rounded-xl border border-neutral-200 dark:border-neutral-700 bg-white dark:bg-neutral-800 px-3 py-2.5 pl-10 text-neutral-900 dark:text-white focus:ring-2 focus:ring-primary-500/20 focus:border-primary-500 outline-none transition-all"
-                  value={content}
-                  onChange={(e) => setContent(e.target.value)}
-                  placeholder="https://example.com/resource"
-                  type="url"
-                  required
-                  disabled={isLoading}
-                />
-                <LinkIcon size={18} className="absolute left-3 top-1/2 -translate-y-1/2 text-neutral-400" />
-              </div>
-            )}
+            <div className="space-y-2 p-3 bg-neutral-50 dark:bg-neutral-800/50 rounded-lg border border-neutral-200 dark:border-neutral-700">
+              {languages.map(langKey => (
+                <div key={langKey} className="flex items-start gap-2">
+                  <span className="w-10 text-xs font-bold text-neutral-500 uppercase pt-2">{langKey}</span>
+                  {isText ? (
+                    <textarea
+                      className="flex-1 rounded-lg border border-neutral-200 dark:border-neutral-600 bg-white dark:bg-neutral-700 px-3 py-2 text-sm text-neutral-900 dark:text-white focus:ring-2 focus:ring-primary-500/20 focus:border-primary-500 outline-none transition-all min-h-[100px] font-mono resize-none"
+                      value={form.contentJson[langKey] || ''}
+                      onChange={(e) => handleFieldChange('contentJson', langKey, e.target.value)}
+                      placeholder={`Контент матеріалу ${langKey === 'UA' ? 'українською' : langKey === 'PL' ? 'польською' : 'англійською'}...`}
+                      disabled={isLoading}
+                    />
+                  ) : (
+                    <input
+                      className="flex-1 rounded-lg border border-neutral-200 dark:border-neutral-600 bg-white dark:bg-neutral-700 px-3 py-2 text-sm text-neutral-900 dark:text-white focus:ring-2 focus:ring-primary-500/20 focus:border-primary-500 outline-none transition-all"
+                      value={form.urlJson[langKey] || ''}
+                      onChange={(e) => handleFieldChange('urlJson', langKey, e.target.value)}
+                      placeholder={`URL матеріалу ${langKey === 'UA' ? 'українською' : langKey === 'PL' ? 'польською' : 'англійською'}`}
+                      type="url"
+                      disabled={isLoading}
+                    />
+                  )}
+                </div>
+              ))}
+            </div>
             {!isText && (
-              <p className="text-xs text-neutral-500 mt-1.5">
+              <p className="text-xs text-neutral-500 mt-2">
                 {type.toUpperCase() === 'VIDEO' 
-                  ? 'Supported: YouTube links or direct video files (mp4, webm)' 
-                  : 'Link to an external resource or PDF file'}
+                  ? 'Підтримуються: YouTube посилання або прямі посилання на відео (mp4, webm)' 
+                  : 'Посилання на зовнішній ресурс або PDF файл'}
               </p>
             )}
           </div>

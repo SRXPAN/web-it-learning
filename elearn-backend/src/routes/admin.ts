@@ -513,7 +513,7 @@ router.get('/audit-logs', async (req: Request, res: Response) => {
 
 /**
  * GET /admin/content/topics
- * Get all topics with hierarchy for content management
+ * Get all topics with hierarchy and materials for content management
  */
 router.get('/content/topics', async (req: Request, res: Response) => {
   try {
@@ -529,6 +529,35 @@ router.get('/content/topics', async (req: Request, res: Response) => {
         category: true,
         status: true,
         parentId: true,
+        materials: {
+          where: { deletedAt: null },
+          select: {
+            id: true,
+            title: true,
+            titleJson: true,
+            type: true,
+            url: true,
+            urlJson: true,
+            content: true,
+            contentJson: true,
+            status: true,
+            lang: true,
+            createdAt: true,
+            updatedAt: true,
+          },
+          orderBy: { createdAt: 'asc' }
+        },
+        quizzes: {
+          where: { deletedAt: null },
+          select: {
+            id: true,
+            title: true,
+            durationSec: true,
+            status: true,
+            createdAt: true,
+          },
+          orderBy: { createdAt: 'asc' }
+        },
         _count: {
           select: {
             materials: true,

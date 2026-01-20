@@ -1,8 +1,8 @@
 import { useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { 
-  Flame, Target, Clock, BookOpen, Trophy, Zap, 
-  Users, Play, FileText, Award, CheckCircle 
+  Flame, Target, Clock, Zap, 
+  Play, FileText, Award, CheckCircle 
 } from 'lucide-react'
 
 import { useAuth } from '@/auth/AuthContext'

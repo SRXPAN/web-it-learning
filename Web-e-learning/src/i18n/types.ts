@@ -551,6 +551,7 @@ export type TranslationKey =
   | 'admin.allRoles'
   | 'admin.changeRole'
   | 'admin.deleteUser'
+  | 'admin.deleteUserWarning'
   | 'admin.deleteUserConfirm'
   | 'admin.noUsersFound'
   | 'admin.verified'

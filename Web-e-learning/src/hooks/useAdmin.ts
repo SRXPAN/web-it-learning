@@ -248,10 +248,33 @@ export function useAdminStats() {
 export interface AdminTopic extends TopicLite {
   slug: string
   description: string
+  descJson?: LocalizedString
   category: Category
   status: Status
   parentId: string | null
   publishedAt?: string | null
+  materials?: Array<{
+    id: string
+    title: string
+    titleJson?: LocalizedString
+    type: 'pdf' | 'video' | 'link' | 'text'
+    url?: string
+    urlJson?: LocalizedString
+    content?: string
+    contentJson?: LocalizedString
+    status: string
+    lang?: string
+    createdAt: string
+    updatedAt: string
+    isSeen?: boolean
+  }>
+  quizzes?: Array<{
+    id: string
+    title: string
+    durationSec: number
+    status: string
+    createdAt: string
+  }>
   children?: AdminTopic[]
   _count?: {
     materials: number
