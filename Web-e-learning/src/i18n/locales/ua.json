@@ -211,6 +211,7 @@
   "materials.status.subSection": "Підрозділ",
   "materials.count.materials": "Кількість матеріалів",
   "materials.empty.noMaterials": "Немає матеріалів",
+  "materials.lastUpdated": "Останнє оновлення",
 
   "quiz.title": "Тести",
   "quiz.practice": "Практика",

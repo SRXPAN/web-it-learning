@@ -423,13 +423,17 @@ router.delete(
   })
 )
 
-// GET /api/auth/leaderboard — топ користувачів
+// GET /api/auth/leaderboard — топ користувачів (тільки STUDENT, без видалених)
 router.get(
   '/leaderboard',
   requireAuth,
   asyncHandler(async (req: Request, res: Response) => {
     const limit = Math.min(parseInt(req.query.limit as string) || 50, 100)
     const users = await prisma.user.findMany({
+      where: {
+        role: 'STUDENT', // Тільки студенти, без адмінів і модераторів
+        deletedAt: null, // Без видалених акаунтів
+      },
       orderBy: { xp: 'desc' },
       take: limit,
       select: {

@@ -142,20 +142,44 @@ export default function Profile() {
     
     setAvatarLoading(true)
     try {
-      // Use FileReader for base64 (simple MVP approach)
-      const reader = new FileReader()
-      reader.onload = async () => {
-        try {
-          await api('/auth/avatar', { method: 'POST', body: JSON.stringify({ avatar: reader.result }) })
-          await refresh()
-        } catch (err) {
-          console.error(err)
-        } finally {
-          setAvatarLoading(false)
-        }
+      // Step 1: Presign upload
+      const presign = await api<{ fileId: string; uploadUrl: string }>('/files/presign-upload', {
+        method: 'POST',
+        body: JSON.stringify({
+          filename: file.name,
+          mimeType: file.type,
+          size: file.size,
+          category: 'avatars'
+        })
+      })
+
+      // Step 2: Upload to S3
+      const uploadRes = await fetch(presign.uploadUrl, {
+        method: 'PUT',
+        headers: { 'Content-Type': file.type },
+        body: file
+      })
+      
+      if (!uploadRes.ok) {
+        throw new Error('Upload to S3 failed')
       }
-      reader.readAsDataURL(file)
-    } catch {
+
+      // Step 3: Confirm upload
+      await api('/files/confirm', {
+        method: 'POST',
+        body: JSON.stringify({ fileId: presign.fileId })
+      })
+
+      // Step 4: Set as avatar
+      await api('/auth/avatar', {
+        method: 'POST',
+        body: JSON.stringify({ fileId: presign.fileId })
+      })
+
+      await refresh()
+    } catch (err) {
+      console.error(err)
+    } finally {
       setAvatarLoading(false)
     }
   }

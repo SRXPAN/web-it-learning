@@ -37,8 +37,15 @@ interface FileRecord {
 }
 
 interface FilesResponse {
-  data: FileRecord[]
-  meta: {
+  data?: FileRecord[]
+  items?: FileRecord[]
+  meta?: {
+    page: number
+    limit: number
+    total: number
+    pages: number
+  }
+  pagination?: {
     page: number
     limit: number
     total: number
@@ -94,8 +101,10 @@ export default function AdminFiles() {
       })
 
       const response = await api<FilesResponse>(`/admin/files?${params.toString()}`)
-      setFiles(response.data)
-      setPagination(response.meta)
+      const list = response.data ?? response.items ?? []
+      const pager = response.meta ?? response.pagination ?? { page, limit: 20, total: list.length, pages: 1 }
+      setFiles(list)
+      setPagination(pager)
     } catch (err: any) {
       if (!err.message?.includes('404')) {
         setError(err.message || t('common.loadFailed'))

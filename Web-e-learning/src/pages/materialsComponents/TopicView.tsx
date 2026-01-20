@@ -19,7 +19,7 @@ import {
 import { TopicQuizSection } from './TopicQuizSection'
 import type { TopicNode, Tab, Material } from './types'
 import { useTranslation } from '@/i18n/useTranslation'
-import type { Lang, LocalizedString } from '@elearn/shared'
+import type { Lang, LocalizedString, MaterialType } from '@elearn/shared'
 
 // Helper for localization
 const getLocalizedText = (json: LocalizedString | undefined | null, fallback: string, lang: Lang) => {
@@ -40,7 +40,7 @@ interface TopicViewProps {
   onAddLesson?: (topic: TopicNode) => void
   onEditLesson?: (topic: TopicNode) => void
   onDeleteLesson?: (topic: TopicNode) => void
-  onAddMaterial?: (lessonId: string, type: 'VIDEO' | 'TEXT' | 'PDF' | 'LINK') => void
+  onAddMaterial?: (lessonId: string, type: MaterialType) => void
   onEditMaterial?: (material: Material, topic: TopicNode) => void
   onDeleteMaterial?: (material: Material, topic: TopicNode) => void
   onAddQuiz?: (topic: TopicNode) => void
@@ -194,7 +194,7 @@ interface TopicSectionProps {
   onAddLesson?: (topic: TopicNode) => void
   onEditLesson?: (topic: TopicNode) => void
   onDeleteLesson?: (topic: TopicNode) => void
-  onAddMaterial?: (lessonId: string, type: 'VIDEO' | 'TEXT' | 'PDF' | 'LINK') => void
+  onAddMaterial?: (lessonId: string, type: MaterialType) => void
   onEditMaterial?: (material: Material, topic: TopicNode) => void
   onDeleteMaterial?: (material: Material, topic: TopicNode) => void
   onAddQuiz?: (topic: TopicNode) => void
@@ -348,21 +348,69 @@ function TopicSection({
       {/* Materials List */}
       <div className="p-5">
         {filteredMats.length > 0 ? (
-          <div className="grid gap-3 sm:grid-cols-2">
-            {filteredMats.map((m, index) => (
-              <MaterialCardNew
-                key={m.id}
-                material={m}
-                index={index}
-                lang={lang}
-                onOpen={onOpen}
-                isEditable={isEditable}
-                onEditMaterial={onEditMaterial}
-                onDeleteMaterial={onDeleteMaterial}
-                topic={topic}
-              />
-            ))}
-          </div>
+          isEditable && onEditMaterial && onDeleteMaterial ? (
+            <div className="space-y-3">
+              {filteredMats.map((m, index) => {
+                const title = getLocalizedText(m.titleJson, m.title, lang)
+                const typeLabel = m.type.toUpperCase()
+                return (
+                  <div
+                    key={m.id}
+                    className="flex items-center justify-between gap-3 rounded-xl border border-neutral-200 dark:border-neutral-800 bg-white dark:bg-neutral-900 p-3 shadow-sm"
+                  >
+                    <div className="flex items-start gap-3 min-w-0">
+                      <div className="px-2 py-1 rounded-lg text-[10px] font-semibold uppercase tracking-wide bg-neutral-100 dark:bg-neutral-800 text-neutral-600 dark:text-neutral-300">
+                        {typeLabel}
+                      </div>
+                      <div className="min-w-0">
+                        <div className="text-xs text-neutral-400">#{index + 1}</div>
+                        <div className="text-sm font-semibold text-neutral-900 dark:text-white truncate">
+                          {title}
+                        </div>
+                        {m.updatedAt && (
+                          <div className="text-[11px] text-neutral-500 dark:text-neutral-400">
+                            {t('materials.lastUpdated', 'Updated')}: {new Date(m.updatedAt).toLocaleDateString()}
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                    <div className="flex items-center gap-1">
+                      <button
+                        onClick={() => onEditMaterial(m, topic)}
+                        className="p-2 rounded-lg text-blue-600 hover:bg-blue-50 dark:hover:bg-blue-900/20"
+                        title={t('common.edit', 'Edit')}
+                      >
+                        <Pencil size={14} />
+                      </button>
+                      <button
+                        onClick={() => onDeleteMaterial(m, topic)}
+                        className="p-2 rounded-lg text-red-600 hover:bg-red-50 dark:hover:bg-red-900/20"
+                        title={t('common.delete', 'Delete')}
+                      >
+                        <Trash2 size={14} />
+                      </button>
+                    </div>
+                  </div>
+                )
+              })}
+            </div>
+          ) : (
+            <div className="grid gap-3 sm:grid-cols-2">
+              {filteredMats.map((m, index) => (
+                <MaterialCardNew
+                  key={m.id}
+                  material={m}
+                  index={index}
+                  lang={lang}
+                  onOpen={onOpen}
+                  isEditable={isEditable}
+                  onEditMaterial={onEditMaterial}
+                  onDeleteMaterial={onDeleteMaterial}
+                  topic={topic}
+                />
+              ))}
+            </div>
+          )
         ) : (
           <div className="py-8 text-center border-2 border-dashed border-neutral-100 dark:border-neutral-800 rounded-xl">
             <div className="inline-flex items-center justify-center w-12 h-12 rounded-full bg-neutral-50 dark:bg-neutral-800 mb-2">
@@ -377,10 +425,10 @@ function TopicSection({
         {/* Admin Add Buttons */}
         {isEditable && onAddMaterial && (
           <div className="mt-4 flex flex-wrap gap-2 justify-center pt-4 border-t border-neutral-100 dark:border-neutral-800">
-            <AddButton onClick={() => onAddMaterial(topic.id, 'TEXT')} label="Text" color="blue" />
-            <AddButton onClick={() => onAddMaterial(topic.id, 'VIDEO')} label="Video" color="pink" />
-            <AddButton onClick={() => onAddMaterial(topic.id, 'PDF')} label="PDF" color="amber" />
-            <AddButton onClick={() => onAddMaterial(topic.id, 'LINK')} label="Link" color="emerald" />
+            <AddButton onClick={() => onAddMaterial(topic.id, 'text')} label="Text" color="blue" />
+            <AddButton onClick={() => onAddMaterial(topic.id, 'video')} label="Video" color="pink" />
+            <AddButton onClick={() => onAddMaterial(topic.id, 'pdf')} label="PDF" color="amber" />
+            <AddButton onClick={() => onAddMaterial(topic.id, 'link')} label="Link" color="emerald" />
           </div>
         )}
 

@@ -146,6 +146,7 @@ export type TranslationKey =
   | 'materials.type.video'
   | 'materials.type.link'
   | 'materials.type.text'
+  | 'materials.lastUpdated'
 
   // ============================================
   // CATEGORY (10 keys)

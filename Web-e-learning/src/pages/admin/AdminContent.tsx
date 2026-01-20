@@ -16,7 +16,7 @@ import { LoadingButton } from '@/components/LoadingButton'
 import { api } from '@/lib/http'
 
 import type { TopicNode, Material } from '@/pages/materialsComponents/types'
-import type { Lang, LocalizedString, Category } from '@elearn/shared'
+import type { Lang, LocalizedString, Category, MaterialType } from '@elearn/shared'
 
 // Temporary Topic interface for the modal (before saving)
 interface TopicForm {
@@ -53,7 +53,7 @@ export default function AdminContent() {
   // Material/Quiz management
   const [showMaterialModal, setShowMaterialModal] = useState(false)
   const [materialLessonId, setMaterialLessonId] = useState<string | null>(null)
-  const [materialType, setMaterialType] = useState<string>('TEXT')
+  const [materialType, setMaterialType] = useState<MaterialType>('text')
   const [editingMaterial, setEditingMaterial] = useState<Material | null>(null)
   
   const [showQuizModal, setShowQuizModal] = useState(false)
@@ -128,7 +128,7 @@ export default function AdminContent() {
 
   // --- Material Handlers ---
 
-  const handleAddMaterial = useCallback((lessonId: string, type: string) => {
+  const handleAddMaterial = useCallback((lessonId: string, type: MaterialType) => {
     setMaterialLessonId(lessonId)
     setMaterialType(type)
     setEditingMaterial(null)
@@ -142,10 +142,10 @@ export default function AdminContent() {
     setShowMaterialModal(true)
   }, [])
 
-  const handleDeleteMaterial = useCallback(async (material: Material) => {
+  const handleDeleteMaterial = useCallback(async (material: Material, topic: TopicNode) => {
     if (!confirm(t('dialog.deleteConfirmation', 'Delete this material?'))) return
     try {
-      await api(`/editor/materials/${material.id}`, { method: 'DELETE' })
+      await api(`/editor/topics/${topic.id}/materials/${material.id}`, { method: 'DELETE' })
       fetchTopics() // Refresh list
     } catch (err) {
       console.error(err)
@@ -244,7 +244,7 @@ export default function AdminContent() {
               onDeleteLesson={handleDeleteTopic}
               onAddMaterial={handleAddMaterial}
               onEditMaterial={handleEditMaterial}
-              onDeleteMaterial={(m) => handleDeleteMaterial(m)}
+              onDeleteMaterial={(m, topic) => handleDeleteMaterial(m, topic)}
               onAddQuiz={handleAddQuiz}
             />
           ) : (

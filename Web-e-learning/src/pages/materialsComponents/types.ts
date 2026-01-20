@@ -5,6 +5,8 @@ export type { Category, QuizLite, LocalizedString }
 // Розширюємо Material для фронтенд-логіки (відстеження переглядів)
 export interface Material extends BaseMaterial {
   isSeen?: boolean
+  createdAt?: string
+  updatedAt?: string
 }
 
 // Розширюємо TopicTree для фронтенд-логіки

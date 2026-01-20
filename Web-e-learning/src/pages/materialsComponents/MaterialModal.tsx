@@ -3,29 +3,19 @@ import { X, AlignLeft, Link as LinkIcon, Video, FileText } from 'lucide-react'
 import { useTranslation } from '@/i18n/useTranslation'
 import { api } from '@/lib/http'
 import { LoadingButton } from '@/components/LoadingButton'
-import type { Material, Lang, LocalizedString } from '@elearn/shared'
+import type { Material, Lang, LocalizedString, MaterialType } from '@elearn/shared'
 
 interface MaterialModalProps {
   isOpen: boolean
   onClose: () => void
   onSave: () => void
   lessonId: string
-  type: string
+  type: MaterialType
   material?: Material | null
   lang: Lang
 }
 
-interface FormState {
-  titleJson: LocalizedString
-  contentJson: LocalizedString
-  urlJson: LocalizedString
-}
-
-const EMPTY_FORM: FormState = {
-  titleJson: { UA: '', PL: '', EN: '' },
-  contentJson: { UA: '', PL: '', EN: '' },
-  urlJson: { UA: '', PL: '', EN: '' }
-}
+const EMPTY_TRANSLATIONS: LocalizedString = { UA: '', PL: '', EN: '' }
 
 export const MaterialModal: React.FC<MaterialModalProps> = ({
   isOpen,
@@ -36,36 +26,63 @@ export const MaterialModal: React.FC<MaterialModalProps> = ({
   material
 }) => {
   const { t } = useTranslation()
-  const [form, setForm] = useState<FormState>(EMPTY_FORM)
+  const [titles, setTitles] = useState<LocalizedString>(EMPTY_TRANSLATIONS)
+  const [contents, setContents] = useState<LocalizedString>(EMPTY_TRANSLATIONS)
+  const [urls, setUrls] = useState<LocalizedString>(EMPTY_TRANSLATIONS)
   const [isLoading, setIsLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
-  const isText = type.toUpperCase() === 'TEXT'
+  const isText = type === 'text'
   const languages: Lang[] = ['UA', 'PL', 'EN']
+
+  const trimTranslations = (source: LocalizedString): LocalizedString => ({
+    UA: source.UA?.trim() || '',
+    PL: source.PL?.trim() || '',
+    EN: source.EN?.trim() || '',
+  })
+
+  const hasAnyValue = (source: LocalizedString) => Object.values(source).some(v => v?.trim())
+
+  const firstNonEmpty = (source: LocalizedString) => {
+    const order: Lang[] = ['EN', 'UA', 'PL']
+    for (const key of order) {
+      const value = source[key]
+      if (value && value.trim()) return value.trim()
+    }
+    return ''
+  }
 
   // Заповнення форми при відкритті
   useEffect(() => {
     if (isOpen) {
-      if (material) {
-        setForm({
-          titleJson: material.titleJson || EMPTY_FORM.titleJson,
-          contentJson: material.contentJson || EMPTY_FORM.contentJson,
-          urlJson: material.url ? { UA: material.url, PL: material.url, EN: material.url } : EMPTY_FORM.urlJson
-        })
-      } else {
-        setForm(EMPTY_FORM)
-      }
+      const fallbackTitle = material?.title || ''
+      setTitles({
+        UA: material?.titleJson?.UA || '',
+        PL: material?.titleJson?.PL || '',
+        EN: material?.titleJson?.EN || fallbackTitle,
+      })
+
+      const fallbackContent = material?.content || ''
+      setContents({
+        UA: material?.contentJson?.UA || '',
+        PL: material?.contentJson?.PL || '',
+        EN: material?.contentJson?.EN || fallbackContent,
+      })
+
+      const fallbackUrl = material?.url || ''
+      setUrls({
+        UA: (material as any)?.urlJson?.UA || fallbackUrl,
+        PL: (material as any)?.urlJson?.PL || fallbackUrl,
+        EN: (material as any)?.urlJson?.EN || fallbackUrl,
+      })
       setError(null)
     }
   }, [isOpen, material])
 
-  const handleFieldChange = (field: 'titleJson' | 'contentJson' | 'urlJson', langKey: Lang, value: string) => {
-    setForm(prev => ({
+  const updateTranslation = (setter: React.Dispatch<React.SetStateAction<LocalizedString>>, langKey: Lang, value: string) => {
+    setter(prev => ({
       ...prev,
-      [field]: {
-        ...prev[field],
-        [langKey]: value
-      }
+      [langKey]: value,
     }))
   }
 
@@ -74,11 +91,12 @@ export const MaterialModal: React.FC<MaterialModalProps> = ({
     setIsLoading(true)
     setError(null)
 
-    // Перевірка обов'язкових полів
-    const hasTitle = Object.values(form.titleJson).some(v => v?.trim())
-    const hasContent = isText 
-      ? Object.values(form.contentJson).some(v => v?.trim())
-      : Object.values(form.urlJson).some(v => v?.trim())
+    const normalizedTitles = trimTranslations(titles)
+    const normalizedContents = trimTranslations(contents)
+    const normalizedUrls = trimTranslations(urls)
+
+    const hasTitle = hasAnyValue(normalizedTitles)
+    const hasContent = isText ? hasAnyValue(normalizedContents) : hasAnyValue(normalizedUrls)
 
     if (!hasTitle) {
       setError('Назва матеріалу обов\'язкова на хоча б одній мові')
@@ -92,27 +110,51 @@ export const MaterialModal: React.FC<MaterialModalProps> = ({
     }
 
     try {
-      const payload: Record<string, any> = {
-        topicId: lessonId,
-        type: type.toUpperCase(),
-        titleJson: form.titleJson
-      }
-
-      if (isText) {
-        payload.contentJson = form.contentJson
-      } else {
-        payload.urlJson = form.urlJson
-      }
+      const fallbackTitle = firstNonEmpty(normalizedTitles)
 
       if (material?.id) {
-        // Редагування
+        const updatePayload: Record<string, unknown> = {
+          type,
+          titleEN: normalizedTitles.EN,
+          titleUA: normalizedTitles.UA,
+          titlePL: normalizedTitles.PL,
+        }
+
+        if (isText) {
+          updatePayload.contentEN = normalizedContents.EN
+          updatePayload.contentUA = normalizedContents.UA
+          updatePayload.contentPL = normalizedContents.PL
+        } else {
+          updatePayload.linkEN = normalizedUrls.EN
+          updatePayload.linkUA = normalizedUrls.UA
+          updatePayload.linkPL = normalizedUrls.PL
+          updatePayload.urlEN = normalizedUrls.EN
+          updatePayload.urlUA = normalizedUrls.UA
+          updatePayload.urlPL = normalizedUrls.PL
+        }
+
         await api(`/editor/materials/${material.id}`, {
           method: 'PUT',
-          body: JSON.stringify(payload)
+          body: JSON.stringify(updatePayload)
         })
       } else {
-        // Створення
-        await api('/editor/materials', {
+        const payload: Record<string, unknown> = {
+          title: fallbackTitle,
+          titleJson: normalizedTitles,
+          type,
+          lang: 'EN',
+          topicId: lessonId,
+        }
+
+        if (isText) {
+          payload.content = firstNonEmpty(normalizedContents)
+          payload.contentJson = normalizedContents
+        } else {
+          payload.url = firstNonEmpty(normalizedUrls)
+          payload.urlJson = normalizedUrls
+        }
+
+        await api(`/editor/topics/${lessonId}/materials`, {
           method: 'POST',
           body: JSON.stringify(payload)
         })
@@ -139,7 +181,7 @@ export const MaterialModal: React.FC<MaterialModalProps> = ({
 
   if (!isOpen) return null
 
-  const Icon = isText ? AlignLeft : type.toUpperCase() === 'VIDEO' ? Video : type.toUpperCase() === 'PDF' ? FileText : LinkIcon
+  const Icon = isText ? AlignLeft : type === 'video' ? Video : type === 'pdf' ? FileText : LinkIcon
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4 animate-in fade-in duration-200">
@@ -184,8 +226,8 @@ export const MaterialModal: React.FC<MaterialModalProps> = ({
                   <span className="w-10 text-xs font-bold text-neutral-500 uppercase">{langKey}</span>
                   <input
                     className="flex-1 rounded-lg border border-neutral-200 dark:border-neutral-600 bg-white dark:bg-neutral-700 px-3 py-2 text-sm text-neutral-900 dark:text-white focus:ring-2 focus:ring-primary-500/20 focus:border-primary-500 outline-none transition-all"
-                    value={form.titleJson[langKey] || ''}
-                    onChange={(e) => handleFieldChange('titleJson', langKey, e.target.value)}
+                    value={titles[langKey] || ''}
+                    onChange={(e) => updateTranslation(setTitles, langKey, e.target.value)}
                     placeholder={`Назва матеріалу ${langKey === 'UA' ? 'українською' : langKey === 'PL' ? 'польською' : 'англійською'}`}
                     disabled={isLoading}
                   />
@@ -207,16 +249,16 @@ export const MaterialModal: React.FC<MaterialModalProps> = ({
                   {isText ? (
                     <textarea
                       className="flex-1 rounded-lg border border-neutral-200 dark:border-neutral-600 bg-white dark:bg-neutral-700 px-3 py-2 text-sm text-neutral-900 dark:text-white focus:ring-2 focus:ring-primary-500/20 focus:border-primary-500 outline-none transition-all min-h-[100px] font-mono resize-none"
-                      value={form.contentJson[langKey] || ''}
-                      onChange={(e) => handleFieldChange('contentJson', langKey, e.target.value)}
+                      value={contents[langKey] || ''}
+                      onChange={(e) => updateTranslation(setContents, langKey, e.target.value)}
                       placeholder={`Контент матеріалу ${langKey === 'UA' ? 'українською' : langKey === 'PL' ? 'польською' : 'англійською'}...`}
                       disabled={isLoading}
                     />
                   ) : (
                     <input
                       className="flex-1 rounded-lg border border-neutral-200 dark:border-neutral-600 bg-white dark:bg-neutral-700 px-3 py-2 text-sm text-neutral-900 dark:text-white focus:ring-2 focus:ring-primary-500/20 focus:border-primary-500 outline-none transition-all"
-                      value={form.urlJson[langKey] || ''}
-                      onChange={(e) => handleFieldChange('urlJson', langKey, e.target.value)}
+                      value={urls[langKey] || ''}
+                      onChange={(e) => updateTranslation(setUrls, langKey, e.target.value)}
                       placeholder={`URL матеріалу ${langKey === 'UA' ? 'українською' : langKey === 'PL' ? 'польською' : 'англійською'}`}
                       type="url"
                       disabled={isLoading}
@@ -227,7 +269,7 @@ export const MaterialModal: React.FC<MaterialModalProps> = ({
             </div>
             {!isText && (
               <p className="text-xs text-neutral-500 mt-2">
-                {type.toUpperCase() === 'VIDEO' 
+                {type === 'video' 
                   ? 'Підтримуються: YouTube посилання або прямі посилання на відео (mp4, webm)' 
                   : 'Посилання на зовнішній ресурс або PDF файл'}
               </p>

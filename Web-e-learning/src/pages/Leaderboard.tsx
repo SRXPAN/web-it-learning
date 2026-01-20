@@ -117,13 +117,14 @@ export default function Leaderboard() {
         </div>
       </div>
 
-      {/* Top 3 Podium (Only show if we have at least 3 users) */}
+      {/* Top 3 Podium with Crowns (Only show if we have at least 3 users) */}
       {leaderboard.length >= 3 && (
-        <div className="relative pt-8 pb-4 px-4">
+        <div className="relative pt-8 pb-8 px-4 border-b border-neutral-200 dark:border-neutral-800">
           <div className="flex items-end justify-center gap-4 sm:gap-8 text-center">
             
-            {/* 2nd Place */}
+            {/* 2nd Place - Silver Crown */}
             <div className="flex flex-col items-center order-1 w-24 sm:w-32 group">
+              <Medal className="text-slate-400 mb-2" size={28} style={{ filter: 'drop-shadow(0 0 8px rgba(100,116,139,0.4))' }} />
               <div className="relative mb-3">
                 <div className="w-16 h-16 sm:w-20 sm:h-20 rounded-full bg-gradient-to-br from-slate-200 to-slate-300 dark:from-slate-700 dark:to-slate-600 flex items-center justify-center shadow-xl ring-4 ring-white dark:ring-neutral-900 z-10 relative group-hover:scale-105 transition-transform duration-300">
                   <span className="text-2xl font-bold text-slate-600 dark:text-slate-200">2</span>
@@ -140,9 +141,9 @@ export default function Leaderboard() {
               </p>
             </div>
             
-            {/* 1st Place */}
+            {/* 1st Place - Gold Crown */}
             <div className="flex flex-col items-center order-0 w-28 sm:w-40 z-10 -mt-8 group">
-              <Crown className="text-yellow-500 mb-2 animate-bounce" size={32} />
+              <Crown className="text-yellow-500 mb-2 animate-bounce drop-shadow-lg" size={40} />
               <div className="relative mb-4">
                 <div className="w-20 h-20 sm:w-24 sm:h-24 rounded-full bg-gradient-to-br from-yellow-300 to-amber-500 flex items-center justify-center shadow-xl shadow-amber-500/20 ring-4 ring-white dark:ring-neutral-900 z-10 relative group-hover:scale-105 transition-transform duration-300">
                   <span className="text-4xl font-bold text-white">1</span>
@@ -159,8 +160,9 @@ export default function Leaderboard() {
               </p>
             </div>
             
-            {/* 3rd Place */}
+            {/* 3rd Place - Bronze Crown */}
             <div className="flex flex-col items-center order-2 w-24 sm:w-32 group">
+              <Trophy className="text-orange-700 mb-2" size={28} style={{ filter: 'drop-shadow(0 0 8px rgba(180,83,9,0.4))' }} />
               <div className="relative mb-3">
                 <div className="w-16 h-16 sm:w-20 sm:h-20 rounded-full bg-gradient-to-br from-orange-300 to-amber-700 flex items-center justify-center shadow-xl ring-4 ring-white dark:ring-neutral-900 z-10 relative group-hover:scale-105 transition-transform duration-300">
                   <span className="text-2xl font-bold text-white/90">3</span>
@@ -180,7 +182,7 @@ export default function Leaderboard() {
         </div>
       )}
 
-      {/* List */}
+      {/* List (Starting from 4th place onwards - Top 3 only on podium) */}
       <div className="card p-0 overflow-hidden border border-neutral-200 dark:border-neutral-800 shadow-sm">
         <div className="overflow-x-auto">
           <table className="w-full">
@@ -194,7 +196,7 @@ export default function Leaderboard() {
               </tr>
             </thead>
             <tbody className="divide-y divide-neutral-100 dark:divide-neutral-800">
-              {leaderboard.map((u) => {
+              {leaderboard.filter(u => u.rank > 3).map((u) => {
                 const isCurrentUser = user && u.id === user.id
                 return (
                   <tr 

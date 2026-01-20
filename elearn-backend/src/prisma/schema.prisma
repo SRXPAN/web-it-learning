@@ -30,6 +30,7 @@ model User {
   refreshTokens    RefreshToken[]
   filesUploaded    File[]         @relation("FileUploader")
   auditLogs        AuditLog[]
+  dailyGoals       DailyGoalTemplate[]
 
   @@index([role])
   @@index([createdAt])
@@ -94,7 +95,7 @@ model Material {
   titleCache    Json?        // {"UA": "...", "EN": "..."}
   type          MaterialType
   url           String?      // Fallback URL (EN)
-  urlJson       Json?        // {"UA": "s3/file_ua.pdf", "EN": "s3/file_en.pdf"}
+  urlJson       Json?        @map("urlCache") // {"UA": "s3/file_ua.pdf", "EN": "s3/file_en.pdf"}
   fileId        String?      // Reference to File for pdf/video/image
   file          File?        @relation(fields: [fileId], references: [id])
   content       String?      // Fallback content (EN)
