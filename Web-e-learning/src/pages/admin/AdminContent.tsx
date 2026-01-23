@@ -11,6 +11,7 @@ import { useAdminContent } from '@/hooks/useAdmin'
 import { ConfirmDialog } from '@/components/ConfirmDialog'
 import { TopicSidebar, TopicView, MaterialModal } from '@/pages/materialsComponents'
 import { QuizModal } from '@/pages/materialsComponents/QuizModal'
+import EditQuizModal from '@/pages/materialsComponents/EditQuizModal'
 import { SkeletonDashboard } from '@/components/Skeletons'
 import { LoadingButton } from '@/components/LoadingButton'
 import { api } from '@/lib/http'
@@ -58,6 +59,7 @@ export default function AdminContent() {
   
   const [showQuizModal, setShowQuizModal] = useState(false)
   const [quizTopicId, setQuizTopicId] = useState<string | null>(null)
+  const [editQuizId, setEditQuizId] = useState<string | null>(null)
 
   // Transform topics tree for student view (TopicNode)
   const topicsAsNodes = useMemo((): TopicNode[] => {
@@ -226,6 +228,7 @@ export default function AdminContent() {
         {/* Main Content Area */}
         <div className="flex-1 bg-gray-50 dark:bg-neutral-900/30 rounded-3xl border-2 border-dashed border-gray-200 dark:border-gray-800 p-4 md:p-6 lg:p-8 min-h-[600px]">
           {activeTopic ? (
+            <>
             <TopicView
               activeTopic={activeTopic}
               activeSub={activeSub}
@@ -247,6 +250,41 @@ export default function AdminContent() {
               onDeleteMaterial={(m, topic) => handleDeleteMaterial(m, topic)}
               onAddQuiz={handleAddQuiz}
             />
+            {/* Admin Quiz Management */}
+            <div className="mt-6 space-y-3">
+              <h3 className="text-sm font-semibold text-neutral-700 dark:text-neutral-300">Quizzes</h3>
+              <div className="space-y-2">
+                {((activeSub || activeTopic)?.quizzes || []).length === 0 ? (
+                  <div className="text-xs text-neutral-500 dark:text-neutral-400">No quizzes yet</div>
+                ) : (
+                  (activeSub || activeTopic)!.quizzes!.map((q) => (
+                    <div key={q.id} className="flex items-center justify-between rounded-xl border border-neutral-200 dark:border-neutral-800 p-3 bg-white dark:bg-neutral-900">
+                      <div className="text-sm font-medium text-neutral-900 dark:text-white">{q.title}</div>
+                      <div className="flex items-center gap-2">
+                        <button
+                          onClick={() => setEditQuizId(q.id)}
+                          className="px-3 py-1.5 text-xs rounded-lg bg-neutral-100 dark:bg-neutral-800 hover:bg-neutral-200 dark:hover:bg-neutral-700"
+                        >
+                          {t('common.edit', 'Edit')}
+                        </button>
+                        <button
+                          onClick={async () => {
+                            try {
+                              await api(`/editor/topics/${(activeSub || activeTopic)!.id}/quizzes/${q.id}`, { method: 'DELETE' })
+                              fetchTopics()
+                            } catch (err) { console.error(err) }
+                          }}
+                          className="px-3 py-1.5 text-xs rounded-lg bg-red-50 text-red-600 hover:bg-red-100 dark:bg-red-900/20 dark:text-red-400"
+                        >
+                          {t('common.delete', 'Delete')}
+                        </button>
+                      </div>
+                    </div>
+                  ))
+                )}
+              </div>
+            </div>
+            </>
           ) : (
             <div className="flex flex-col items-center justify-center h-full text-gray-400 dark:text-gray-500 py-20">
               <BookOpen size={48} className="mb-4 opacity-20" />
@@ -261,6 +299,7 @@ export default function AdminContent() {
               </button>
             </div>
           )}
+          
         </div>
       </div>
 
@@ -324,6 +363,16 @@ export default function AdminContent() {
             setQuizTopicId(null)
             fetchTopics()
           }}
+        />
+      )}
+
+      {/* Edit Quiz Modal */}
+      {editQuizId && (
+        <EditQuizModal
+          quizId={editQuizId}
+          topicId={(activeSub || activeTopic)?.id || ''}
+          onClose={() => setEditQuizId(null)}
+          onSave={() => { setEditQuizId(null); fetchTopics() }}
         />
       )}
     </div>

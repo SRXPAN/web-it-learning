@@ -45,10 +45,10 @@ export default function AdminUsers() {
     fetchUsers,
     updateRole,
     deleteUser,
+    verifyUser,
   } = useAdminUsers()
   
   // Stub functions for features not yet implemented
-  const verifyUser = async (_id: string) => { throw new Error('Not implemented') }
   const createUser = async (_data: { email: string; name: string; password: string; role: Role }) => { throw new Error('Not implemented') }
 
   const [search, setSearch] = useState('')

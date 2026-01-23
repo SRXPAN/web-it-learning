@@ -35,8 +35,12 @@ export default function Materials() {
   // Reserved for text material viewer modal in the future
   const [_selectedMaterial, setSelectedMaterial] = useState<Material | null>(null)
   
-  // Load topics on mount/lang change
+  // Load topics on mount/lang change (force fresh data)
   useEffect(() => {
+    // Ensure we always fetch fresh topics when visiting this page
+    try {
+      useCatalogStore.getState().invalidateTopics()
+    } catch {}
     loadTopics(lang as 'UA' | 'PL' | 'EN')
   }, [loadTopics, lang])
 
@@ -130,25 +134,53 @@ export default function Materials() {
   }, [tab, query])
 
   const handleOpenMaterial = useCallback(async (material: Material) => {
-    // Mark material as seen and open it
+    // Optimistically mark material as seen in local state
+    useCatalogStore.getState().markMaterialAsSeen(material.id)
+    
+    // Mark material as seen on backend
     try {
-      await api('/progress/material', {
+      await api('/progress/viewed', {
         method: 'POST',
         body: JSON.stringify({ materialId: material.id })
       })
-      // Reload topics to update progress bars
-      loadTopics(lang as 'UA' | 'PL' | 'EN')
     } catch (e) {
       console.error('Failed to mark material as complete', e)
+      // Reload topics to ensure consistency if API call failed
+      useCatalogStore.getState().invalidateTopics()
+      loadTopics(lang as 'UA' | 'PL' | 'EN')
     }
     
     // Open material based on type
     const url = material.url || material.content
-    if (url && (material.type === 'link' || material.type === 'pdf' || material.type === 'video')) {
+    if (material.type === 'text') {
+      // For text materials, open content in new window/tab
+      if (url) {
+        const newWindow = window.open('', '_blank')
+        if (newWindow) {
+          newWindow.document.write(`
+            <!DOCTYPE html>
+            <html>
+              <head>
+                <meta charset="utf-8">
+                <title>${material.title}</title>
+                <style>
+                  body { font-family: system-ui; max-width: 800px; margin: 40px auto; padding: 20px; line-height: 1.6; }
+                  h1 { color: #333; }
+                </style>
+              </head>
+              <body>
+                <h1>${material.title}</h1>
+                <div>${url}</div>
+              </body>
+            </html>
+          `)
+          newWindow.document.close()
+        }
+      }
+      setSelectedMaterial(material)
+    } else if (url && (material.type === 'link' || material.type === 'pdf' || material.type === 'video')) {
       window.open(url, '_blank')
     }
-    // For text materials, they can be viewed inline in TopicView
-    setSelectedMaterial(material)
   }, [loadTopics, lang])
 
   return (

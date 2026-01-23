@@ -36,7 +36,9 @@ export function TopicQuizSection({
 }: TopicQuizSectionProps) {
   const { t } = useTranslation()
   const [quiz, setQuiz] = useState<Quiz | null>(null)
+  const [quizToken, setQuizToken] = useState<string | null>(null)
   const [loading, setLoading] = useState(false)
+  const [error, setError] = useState<string | null>(null)
   
   // Quiz Session State
   const [quizStarted, setQuizStarted] = useState(false)
@@ -48,6 +50,16 @@ export function TopicQuizSection({
   const [showResults, setShowResults] = useState(false)
   const [score, setScore] = useState(0)
   const [_correctIds, setCorrectIds] = useState<Record<string, string>>({})
+
+  // Filter duplicate quizzes (by ID) - defensive programming
+  const uniqueQuizzes = useMemo(() => {
+    const seen = new Set<string>()
+    return quizzes.filter(q => {
+      if (seen.has(q.id)) return false
+      seen.add(q.id)
+      return true
+    })
+  }, [quizzes])
 
   // Determine UI state
   const quizState: QuizState = useMemo(() => {
@@ -76,12 +88,16 @@ export function TopicQuizSection({
 
   const loadQuiz = useCallback(async (quizId: string) => {
     setLoading(true)
+    setError(null)
     try {
-      const data = await api<Quiz>(`/quizzes/${quizId}?lang=${lang}`)
+      const data = await api<Quiz & { token: string }>(`/quiz/${quizId}?lang=${lang}`)
       setQuiz(data)
+      setQuizToken(data.token)
       setTimeLeft(data.durationSec)
     } catch (e) {
+      const errorMsg = e instanceof Error ? e.message : 'Failed to load quiz'
       console.error('Failed to load quiz:', e)
+      setError(errorMsg)
     } finally {
       setLoading(false)
     }
@@ -102,7 +118,7 @@ export function TopicQuizSection({
   }, [])
 
   const handleSubmit = useCallback(async () => {
-    if (!quiz) return
+    if (!quiz || !quizToken) return
 
     const answerArray = Object.entries(answers).map(([questionId, optionId]) => ({
       questionId,
@@ -113,10 +129,14 @@ export function TopicQuizSection({
       setLoading(true)
       // Submit attempt
       const result = await api<{ correct: number, correctMap: Record<string, string>, passed: boolean }>(
-        `/quizzes/${quiz.id}/submit`, 
+        `/quiz/${quiz.id}/submit`, 
         {
           method: 'POST',
-          body: JSON.stringify({ answers: answerArray })
+          body: JSON.stringify({ 
+            token: quizToken,
+            answers: answerArray,
+            lang 
+          })
         }
       )
       
@@ -130,18 +150,21 @@ export function TopicQuizSection({
       }
     } catch (e) {
       console.error('Failed to submit quiz:', e)
+      setError(e instanceof Error ? e.message : 'Failed to submit quiz')
     } finally {
       setLoading(false)
     }
-  }, [quiz, answers, onQuizComplete])
+  }, [quiz, quizToken, answers, lang, onQuizComplete])
 
   const resetQuiz = useCallback(() => {
     setQuiz(null)
+    setQuizToken(null)
     setQuizStarted(false)
     setShowResults(false)
     setAnswers({})
     setScore(0)
     setCurrentQuestion(0)
+    setError(null)
   }, [])
 
   const formatTime = (seconds: number) => {
@@ -209,14 +232,19 @@ export function TopicQuizSection({
         {/* 2. Ready State (List or Preview) */}
         {quizState === 'ready' && !quiz && (
           <div className="space-y-3">
-            {quizzes.map((q) => {
+            {error && (
+              <div className="p-3 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-lg text-sm text-red-600 dark:text-red-400">
+                {error}
+              </div>
+            )}
+            {uniqueQuizzes.map((q) => {
               const quizTitle = getLocalizedText(q.titleJson, q.title, lang)
               return (
                 <button
                   key={q.id}
                   onClick={() => loadQuiz(q.id)}
                   disabled={loading}
-                  className="w-full flex items-center justify-between p-4 rounded-xl border border-neutral-200 dark:border-neutral-800 hover:border-primary-500 dark:hover:border-primary-500 hover:bg-primary-50/50 dark:hover:bg-primary-900/10 transition-all group text-left"
+                  className="w-full flex items-center justify-between p-4 rounded-xl border border-neutral-200 dark:border-neutral-800 hover:border-primary-500 dark:hover:border-primary-500 hover:bg-primary-50/50 dark:hover:bg-primary-900/10 transition-all group text-left disabled:opacity-50 disabled:cursor-not-allowed"
                 >
                   <div className="flex items-center gap-3">
                     <div className="p-2 bg-primary-100 dark:bg-primary-900/30 rounded-lg text-primary-600 dark:text-primary-400">

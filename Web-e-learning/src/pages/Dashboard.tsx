@@ -19,9 +19,13 @@ import {
 
 // Типи даних, які очікуємо від бекенду
 interface DashboardData {
+  userXp: number;
   stats: {
-    streak: { current: number; longest: number; history: boolean[] };
-    activity: { timeSpent: number; quizAttempts: number }; // за 7 днів
+    streak: { current: number; longest: number; lastActiveDate: Date | null; history: boolean[] };
+    activity: { 
+      timeSpent: number; 
+      quizAttempts: number;
+    };
   };
   recentTopics: Array<{
     id: string;
@@ -44,6 +48,7 @@ interface DashboardData {
   achievements: Array<{
     id: string;
     name: string;
+    description: string;
     earned: boolean;
   }>;
 }
@@ -253,7 +258,7 @@ export default function Dashboard() {
             </div>
           )}
 
-          {/* 3. Daily Goals */}
+          {/* Daily Goals */}
           <div className="card">
             <div className="flex items-center gap-3 mb-5">
               <div className="p-2 bg-green-100 dark:bg-green-900/30 rounded-lg text-green-600 dark:text-green-400">
@@ -301,7 +306,7 @@ export default function Dashboard() {
             </ul>
           </div>
 
-          {/* 4. Weak Spots */}
+          {/* 5. Weak Spots */}
           {data.weakSpots.length > 0 && (
             <div className="card bg-gradient-to-br from-white to-red-50/30 dark:from-neutral-900 dark:to-red-900/10 border-red-100 dark:border-red-900/20">
               <div className="flex items-center gap-2 mb-4">

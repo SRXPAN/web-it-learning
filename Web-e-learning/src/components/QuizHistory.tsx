@@ -1,7 +1,6 @@
 import { useEffect, useState } from 'react'
 import { http } from '@/lib/http'
-import { Clock, CheckCircle, XCircle, History, ArrowRight } from 'lucide-react'
-import { Link } from 'react-router-dom'
+import { Clock, CheckCircle, XCircle, History } from 'lucide-react'
 import { useTranslation } from '@/i18n/useTranslation'
 import { useAuth } from '@/auth/AuthContext'
 import { EmptyQuizHistory } from './EmptyState'
@@ -128,20 +127,13 @@ export default function QuizHistory() {
 
   return (
     <div className="card">
-      <div className="flex items-center justify-between mb-6">
+      <div className="flex items-center mb-6">
         <div className="flex items-center gap-2">
           <div className="p-2 bg-primary-100 dark:bg-primary-900/30 rounded-lg text-primary-600 dark:text-primary-400">
             <History size={20} />
           </div>
           <h3 className="text-lg font-display font-semibold">{t('dashboard.recentActivity', 'Recent Activity')}</h3>
         </div>
-        <Link 
-          to="/quiz" 
-          className="text-sm font-medium text-primary-600 hover:text-primary-700 dark:text-primary-400 flex items-center gap-1 hover:underline"
-        >
-          {t('dashboard.allQuizzes', 'All Quizzes')} 
-          <ArrowRight size={14} />
-        </Link>
       </div>
 
       <div className="space-y-4">

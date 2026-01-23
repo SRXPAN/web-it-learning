@@ -42,7 +42,8 @@ router.get(
       category: category as any,
       lang: lang.toUpperCase(), // Service expects uppercase
       isStaff,
-      search
+      search,
+      userId: req.user?.id  // Pass user ID to load viewed materials
     })
 
     return ok(res, result)
@@ -66,6 +67,7 @@ router.get(
       limit: 1000,
       lang: lang.toUpperCase(),
       isStaff,
+      userId: req.user?.id  // Pass user ID to load viewed materials
     })
 
     return ok(res, result.topics)
@@ -90,7 +92,7 @@ router.get(
     const isStaff = ['ADMIN', 'EDITOR'].includes(req.user?.role || '')
 
     // Get topic with validation
-    const topic = await getTopicByIdOrSlug(slug, lang.toUpperCase(), isStaff)
+    const topic = await getTopicByIdOrSlug(slug, lang.toUpperCase(), isStaff, req.user?.id)
 
     if (!topic) {
       throw AppError.notFound(`Topic '${slug}' not found`)

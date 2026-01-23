@@ -1,101 +1,179 @@
 // src/routes/dashboard.ts
-import { Router } from 'express'
+import { Router, Request, Response } from 'express'
 import { prisma } from '../db.js'
 import { requireAuth } from '../middleware/auth.js'
-import { AppError } from '../utils/AppError.js'
+import { asyncHandler } from '../middleware/errorHandler.js'
+import {
+  calculateStreak,
+  getRecentActivity,
+  getViewedMaterialIds,
+} from '../services/progress.service.js'
+import type { Lang } from '@elearn/shared'
 
 const router = Router()
 
 /**
  * GET /api/dashboard/summary?lang=EN
- * Returns dashboard data for authenticated user
+ * Returns dashboard data for authenticated user with REAL streak & progress data
  */
-router.get('/summary', requireAuth, async (req, res, next) => {
-  try {
-    const userId = req.user!.id
-    const lang = (req.query.lang as string) || 'EN'
+router.get('/summary', requireAuth, asyncHandler(async (req: Request, res: Response) => {
+  const userId = req.user!.id
+  const lang = (req.query.lang as string || 'EN') as Lang
 
-    // Get user's activity
-    const activities = await prisma.userActivity.findMany({
-      where: { userId },
-      orderBy: { date: 'desc' },
-      take: 7
-    })
+  // 0. Get user info (for XP)
+  const user = await prisma.user.findUnique({
+    where: { id: userId },
+    select: { xp: true }
+  })
+  const userXp = user?.xp ?? 0
 
-    // Get quiz attempts
-    const quizAttempts = await prisma.quizAttempt.findMany({
-      where: { userId },
-      orderBy: { createdAt: 'desc' },
-      take: 10
-    })
+  // 1. Get REAL streak data (not hardcoded)
+  const streakData = await calculateStreak(userId)
+  
+  // 2. Get recent activity (last 7 days)
+  const activities = await getRecentActivity(userId, 7)
+  const totalTimeSpent = activities.reduce((sum, a) => sum + a.timeSpent, 0)
+  const totalQuizAttempts = activities.reduce((sum, a) => sum + a.quizAttempts, 0)
 
-    // Get viewed materials
-    const viewedMaterials = await prisma.materialView.findMany({
-      where: { userId },
-      select: { materialId: true }
-    })
+  // 3. Get viewed materials for progress calculation
+  const viewedMaterialIds = new Set(await getViewedMaterialIds(userId))
 
-    // Calculate stats
-    const totalTopics = await prisma.topic.count({ where: { status: 'Published' } })
-    const viewedMaterialIds = new Set(viewedMaterials.map(v => v.materialId))
-    
-    // Calculate time spent in last 7 days
-    const totalTimeSpent = activities.reduce((sum, a) => sum + a.timeSpent, 0)
-    const totalQuizAttempts = activities.reduce((sum, a) => sum + a.quizAttempts, 0)
+  // 4. Get recent topics with REAL progress calculation
+  const recentViews = await prisma.materialView.findMany({
+    where: { userId },
+    orderBy: { viewedAt: 'desc' },
+    take: 50,
+    select: { materialId: true, viewedAt: true },
+  })
 
-    // Streak calculation (simplified)
+  if (recentViews.length === 0) {
+    // Generate empty 7-day history
     const today = new Date()
-    const streak = {
-      current: activities.length > 0 ? Math.min(activities.length, 7) : 0,
-      longest: activities.length,
-      history: [true, true, false, true, true, true, false] // placeholder
+    today.setUTCHours(0, 0, 0, 0)
+    const history: boolean[] = []
+    for (let i = 6; i >= 0; i--) {
+      const checkDate = new Date(today)
+      checkDate.setDate(checkDate.getDate() - i)
+      history.push(false)
     }
-
-    // Daily goals (placeholder)
-    const dailyGoals = [
-      { id: '1', text: 'Complete 1 lesson', isCompleted: false },
-      { id: '2', text: 'Score 80%+ on quiz', isCompleted: false },
-      { id: '3', text: 'Study 30 minutes', isCompleted: false }
-    ]
-
-    // Recent topics (simplified)
-    const recentTopics = await prisma.topic.findMany({
-      where: { status: 'Published' },
-      take: 4,
-      orderBy: { createdAt: 'desc' },
-      include: {
-        materials: {
-          select: { id: true }
-        }
-      }
-    })
-
-    const formattedTopics = recentTopics.map(topic => ({
-      id: topic.id,
-      name: topic.name,
-      slug: topic.slug,
-      progress: 0,
-      totalMaterials: topic.materials.length,
-      viewedMaterials: topic.materials.filter(m => viewedMaterialIds.has(m.id)).length
-    }))
-
-    res.json({
+    
+    return res.json({
+      userXp,
       stats: {
-        streak,
-        activity: {
-          timeSpent: totalTimeSpent,
-          quizAttempts: totalQuizAttempts
+        streak: { ...streakData, history },
+        activity: { 
+          timeSpent: 0, 
+          quizAttempts: 0
         }
       },
-      recentTopics: formattedTopics,
-      dailyGoals,
+      recentTopics: [],
+      dailyGoals: [],
       weakSpots: [],
       tipOfTheDay: 'Practice makes perfect! Keep learning every day.',
-      achievements: []
+      achievements: [
+        { id: 'first_material', name: 'First Steps', description: 'View your first material', earned: false },
+        { id: 'quiz_master', name: 'Quiz Master', description: 'Complete 5 quizzes', earned: false },
+        { id: 'streak_7', name: '7-Day Streak', description: 'Maintain a 7-day streak', earned: false }
+      ]
     })
-  } catch (error) {
-    next(error)
   }
-})
+
+  // Get materials to identify topics
+  const materials = await prisma.material.findMany({
+    where: { id: { in: recentViews.map(v => v.materialId) } },
+    select: { id: true, topicId: true }
+  })
+
+  // Extract unique topics (preserving recency)
+  const uniqueTopicIds = new Set<string>()
+  const topicLastViewedMap = new Map<string, Date>()
+
+  for (const view of recentViews) {
+    const mat = materials.find(m => m.id === view.materialId)
+    if (mat && mat.topicId) {
+      if (!uniqueTopicIds.has(mat.topicId)) {
+        uniqueTopicIds.add(mat.topicId)
+        topicLastViewedMap.set(mat.topicId, view.viewedAt)
+      }
+    }
+    if (uniqueTopicIds.size >= 4) break
+  }
+
+  // Fetch topic details
+  const topicsData = await prisma.topic.findMany({
+    where: { id: { in: Array.from(uniqueTopicIds) } },
+    select: {
+      id: true,
+      name: true,
+      nameJson: true,
+      slug: true,
+      materials: { select: { id: true } }
+    }
+  })
+
+  const recentTopics = topicsData
+    .map(topic => {
+      const viewedCount = topic.materials.filter(m => viewedMaterialIds.has(m.id)).length
+      const totalCount = topic.materials.length
+      const progress = totalCount > 0 ? Math.round((viewedCount / totalCount) * 100) : 0
+
+      return {
+        id: topic.id,
+        name: topic.name,
+        nameJson: topic.nameJson,
+        slug: topic.slug,
+        progress,
+        totalMaterials: totalCount,
+        viewedMaterials: viewedCount,
+        lastViewedAt: topicLastViewedMap.get(topic.id) || new Date(0)
+      }
+    })
+    .sort((a, b) => b.lastViewedAt.getTime() - a.lastViewedAt.getTime())
+
+  // Generate 7-day history for streak visualization
+  const today = new Date()
+  today.setUTCHours(0, 0, 0, 0)
+  const activityDates = new Set(activities.map(a => new Date(a.date).toISOString().split('T')[0]))
+  
+  const history: boolean[] = []
+  for (let i = 6; i >= 0; i--) {
+    const checkDate = new Date(today)
+    checkDate.setDate(checkDate.getDate() - i)
+    const dateStr = checkDate.toISOString().split('T')[0]
+    history.push(activityDates.has(dateStr))
+  }
+
+  // Daily goals (for now, placeholder)
+  const dailyGoals = [
+    { id: '1', text: 'Complete 1 lesson', isCompleted: false },
+    { id: '2', text: 'Score 80%+ on quiz', isCompleted: false },
+    { id: '3', text: 'Study 30 minutes', isCompleted: false }
+  ]
+
+  res.json({
+    userXp,
+    stats: {
+      streak: {
+        current: streakData.current,
+        longest: streakData.longest,
+        lastActiveDate: streakData.lastActiveDate,
+        history
+      },
+      activity: {
+        timeSpent: totalTimeSpent,
+        quizAttempts: totalQuizAttempts
+      }
+    },
+    recentTopics,
+    dailyGoals,
+    weakSpots: [],
+    tipOfTheDay: 'Practice makes perfect! Keep learning every day.',
+    achievements: [
+      { id: 'first_material', name: 'First Steps', description: 'View your first material', earned: totalTimeSpent > 0 },
+      { id: 'quiz_master', name: 'Quiz Master', description: 'Complete 5 quizzes', earned: totalQuizAttempts >= 5 },
+      { id: 'streak_7', name: '7-Day Streak', description: 'Maintain a 7-day streak', earned: streakData.current >= 7 }
+    ]
+  })
+}))
 
 export default router

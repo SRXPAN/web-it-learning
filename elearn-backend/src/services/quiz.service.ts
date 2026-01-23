@@ -4,6 +4,7 @@ import jwt from 'jsonwebtoken'
 import { getJwtSecret } from '../utils/env.js'
 import type { Lang } from '@elearn/shared'
 import { logger } from '../utils/logger.js'
+import { updateDailyActivity } from './progress.service.js'
 
 /**
  * Helper to get localized value from JSON field
@@ -82,6 +83,8 @@ export async function submitQuizAttempt(
   answers: Array<{ questionId: string; optionId?: string }>,
   lang?: Lang
 ) {
+  logger.info(`[submitQuizAttempt] Starting quiz submission for user ${userId}, quiz ${quizId}`)
+  
   // Verify quiz token
   let quizPayload: any
   try {
@@ -177,6 +180,8 @@ export async function submitQuizAttempt(
         xpEarned,
       },
     })
+    
+    logger.info(`[submitQuizAttempt] Created quiz attempt ${attempt.id} for user ${userId}, quiz ${quizId}. Score: ${correctCount}/${quiz.questions.length}`)
 
     if (rows.length) {
       const rowsWithAttempt = rows.map((r) => ({ ...r, attemptId: attempt.id }))
@@ -188,6 +193,11 @@ export async function submitQuizAttempt(
       data: { xp: { increment: xpEarned } },
     })
   })
+
+  // Log quiz attempt in daily activity
+  logger.info(`[submitQuizAttempt] Updating daily activity for user ${userId}`)
+  await updateDailyActivity(userId, { quizAttempts: 1 })
+  logger.info(`[submitQuizAttempt] Quiz attempt successfully recorded for user ${userId}`)
 
   return {
     correct: correctCount,
@@ -205,6 +215,8 @@ export async function getUserQuizHistory(
   userId: string, 
   options: { page: number; limit: number; lang?: Lang }
 ) {
+  logger.info(`[getUserQuizHistory] Fetching history for user ${userId}, page: ${options.page}, limit: ${options.limit}`)
+  
   const skip = (options.page - 1) * options.limit
   
   const [attempts, total] = await Promise.all([
@@ -225,6 +237,8 @@ export async function getUserQuizHistory(
     }),
     prisma.quizAttempt.count({ where: { userId } }),
   ])
+  
+  logger.info(`[getUserQuizHistory] Found ${attempts.length} attempts out of ${total} total for user ${userId}`)
 
   const history = attempts.map((a: any) => {
     let quizTitle = a.quiz.title
@@ -235,14 +249,14 @@ export async function getUserQuizHistory(
     return {
       quizId: a.quiz.id,
       quizTitle,
-      score: a.score,
-      totalQuestions: a.totalQuestions,
-      createdAt: a.createdAt.toISOString(),
+      correct: a.score,
+      total: a.total,
+      lastAttempt: a.createdAt.toISOString(),
     }
   })
 
   return {
-    items: history,
+    data: history,
     pagination: {
       page: options.page,
       limit: options.limit,

@@ -156,11 +156,21 @@ export function useAdminUsers(initialPage = 1, initialLimit = 20) {
     }
   }, [fetchUsers, pagination])
 
+  const verifyUser = useCallback(async (userId: string) => {
+    try {
+      await api(`/admin/users/${userId}/verify`, { method: 'PUT' })
+      fetchUsers({ page: pagination.page, limit: pagination.limit })
+      return true
+    } catch {
+      return false
+    }
+  }, [fetchUsers, pagination])
+
   useEffect(() => {
     fetchUsers({ page: initialPage, limit: initialLimit })
   }, [])
 
-  return { users, pagination, loading, error, fetchUsers, updateRole, deleteUser }
+  return { users, pagination, loading, error, fetchUsers, updateRole, deleteUser, verifyUser }
 }
 
 // ============================================

@@ -21,6 +21,7 @@ type CatalogState = {
   invalidateTopics: () => void
   invalidateQuiz: (id: string) => void
   invalidateAll: () => void
+  markMaterialAsSeen: (materialId: string) => void
 }
 
 const useCatalogStore = create<CatalogState>((set, get) => ({
@@ -71,7 +72,7 @@ const useCatalogStore = create<CatalogState>((set, get) => ({
     
     try {
       const query = lang ? `?lang=${lang}` : ''
-      const q = await api<Quiz>(`/quizzes/${id}${query}`)
+      const q = await api<Quiz>(`/quiz/${id}${query}`)
       
       set((s) => ({ 
         quizMap: { ...s.quizMap, [cacheKey]: q }, 
@@ -113,6 +114,22 @@ const useCatalogStore = create<CatalogState>((set, get) => ({
       lang: undefined, 
       quizMap: {}, 
       quizError: {} 
+    })
+  },
+  
+  // Optimistically mark material as seen without reloading
+  markMaterialAsSeen(materialId: string) {
+    set((state) => {
+      const updateMaterial = (topics: TopicTree[]): TopicTree[] => {
+        return topics.map(topic => ({
+          ...topic,
+          materials: topic.materials?.map(m => 
+            m.id === materialId ? { ...m, isSeen: true } : m
+          ),
+          children: topic.children ? updateMaterial(topic.children) : undefined
+        }))
+      }
+      return { topics: updateMaterial(state.topics) }
     })
   },
 }))

@@ -9,6 +9,7 @@ interface TopicQueryParams {
   lang: string
   isStaff: boolean
   search?: string // <--- Added search param
+  userId?: string // <--- Added userId for checking if material is viewed
 }
 
 /**
@@ -26,7 +27,7 @@ function getLocalizedText(jsonField: any, lang: string, fallback: string): strin
  * Get paginated topics list with localization
  */
 export async function getTopics(params: TopicQueryParams) {
-  const { page, limit, category, lang, isStaff, search } = params
+  const { page, limit, category, lang, isStaff, search, userId } = params
   
   const whereClause: any = {
     parentId: null,
@@ -73,7 +74,10 @@ export async function getTopics(params: TopicQueryParams) {
           parentId: true,
           category: true,
           materials: {
-            where: isStaff ? {} : { status: 'Published' },
+            where: {
+              ...(isStaff ? {} : { status: 'Published' }),
+              deletedAt: null,
+            },
             select: {
               id: true,
               title: true,
@@ -87,7 +91,10 @@ export async function getTopics(params: TopicQueryParams) {
             } as any
           },
           quizzes: {
-            where: isStaff ? {} : { status: 'Published' },
+            where: {
+              ...(isStaff ? {} : { status: 'Published' }),
+              deletedAt: null,
+            },
             select: {
               id: true,
               title: true,
@@ -98,7 +105,10 @@ export async function getTopics(params: TopicQueryParams) {
         }
       },
       materials: {
-        where: isStaff ? {} : { status: 'Published' },
+        where: {
+          ...(isStaff ? {} : { status: 'Published' }),
+          deletedAt: null,
+        },
         select: {
           id: true,
           title: true,
@@ -112,7 +122,10 @@ export async function getTopics(params: TopicQueryParams) {
         } as any
       },
       quizzes: {
-        where: isStaff ? {} : { status: 'Published' },
+        where: {
+          ...(isStaff ? {} : { status: 'Published' }),
+          deletedAt: null,
+        },
         select: {
           id: true,
           title: true,
@@ -122,6 +135,14 @@ export async function getTopics(params: TopicQueryParams) {
       }
     }
   })
+
+  // Get viewed materials for current user (if logged in)
+  const viewedMaterials = userId 
+    ? (await prisma.materialView.findMany({
+        where: { userId },
+        select: { materialId: true }
+      })).map(v => v.materialId)
+    : []
 
   // Map and localize
   const mappedTopics = topics.map(t => ({
@@ -138,7 +159,8 @@ export async function getTopics(params: TopicQueryParams) {
       description: getLocalizedText(child.descJson, lang, child.description),
       materials: child.materials.map(m => ({
         ...m,
-        title: getLocalizedText(m.titleJson, lang, m.title)
+        title: getLocalizedText(m.titleJson, lang, m.title),
+        isSeen: viewedMaterials.includes(m.id)
       })),
       quizzes: child.quizzes.map(q => ({
         ...q,
@@ -147,7 +169,8 @@ export async function getTopics(params: TopicQueryParams) {
     })),
     materials: t.materials.map(m => ({
       ...m,
-      title: getLocalizedText(m.titleJson, lang, m.title)
+      title: getLocalizedText(m.titleJson, lang, m.title),
+      isSeen: viewedMaterials.includes(m.id)
     })),
     quizzes: t.quizzes.map(q => ({
       ...q,
@@ -170,7 +193,8 @@ export async function getTopics(params: TopicQueryParams) {
 export async function getTopicByIdOrSlug(
   idOrSlug: string, 
   lang: string,
-  isStaff: boolean
+  isStaff: boolean,
+  userId?: string
 ) {
   const topic = await prisma.topic.findFirst({
     where: {
@@ -197,7 +221,10 @@ export async function getTopicByIdOrSlug(
         }
       },
       materials: {
-        where: isStaff ? {} : { status: 'Published' },
+        where: {
+          ...(isStaff ? {} : { status: 'Published' }),
+          deletedAt: null,
+        },
         select: {
           id: true,
           title: true,
@@ -209,7 +236,10 @@ export async function getTopicByIdOrSlug(
         } as any
       },
       quizzes: {
-        where: isStaff ? {} : { status: 'Published' },
+        where: {
+          ...(isStaff ? {} : { status: 'Published' }),
+          deletedAt: null,
+        },
         select: {
           id: true,
           title: true,
@@ -221,6 +251,14 @@ export async function getTopicByIdOrSlug(
   })
 
   if (!topic) return null
+
+  // Get viewed materials for current user (if logged in)
+  const viewedMaterials = userId 
+    ? (await prisma.materialView.findMany({
+        where: { userId },
+        select: { materialId: true }
+      })).map(v => v.materialId)
+    : []
 
   return {
     ...topic,
@@ -234,7 +272,8 @@ export async function getTopicByIdOrSlug(
       ...m,
       title: getLocalizedText(m.titleJson, lang, m.title),
       url: getLocalizedText(m.urlJson, lang, m.url || ''),
-      content: getLocalizedText(m.contentJson, lang, m.content || '')
+      content: getLocalizedText(m.contentJson, lang, m.content || ''),
+      isSeen: viewedMaterials.includes(m.id)
     })),
     quizzes: topic.quizzes.map(q => ({
       ...q,

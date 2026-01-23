@@ -1,5 +1,6 @@
 // src/services/progress.service.ts
 import { prisma } from '../db.js'
+import { logger } from '../utils/logger.js'
 
 /**
  * Helper to get normalized UTC date (00:00:00.000 Z)
@@ -85,6 +86,8 @@ export async function updateDailyActivity(
 ): Promise<void> {
   const today = getUtcToday() // Use UTC normalized date
   
+  logger.info(`[updateDailyActivity] Updating activity for user ${userId}, date: ${today.toISOString()}, updates: ${JSON.stringify(updates)}`)
+  
   await prisma.userActivity.upsert({
     where: {
       userId_date: { userId, date: today },
@@ -104,6 +107,8 @@ export async function updateDailyActivity(
       goalsCompleted: updates.goalsCompleted ? { increment: updates.goalsCompleted } : undefined,
     },
   })
+  
+  logger.info(`[updateDailyActivity] Successfully updated activity for user ${userId}`)
 }
 
 /**
