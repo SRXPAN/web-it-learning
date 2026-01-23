@@ -16,7 +16,8 @@
     "noUnusedParameters": true,
     "noFallthroughCasesInSwitch": true,
     "forceConsistentCasingInFileNames": false,
-    "baseUrl": ".",
+    "ignoreDeprecations": "6.0",
+    "baseUrl": "",
     "paths": {
       "@/*": ["./src/*"],
       "@packages/shared": ["./src/shared/index.ts"]
