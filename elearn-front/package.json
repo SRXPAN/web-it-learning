@@ -9,6 +9,7 @@
   "scripts": {
     "dev": "vite",
     "build": "tsc -b && vite build",
+    "deploy": "wrangler pages deploy dist --project-name elearn-frontend",
     "preview": "vite preview",
     "lint": "tsc -b",
     "test": "vitest run"
