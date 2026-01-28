@@ -52,7 +52,6 @@ async function importTopic(topicData: any, parentId: string | null = null) {
       const { id: matId, topicId, createdById, createdBy, file, fileId, createdAt, updatedAt, deletedAt, ...matData } = mat
 
       try {
-        // Якщо є валідний ID - використовуємо його, інакше створюємо новий
         if (matId && matId.length > 10) {
           await prisma.material.upsert({
             where: { id: matId },
@@ -89,7 +88,6 @@ async function importTopic(topicData: any, parentId: string | null = null) {
             },
           })
         } else {
-          // Створюємо новий без збереження старого ID
           await prisma.material.create({
             data: {
               title: matData.title,
@@ -114,17 +112,15 @@ async function importTopic(topicData: any, parentId: string | null = null) {
     }
   }
 
-  // 3. Імпортуємо Квізи (підтримка зовнішніх файлів)
+  // 3. Імпортуємо Квізи
   let quizzesToImport = quizzes || []
 
-  // Якщо вказано quizFile - завантажуємо квізи з окремого файлу
   if (topicData.quizFile) {
     try {
       const quizFilePath = path.join(__dirname, 'data', 'quizzes', topicData.quizFile)
       console.log(`   📦 Loading external quiz from ${topicData.quizFile}...`)
       const fileContent = await fs.readFile(quizFilePath, 'utf-8')
       const externalQuizzes = JSON.parse(fileContent)
-      // Якщо у файлі масив - беремо його, якщо об'єкт - огортаємо в масив
       quizzesToImport = Array.isArray(externalQuizzes) ? externalQuizzes : [externalQuizzes]
       console.log(`   ✅ Loaded ${quizzesToImport.length} quiz(zes) from external file`)
     } catch (e: any) {
@@ -176,7 +172,6 @@ async function importTopic(topicData: any, parentId: string | null = null) {
           })
         }
 
-        // Імпортуємо Питання
         if (questions && questions.length > 0) {
           for (const q of questions) {
             const { id: qId, quizId: oldQuizId, options, answers, createdAt, updatedAt, ...qData } = q
@@ -221,13 +216,12 @@ async function importTopic(topicData: any, parentId: string | null = null) {
                 })
               }
 
-              // Імпортуємо Опції (видаляємо старі, створюємо нові з textJson)
               if (options && options.length > 0) {
                 await prisma.option.deleteMany({ where: { questionId: createdQuestion.id } })
                 await prisma.option.createMany({
                   data: options.map((o: any) => ({
                     text: o.text,
-                    textJson: o.textJson || null, // КРИТИЧНО: зберігаємо textJson
+                    textJson: o.textJson || null,
                     correct: o.correct || false,
                     questionId: createdQuestion.id,
                   })),
@@ -244,7 +238,6 @@ async function importTopic(topicData: any, parentId: string | null = null) {
     }
   }
 
-  // 4. РЕКУРСІЯ: Імпортуємо дочірні теми
   if (children && children.length > 0) {
     for (const child of children) {
       await importTopic(child, createdTopic.id)
@@ -270,10 +263,10 @@ async function main() {
   console.log('✅ Admin user ready')
 
   // ===== 2. STATIC DATA (Translations, Categories, Goals) =====
-  // Це дані, які потрібні для роботи інтерфейсу, тому ми лишаємо їх тут
   
   console.log('🌐 Seeding translations & config...')
   
+  // Categories
   const categoryTranslations: { category: Category; translations: { UA: string; PL: string; EN: string } }[] = [
     { category: 'Programming', translations: { UA: 'Програмування', PL: 'Programowanie', EN: 'Programming' } },
     { category: 'Mathematics', translations: { UA: 'Математика', PL: 'Matematyka', EN: 'Mathematics' } },
@@ -291,14 +284,23 @@ async function main() {
     if (!exists) await prisma.categoryTranslation.create({ data: cat })
   }
 
-  // Goals
+  // Goals - ВИПРАВЛЕНО ТУТ!
   const existingGoals = await prisma.dailyGoalTemplate.count()
   if (existingGoals === 0) {
     await prisma.dailyGoalTemplate.createMany({
       data: [
-        { category: 'quiz', weight: 1, translations: { UA: 'Пройти 1 квіз', PL: 'Zrób 1 quiz', EN: 'Complete 1 quiz' } },
-        { category: 'materials', weight: 1, translations: { UA: 'Переглянути 3 матеріали', PL: 'Obejrzyj 3 materiały', EN: 'View 3 materials' } },
-        // ... (можеш додати інші за бажанням)
+        { 
+          actionType: 'QUIZ_PERFECT', 
+          count: 1, 
+          xpReward: 100,
+          title: 'Complete 1 quiz with 100% score'
+        },
+        { 
+          actionType: 'LESSON_COMPLETE', 
+          count: 3, 
+          xpReward: 50,
+          title: 'Complete 3 lessons'
+        },
       ]
     })
   }
@@ -309,7 +311,6 @@ async function main() {
     const uiKeys = [
       { key: 'common.save', translations: { UA: 'Зберегти', PL: 'Zapisz', EN: 'Save' } },
       { key: 'auth.login', translations: { UA: 'Вхід', PL: 'Logowanie', EN: 'Login' } },
-      // ... (основні ключі)
     ]
     await prisma.uiTranslation.createMany({ data: uiKeys })
   }
