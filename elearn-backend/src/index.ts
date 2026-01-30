@@ -32,7 +32,7 @@ import activityRouter from './routes/activity.js'
 
 // Import Middleware
 import { generalLimiter, authLimiter } from './middleware/rateLimit.js'
-import { validateCsrf } from './middleware/csrf.js'
+import { validateCsrf, validateCsrfSoft } from './middleware/csrf.js'
 import { errorHandler, notFoundHandler } from './middleware/errorHandler.js'
 
 const app = express()
@@ -80,10 +80,11 @@ app.use(cookieParser())
 app.use(express.json({ limit: '1mb' }))
 
 // --- CSRF Protection (Mutating methods only) ---
+// TEMPORARY: Using soft validation for cross-domain debugging
 app.use('/api', (req, res, next) => {
   const mutatingMethods = ['POST', 'PUT', 'PATCH', 'DELETE']
   if (mutatingMethods.includes(req.method)) {
-    return validateCsrf(req, res, next)
+    return validateCsrfSoft(req, res, next)
   }
   next()
 })
