@@ -125,7 +125,13 @@ router.post(
       const result = await loginUser(req.body, userAgent, ip)
       setAuthCookies(res, result.tokens.accessToken, result.tokens.refreshToken)
       logger.info('[LOGIN] Success', { userId: result.user.id, email: result.user.email })
-      return ok(res, { user: result.user, badges: getBadges(result.user.xp) })
+      // TEMPORARY: Return tokens in body for cross-domain auth (until api.e-learn.space is configured)
+      return ok(res, { 
+        user: result.user, 
+        badges: getBadges(result.user.xp),
+        accessToken: result.tokens.accessToken,
+        refreshToken: result.tokens.refreshToken
+      })
     } catch (e) {
       logger.error('[LOGIN] Failed', { email: req.body.email, error: e instanceof Error ? e.message : 'Unknown' })
       if (e instanceof Error && e.message === 'Invalid credentials') {

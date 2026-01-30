@@ -50,13 +50,21 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   }, [])
 
   async function login(email: string, password: string): Promise<void> {
-    // Бекенд повертає { user: User } всередині `data`
-    // api<T> вже розпаковує response.data
-    const { user: userData } = await api<AuthResponse>('/auth/login', { 
+    // Бекенд повертає { user: User, accessToken, refreshToken }
+    const response = await api<AuthResponse & { accessToken?: string; refreshToken?: string }>('/auth/login', { 
       method: 'POST', 
       body: JSON.stringify({ email, password }), 
     })
-    setUser(userData)
+    
+    // TEMPORARY: Store tokens in localStorage for cross-domain auth
+    if (response.accessToken) {
+      localStorage.setItem('access_token', response.accessToken)
+    }
+    if (response.refreshToken) {
+      localStorage.setItem('refresh_token', response.refreshToken)
+    }
+    
+    setUser(response.user)
   }
 
   async function register(name: string, email: string, password: string): Promise<void> {
@@ -73,6 +81,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     } catch (error) {
       console.error('Logout failed:', error)
     } finally {
+      // Clear localStorage tokens
+      localStorage.removeItem('access_token')
+      localStorage.removeItem('refresh_token')
       setUser(null)
       // Опціонально: повне перезавантаження, щоб очистити кеш стану додатка
       // window.location.href = '/login'

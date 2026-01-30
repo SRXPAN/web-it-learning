@@ -226,6 +226,12 @@ export async function api<T>(path: string, init: RequestInit = {}): Promise<T> {
     ...(init.headers as Record<string, string> || {}),
   }
   
+  // TEMPORARY: Add Authorization header with token from localStorage
+  const accessToken = localStorage.getItem('access_token')
+  if (accessToken) {
+    headers['Authorization'] = `Bearer ${accessToken}`
+  }
+  
   const method = (init.method ?? 'GET').toUpperCase()
   const isMutating = !['GET', 'HEAD', 'OPTIONS'].includes(method)
   
