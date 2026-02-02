@@ -6,11 +6,45 @@ import { logger } from '../utils/logger.js'
 const CSRF_COOKIE = 'csrf_token'
 const CSRF_HEADER = 'x-csrf-token'
 
+// Secret для HMAC - має бути в env, fallback для dev
+const CSRF_SECRET = process.env.CSRF_SECRET || process.env.JWT_SECRET || 'default-csrf-secret-change-me'
+
 /**
- * Генерує CSRF токен і встановлює його в cookie
+ * Генерує stateless CSRF токен
+ * Формат: timestamp.signature
+ * Це дозволяє будь-якому інстансу перевірити токен
  */
 export function generateCsrfToken(): string {
-  return crypto.randomBytes(32).toString('hex')
+  const timestamp = Date.now().toString()
+  const signature = crypto
+    .createHmac('sha256', CSRF_SECRET)
+    .update(timestamp)
+    .digest('hex')
+  return `${timestamp}.${signature}`
+}
+
+/**
+ * Перевіряє stateless CSRF токен
+ */
+function verifyCsrfToken(token: string): boolean {
+  const parts = token.split('.')
+  if (parts.length !== 2) return false
+  
+  const [timestamp, signature] = parts
+  const expectedSignature = crypto
+    .createHmac('sha256', CSRF_SECRET)
+    .update(timestamp)
+    .digest('hex')
+  
+  // Constant-time comparison
+  if (!crypto.timingSafeEqual(Buffer.from(signature), Buffer.from(expectedSignature))) {
+    return false
+  }
+  
+  // Перевірка терміну дії (24 години)
+  const tokenAge = Date.now() - parseInt(timestamp, 10)
+  const maxAge = 24 * 60 * 60 * 1000 // 24 години
+  return tokenAge < maxAge
 }
 
 /**
@@ -34,8 +68,8 @@ export function setCsrfToken(req: Request, res: Response): void {
 }
 
 /**
- * Middleware для валідації CSRF токена
- * Перевіряє, що токен з header збігається з токеном з cookie
+ * Middleware для валідації CSRF токена (Stateless)
+ * Перевіряє що токен валідний через HMAC
  */
 export function validateCsrf(req: Request, res: Response, next: NextFunction): void {
   // Пропускаємо для безпечних методів
@@ -51,9 +85,15 @@ export function validateCsrf(req: Request, res: Response, next: NextFunction): v
     return
   }
 
-  // Constant-time comparison для захисту від timing attacks
-  if (!crypto.timingSafeEqual(Buffer.from(cookieToken), Buffer.from(headerToken))) {
-    res.status(403).json({ error: 'CSRF token invalid' })
+  // Перевіряємо що cookie і header однакові
+  if (cookieToken !== headerToken) {
+    res.status(403).json({ error: 'CSRF token mismatch' })
+    return
+  }
+
+  // Перевіряємо валідність токена через HMAC
+  if (!verifyCsrfToken(headerToken)) {
+    res.status(403).json({ error: 'CSRF token invalid or expired' })
     return
   }
 

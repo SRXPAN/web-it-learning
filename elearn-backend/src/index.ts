@@ -33,7 +33,7 @@ import activityRouter from './routes/activity.js'
 
 // Import Middleware
 import { generalLimiter, authLimiter } from './middleware/rateLimit.js'
-import { validateCsrf } from './middleware/csrf.js'
+import { validateCsrf, setCsrfToken } from './middleware/csrf.js'
 import { errorHandler, notFoundHandler } from './middleware/errorHandler.js'
 
 const app = express()
@@ -81,13 +81,32 @@ app.use(cookieParser())
 app.use(express.json({ limit: '1mb' }))
 
 // --- CSRF Protection (Mutating methods only) ---
-// PRODUCTION: Using strict CSRF validation for all mutating methods
+// Stateless CSRF validation - works across multiple instances
+// Skip for auth endpoints that don't require session (login, register, password reset)
+const CSRF_EXEMPT_PATHS = [
+  '/api/auth/login',
+  '/api/auth/register', 
+  '/api/auth/refresh',
+  '/api/auth/forgot-password',
+  '/api/auth/reset-password',
+  '/api/auth/verify-email',
+  '/api/auth/resend-verification',
+]
+
 app.use('/api', (req, res, next) => {
   const mutatingMethods = ['POST', 'PUT', 'PATCH', 'DELETE']
-  if (mutatingMethods.includes(req.method)) {
-    return validateCsrf(req, res, next)
+  
+  // Skip CSRF for safe methods
+  if (!mutatingMethods.includes(req.method)) {
+    return next()
   }
-  next()
+  
+  // Skip CSRF for exempt paths (pre-auth endpoints)
+  if (CSRF_EXEMPT_PATHS.includes(req.path)) {
+    return next()
+  }
+  
+  return validateCsrf(req, res, next)
 })
 
 // --- Global Rate Limit ---
@@ -95,6 +114,10 @@ app.use('/api', generalLimiter)
 
 // --- Healthcheck ---
 app.get('/api/health', (_req, res) => res.json({ ok: true }))
+
+// --- CSRF Token endpoint (before auth limiter) ---
+// This endpoint is called frequently, so it should not be under strict auth limiter
+app.get('/api/auth/csrf', setCsrfToken)
 
 // --- Routes ---
 app.use('/api/auth', authLimiter, authRouter)

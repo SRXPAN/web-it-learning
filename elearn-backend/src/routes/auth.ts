@@ -3,7 +3,6 @@ import { Router, Request, Response } from 'express'
 import { prisma } from '../db.js'
 import { requireAuth, COOKIE_NAME, REFRESH_COOKIE_NAME } from '../middleware/auth.js'
 import { authLimiter } from '../middleware/rateLimit.js'
-import { setCsrfToken } from '../middleware/csrf.js'
 import { AppError, asyncHandler } from '../middleware/errorHandler.js'
 import { validateResource } from '../middleware/validateResource.js'
 import { authSchemas } from '../schemas/auth.schema.js'
@@ -60,7 +59,8 @@ function getClientInfo(req: Request): { userAgent?: string; ip?: string } {
     ip: req.ip || forwardedIp,
   }
 }
-router.get('/csrf', setCsrfToken)
+
+// Note: CSRF endpoint moved to index.ts (before auth limiter)
 
 router.get('/me', requireAuth, asyncHandler(async (req: Request, res: Response) => {
   const user = await prisma.user.findUnique({
