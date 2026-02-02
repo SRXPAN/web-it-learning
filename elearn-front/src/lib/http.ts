@@ -5,17 +5,6 @@ import { dispatchToast } from '@/utils/toastEmitter'
 const envUrl = (import.meta.env.VITE_API_URL || 'http://localhost:5000').replace(/\/$/, '')
 export const API_URL = envUrl.endsWith('/api') ? envUrl : `${envUrl}/api`
 
-// CSRF token storage
-let csrfToken: string | null = null
-
-// Helper: Отримання CSRF токена з куків
-function getCsrfFromCookie(): string | null {
-  if (typeof document === 'undefined') return null
-  const match = document.cookie.match(/(?:^|; )csrf_token=([^;]*)/)
-  return match ? decodeURIComponent(match[1]) : null
-}
-
-// Створюємо інстанс axios
 const $api = axios.create({
   baseURL: API_URL,
   withCredentials: true,
@@ -24,20 +13,24 @@ const $api = axios.create({
   },
 })
 
+// === Helper: Отримання CSRF токена з куків ===
+function getCsrfFromCookie() {
+  const match = document.cookie.match(new RegExp('(^| )csrf_token=([^;]+)'))
+  return match ? match[2] : null
+}
+
 // === Request Interceptor ===
 $api.interceptors.request.use((config: InternalAxiosRequestConfig) => {
-  // Add Authorization header
   const token = localStorage.getItem('access_token')
   if (token && config.headers) {
     config.headers.Authorization = `Bearer ${token}`
   }
 
-  // Add CSRF token for mutating methods (POST, PUT, PATCH, DELETE)
-  const mutatingMethods = ['post', 'put', 'delete', 'patch']
-  if (config.method && mutatingMethods.includes(config.method.toLowerCase())) {
-    const csrf = csrfToken || getCsrfFromCookie()
-    if (csrf && config.headers) {
-      config.headers['x-csrf-token'] = csrf
+  // Додаємо CSRF для мутуючих методів
+  if (config.method && ['post', 'put', 'delete', 'patch'].includes(config.method.toLowerCase())) {
+    const csrfToken = getCsrfFromCookie()
+    if (csrfToken && config.headers) {
+      config.headers['x-csrf-token'] = csrfToken
     }
   }
   
@@ -50,12 +43,12 @@ $api.interceptors.response.use(
   async (error: AxiosError) => {
     const originalRequest = error.config as InternalAxiosRequestConfig & { _retry?: boolean }
 
-    // ВАЖЛИВО: Якщо ми вже на /login - НЕ робимо нічого (зупиняємо цикл)
+    // Якщо це 401 на /me і ми вже на /login - ігноруємо (щоб не було циклу)
     if (error.response?.status === 401 && window.location.pathname === '/login') {
-      return Promise.reject(error)
+        return Promise.reject(error)
     }
 
-    // Логіка оновлення токена (Refresh) - тільки для 401
+    // Логіка Refresh Token
     if (error.response?.status === 401 && error.config && !originalRequest._retry) {
       originalRequest._retry = true
 
@@ -68,35 +61,35 @@ $api.interceptors.response.use(
             headers: { 'x-csrf-token': getCsrfFromCookie() || '' }
           }
         )
-        // Повторюємо оригінальний запит
         return $api.request(originalRequest)
       } catch (refreshError) {
         console.error('Session expired', refreshError)
         localStorage.removeItem('user_data')
         localStorage.removeItem('access_token')
         
-        // Перенаправляємо на логін тільки якщо ми НЕ там
-        // Використовуємо replace замість href, щоб не засмічувати історію
-        if (window.location.pathname !== '/login' && window.location.pathname !== '/register') {
-          window.location.replace('/login')
+        // Redirect ONLY if not already on login page
+        if (window.location.pathname !== '/login') {
+            // Використовуємо replace, щоб не було кнопки "Назад"
+            window.location.replace('/login')
         }
         
         return Promise.reject(refreshError)
       }
     }
 
-    // Глобальний Toast для помилок (крім 401, 403, 429)
+    // Глобальний Toast (крім 401/403/429)
     const status = error.response?.status
     if (status !== 401 && status !== 403 && status !== 429) {
-      try {
-        const data = error.response?.data as any
-        const message = data?.message || data?.error || 'Request failed'
-        if (typeof dispatchToast === 'function') {
-          dispatchToast(typeof message === 'string' ? message : 'Error', 'error')
-        }
-      } catch (e) {
-        console.error('Toast dispatch error:', e)
-      }
+       // Безпечний виклик тоста
+       try {
+         const data = error.response?.data as any
+         const message = data?.message || data?.error || 'Request failed'
+         if (typeof dispatchToast === 'function') {
+            dispatchToast(typeof message === 'string' ? message : 'Error', 'error')
+         }
+       } catch (e) {
+         console.error(e)
+       }
     }
 
     return Promise.reject(error)
@@ -106,6 +99,7 @@ $api.interceptors.response.use(
 export default $api
 
 // === Fetch-style API wrapper ===
+// This is used by many components for fetch-like syntax
 interface FetchOptions {
   method?: 'GET' | 'POST' | 'PUT' | 'DELETE' | 'PATCH'
   body?: string
@@ -129,27 +123,15 @@ export async function api<T = any>(url: string, options: FetchOptions = {}): Pro
 }
 
 // === Compatibility Layer ===
-
-// Функція для отримання CSRF токена
 export const fetchCsrfToken = async (): Promise<string> => {
   try {
-    const res = await $api.get('/auth/csrf')
-    const token = res.data.csrfToken || ''
-    csrfToken = token
-    return token
+    await $api.get('/auth/csrf')
+    return getCsrfFromCookie() || ''
   } catch (e) {
-    console.warn('CSRF Fetch Error', e)
-    csrfToken = getCsrfFromCookie()
-    return csrfToken || ''
+    return ''
   }
 }
 
-// Force refresh CSRF token
-export const refreshCsrfToken = async (): Promise<void> => {
-  await fetchCsrfToken()
-}
-
-// Обгортки для методів
 export const apiGet = async <T>(url: string, config?: any): Promise<T> => {
   const response = await $api.get<T>(url, config)
   return response.data
