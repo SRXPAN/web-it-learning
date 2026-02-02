@@ -167,6 +167,7 @@ router.post(
 // POST /api/auth/logout — вихід
 router.post(
   '/logout',
+  requireAuth,
   asyncHandler(async (req: Request, res: Response) => {
     const refreshToken = req.cookies?.[REFRESH_COOKIE_NAME]
     if (refreshToken) {

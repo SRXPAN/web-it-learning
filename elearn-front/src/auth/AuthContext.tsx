@@ -1,6 +1,6 @@
 // src/auth/AuthContext.tsx
 import React, { createContext, useContext, useEffect, useMemo, useState, useCallback } from 'react'
-import { api, fetchCsrfToken } from '../lib/http'
+import { api, apiPost, fetchCsrfToken } from '../lib/http'
 import type { User, AuthResponse } from '@packages/shared'
 
 // Re-export User type for convenience
@@ -99,7 +99,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   async function logout(): Promise<void> {
     try {
-      await api('/auth/logout', { method: 'POST' })
+      await apiPost('/auth/logout', {})
     } catch (error) {
       console.error('Logout failed:', error)
     } finally {
