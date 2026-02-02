@@ -60,7 +60,7 @@ const PageLoader = () => (
 )
 
 export default function App() {
-  const { user, logout } = useAuth()
+  const { user, logout, loading } = useAuth()
   const { t } = useTranslation()
   const nav = useNavigate()
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false)
@@ -76,6 +76,20 @@ export default function App() {
 
   const location = useLocation()
   const isAuthPage = location.pathname === '/login' || location.pathname === '/register'
+
+  // Show loading state first to prevent DOM inconsistency during auth initialization
+  // This ensures a consistent render tree while auth status is being determined
+  if (loading && !isAuthPage) {
+    return (
+      <div className="min-h-screen bg-neutral-50 dark:bg-neutral-950 flex items-center justify-center">
+        <div className="flex flex-col items-center gap-4">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary-600"></div>
+          <p className="text-neutral-500 dark:text-neutral-400 text-sm">{t('common.loading', 'Loading...')}</p>
+        </div>
+        <Toasts />
+      </div>
+    )
+  }
 
   // Special layout for auth pages
   if (isAuthPage) {

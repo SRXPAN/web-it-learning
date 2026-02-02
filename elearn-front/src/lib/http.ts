@@ -45,13 +45,10 @@ $api.interceptors.response.use(
         localStorage.removeItem('user_data')
         localStorage.removeItem('access_token')
         
-        // Only redirect to login if not already there (prevent infinite loop)
-        const currentPath = window.location.pathname
-        if (!currentPath.startsWith('/login') && !currentPath.startsWith('/register')) {
-          setTimeout(() => {
-            window.location.href = '/login'
-          }, 100)
-        }
+        // Do NOT redirect here - let AuthContext and RequireAuth handle the redirect
+        // Using window.location.href causes React DOM inconsistency errors
+        // The 401 error will propagate to AuthContext which sets user=null,
+        // and RequireAuth will then use React Router's Navigate component
         
         return Promise.reject(refreshError)
       }

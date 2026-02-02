@@ -27,8 +27,14 @@ export const useAuth = () => {
 export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [user, setUser] = useState<User | null>(null)
   const [loading, setLoading] = useState(true)
+  const [initialized, setInitialized] = useState(false)
 
   useEffect(() => {
+    // Prevent double initialization (React StrictMode)
+    if (initialized) return
+    
+    let isMounted = true
+    
     const initAuth = async () => {
       try {
         // 1. Отримуємо CSRF токен (потрібен для POST/PUT/DELETE)
@@ -37,17 +43,28 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         // 2. Перевіряємо сесію (HttpOnly Cookie)
         // Якщо токен валідний, бекенд поверне об'єкт User
         const userData = await api<User>('/auth/me')
-        setUser(userData)
+        if (isMounted) {
+          setUser(userData)
+        }
       } catch (err) {
         // 401 Unauthorized або мережева помилка -> користувач не залогінений
-        setUser(null)
+        if (isMounted) {
+          setUser(null)
+        }
       } finally {
-        setLoading(false)
+        if (isMounted) {
+          setLoading(false)
+          setInitialized(true)
+        }
       }
     }
 
     initAuth()
-  }, [])
+    
+    return () => {
+      isMounted = false
+    }
+  }, [initialized])
 
   async function login(email: string, password: string): Promise<void> {
     // Бекенд повертає { user: User, accessToken, refreshToken }
