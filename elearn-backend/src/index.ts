@@ -84,13 +84,13 @@ app.use(express.json({ limit: '1mb' }))
 // Stateless CSRF validation - works across multiple instances
 // Skip for auth endpoints that don't require session (login, register, password reset)
 const CSRF_EXEMPT_PATHS = [
-  '/api/auth/login',
-  '/api/auth/register', 
-  '/api/auth/refresh',
-  '/api/auth/forgot-password',
-  '/api/auth/reset-password',
-  '/api/auth/verify-email',
-  '/api/auth/resend-verification',
+  '/auth/login',
+  '/auth/register', 
+  '/auth/refresh',
+  '/auth/forgot-password',
+  '/auth/reset-password',
+  '/auth/verify-email',
+  '/auth/resend-verification',
 ]
 
 app.use('/api', (req, res, next) => {
@@ -102,6 +102,7 @@ app.use('/api', (req, res, next) => {
   }
   
   // Skip CSRF for exempt paths (pre-auth endpoints)
+  // Note: req.path here is relative to /api mount point (e.g., /auth/login not /api/auth/login)
   if (CSRF_EXEMPT_PATHS.includes(req.path)) {
     return next()
   }

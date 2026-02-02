@@ -45,10 +45,13 @@ $api.interceptors.response.use(
         localStorage.removeItem('user_data')
         localStorage.removeItem('access_token')
         
-        // Timeout fix for React "NotFoundError" (білий екран)
-        setTimeout(() => {
+        // Only redirect to login if not already there (prevent infinite loop)
+        const currentPath = window.location.pathname
+        if (!currentPath.startsWith('/login') && !currentPath.startsWith('/register')) {
+          setTimeout(() => {
             window.location.href = '/login'
-        }, 100)
+          }, 100)
+        }
         
         return Promise.reject(refreshError)
       }
