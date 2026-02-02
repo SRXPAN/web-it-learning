@@ -2,6 +2,7 @@ import { create } from 'zustand'
 import { memo, useEffect } from 'react'
 import { CheckCircle, AlertCircle, Info, X } from 'lucide-react'
 import clsx from 'clsx'
+import { subscribeToToasts, type ToastEvent } from '@/utils/toastEmitter'
 
 type ToastType = 'success' | 'error' | 'info'
 
@@ -26,6 +27,13 @@ export const useToast = create<ToastStore>((set) => ({
     toasts: s.toasts.filter((x) => x.id !== id) 
   })),
 }))
+
+// Subscribe to global toast events from toastEmitter
+if (typeof window !== 'undefined') {
+  subscribeToToasts((event: ToastEvent) => {
+    useToast.getState().push({ type: event.type, msg: event.message })
+  })
+}
 
 const styles = {
   success: {
@@ -57,7 +65,7 @@ const ToastItem = memo(function ToastItem({ toast, onRemove }: ToastItemProps) {
   useEffect(() => {
     const timer = setTimeout(() => {
       onRemove()
-    }, 5000)
+    }, 3000) // Auto-dismiss after 3 seconds
     return () => clearTimeout(timer)
   }, [onRemove])
 
@@ -109,7 +117,7 @@ export default function Toasts() {
   return (
     <div 
       aria-live="assertive" 
-      className="fixed bottom-0 right-0 z-[100] flex w-full flex-col items-end gap-2 p-4 sm:p-6 pointer-events-none"
+      className="fixed top-0 right-0 z-50 flex w-full max-w-sm flex-col items-end gap-2 p-4 sm:p-6 pointer-events-none"
     >
       {toasts.map((t) => (
         <ToastItem key={t.id} toast={t} onRemove={() => remove(t.id)} />

@@ -9,13 +9,14 @@ import type { Category } from '@packages/shared'
 import {
   DEFAULT_CAT,
   TopicSidebar,
+  MobileSidebar,
   DashboardView,
   TopicNode,
   Material,
 } from '@/pages/materialsComponents'
 import { MaterialsHeader } from '@/pages/materialsComponents/MaterialsHeader'
 import { TopicView } from '@/pages/materialsComponents/TopicView'
-import { SkeletonDashboard } from '@/components/Skeletons'
+import { CardSkeleton } from '@/components/Skeletons'
 
 export type Tab = 'ALL' | 'PDF' | 'VIDEO' | 'TEXT' | 'LINK'
 
@@ -31,6 +32,7 @@ export default function Materials() {
   
   const [tab, setTab] = useState<Tab>('ALL')
   const [query, setQuery] = useState('')
+  const [mobileSidebarOpen, setMobileSidebarOpen] = useState(false)
   
   // Reserved for text material viewer modal in the future
   const [_selectedMaterial, setSelectedMaterial] = useState<Material | null>(null)
@@ -192,6 +194,7 @@ export default function Materials() {
             activeCat={activeCat}
             categories={categories}
             onCategoryChange={setActiveCat}
+            onOpenSidebar={() => setMobileSidebarOpen(true)}
           />
 
           <div className="grid lg:grid-cols-[280px_1fr] gap-6 items-start">
@@ -208,11 +211,30 @@ export default function Materials() {
               }}
             />
 
+            {/* Mobile Sidebar Drawer */}
+            <MobileSidebar
+              isOpen={mobileSidebarOpen}
+              onClose={() => setMobileSidebarOpen(false)}
+              catTopics={catTopics}
+              activeTopicId={activeTopicId}
+              activeSubId={activeSubId}
+              loading={loading}
+              onSelectTopic={setActiveTopicId}
+              onSelectSub={(topicId, subId) => {
+                setActiveTopicId(topicId)
+                setActiveSubId(subId)
+              }}
+            />
+
             <main className="space-y-6 min-w-0">
               {/* Breadcrumbs can be added here if needed, but sidebar + header usually enough */}
 
               {loading && !roots.length ? (
-                <SkeletonDashboard />
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+                  {Array.from({ length: 6 }).map((_, i) => (
+                    <CardSkeleton key={i} />
+                  ))}
+                </div>
               ) : isDashboardView ? (
                 <DashboardView catTopics={catTopics} onSelectTopic={setActiveTopicId} />
               ) : (

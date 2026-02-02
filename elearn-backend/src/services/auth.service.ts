@@ -57,21 +57,10 @@ export async function registerUser(
   const { name, email, password } = data
   
   // Перевірка на існуючого користувача
-  const exists = await prisma.user.findUnique({ where: { email } })
+  const exists = await prisma.user.findUnique({ where: { email: email.toLowerCase().trim() } })
   if (exists) {
-    // SECURITY: Повертаємо успіх, щоб не розкривати існування email.
-    // Опціонально: можна відправити email власнику "Хтось намагався зареєструватися..."
-    return { 
-      user: { 
-        id: exists.id,
-        name: exists.name,
-        email: exists.email,
-        role: exists.role as Role,
-        xp: exists.xp,
-        emailVerified: exists.emailVerified
-      }, 
-      tokens: { accessToken: '', refreshToken: '' } // Повертаємо пусті токени або dummy об'єкт
-    }
+    // SECURITY FIX: Явно повідомляємо про конфлікт, щоб фронтенд міг правильно обробити
+    throw AppError.conflict('Email already in use')
   }
   
   // Хешуємо пароль

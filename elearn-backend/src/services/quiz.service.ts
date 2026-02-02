@@ -5,14 +5,46 @@ import { getJwtSecret } from '../utils/env.js'
 import type { Lang } from '../shared'
 import { logger } from '../utils/logger.js'
 import { updateDailyActivity } from './progress.service.js'
+import type { Quiz, Question, Option, QuizAttempt, Prisma } from '@prisma/client'
+
+// Type definitions for quiz-related data
+interface QuizWithQuestions extends Quiz {
+  questions: (Question & { options: Pick<Option, 'id' | 'text' | 'textJson'>[] })[]
+}
+
+interface QuizWithAnswers extends Quiz {
+  questions: (Question & { options: Pick<Option, 'id' | 'correct'>[] })[]
+}
+
+interface SubmitAnswer {
+  questionId: string
+  optionId?: string
+}
+
+interface QuizSubmitResult {
+  correct: number
+  total: number
+  score: number
+  passed: boolean
+  xpEarned: number
+  correctMap: Record<string, string>
+  solutions: Record<string, string>
+}
 
 /**
  * Helper to get localized value from JSON field
+ * Searches for requested language, then falls back to UA, then EN, then any available
  */
-function getLocalized(jsonField: any, lang: Lang, fallback: string): string {
+function getLocalized(jsonField: unknown, lang: Lang, fallback: string): string {
   if (jsonField && typeof jsonField === 'object' && !Array.isArray(jsonField)) {
-    if (jsonField[lang]) return jsonField[lang]
-    if (jsonField['EN']) return jsonField['EN']
+    const json = jsonField as Record<string, string>
+    // First, try the requested language
+    if (json[lang]) return json[lang]
+    // Fallback: try UA first, then EN, then PL
+    const fallbackLangs: Lang[] = ['UA', 'EN', 'PL']
+    for (const fbLang of fallbackLangs) {
+      if (json[fbLang]) return json[fbLang]
+    }
   }
   return fallback
 }
@@ -51,7 +83,6 @@ export async function getQuizWithToken(quizId: string, userId: string, lang?: La
   // Apply localization if specified
   const shouldLocalize = lang && ['UA', 'PL', 'EN'].includes(lang)
   
-  // FIX: Changed titleCache to titleJson
   return {
     id: quiz.id,
     title: shouldLocalize ? getLocalized(quiz.titleJson, lang, quiz.title) : quiz.title,
@@ -59,13 +90,13 @@ export async function getQuizWithToken(quizId: string, userId: string, lang?: La
     topicId: quiz.topicId,
     status: quiz.status,
     token: quizToken,
-    questions: quiz.questions.map((q: any) => ({
+    questions: quiz.questions.map((q) => ({
       id: q.id,
       text: shouldLocalize ? getLocalized(q.textJson, lang, q.text) : q.text,
       explanation: shouldLocalize ? getLocalized(q.explanationJson, lang, q.explanation || '') : q.explanation,
       difficulty: q.difficulty,
       tags: q.tags,
-      options: q.options.map((o: any) => ({
+      options: q.options.map((o) => ({
         id: o.id,
         text: shouldLocalize ? getLocalized(o.textJson, lang, o.text) : o.text,
       }))
@@ -80,9 +111,9 @@ export async function submitQuizAttempt(
   quizId: string,
   userId: string,
   token: string,
-  answers: Array<{ questionId: string; optionId?: string }>,
+  answers: SubmitAnswer[],
   lang?: Lang
-) {
+): Promise<QuizSubmitResult> {
   logger.info(`[submitQuizAttempt] Starting quiz submission for user ${userId}, quiz ${quizId}`)
   
   // Verify quiz token
@@ -94,8 +125,9 @@ export async function submitQuizAttempt(
     throw new Error('Invalid or expired quiz token')
   }
 
-  // Check if time is up
-  if (Date.now() > quizPayload.expiresAt) {
+  // Check if time is up (with 10-second grace period for network latency)
+  const GRACE_PERIOD_MS = 10 * 1000
+  if (Date.now() > quizPayload.expiresAt + GRACE_PERIOD_MS) {
     throw new Error('Quiz time limit exceeded')
   }
 
@@ -141,16 +173,17 @@ export async function submitQuizAttempt(
   const explanationMap: Record<string, string> = {}
   
   for (const q of quiz.questions) {
-    const correctOption = q.options.find((o: any) => o.correct)
+    const correctOption = q.options.find((o) => o.correct)
     if (correctOption) {
       correctMap[q.id] = correctOption.id
     }
     
     // Get localized explanation if available
-    if (lang && (q as any).explanationJson) {
-      explanationMap[q.id] = getLocalized((q as any).explanationJson, lang, (q as any).explanation || '')
-    } else if ((q as any).explanation) {
-      explanationMap[q.id] = (q as any).explanation
+    const questionWithExplanation = q as Question & { explanationJson?: unknown }
+    if (lang && questionWithExplanation.explanationJson) {
+      explanationMap[q.id] = getLocalized(questionWithExplanation.explanationJson, lang, q.explanation || '')
+    } else if (q.explanation) {
+      explanationMap[q.id] = q.explanation
     }
   }
 
@@ -167,11 +200,27 @@ export async function submitQuizAttempt(
     }
   })
 
-  // Pass threshold: user must score at least 70% to pass and earn XP
-  const PASS_THRESHOLD = 0.70
+  // Pass threshold: user must score at least 80% to pass and earn XP
+  const PASS_THRESHOLD = 0.80
   const scorePercentage = quiz.questions.length > 0 ? correctCount / quiz.questions.length : 0
   const passed = scorePercentage >= PASS_THRESHOLD
-  const xpEarned = passed ? correctCount * 10 : 0
+  
+  // Check if user already has a successful attempt for this quiz (prevent XP farming)
+  const previousSuccessfulAttempt = await prisma.quizAttempt.findFirst({
+    where: {
+      userId,
+      quizId,
+      score: { gte: Math.ceil(quiz.questions.length * PASS_THRESHOLD) }
+    }
+  })
+  
+  // Award XP only if passed AND this is the first successful attempt
+  const isFirstSuccess = passed && !previousSuccessfulAttempt
+  const xpEarned = isFirstSuccess ? correctCount * 10 : 0
+  
+  if (passed && previousSuccessfulAttempt) {
+    logger.info(`[submitQuizAttempt] User ${userId} already passed quiz ${quizId} before. No XP awarded.`)
+  }
 
   // Save attempt in transaction
   await prisma.$transaction(async (tx) => {
@@ -249,9 +298,8 @@ export async function getUserQuizHistory(
   
   logger.info(`[getUserQuizHistory] Found ${attempts.length} attempts out of ${total} total for user ${userId}`)
 
-  const history = attempts.map((a: any) => {
+  const history = attempts.map((a) => {
     let quizTitle = a.quiz.title
-    // FIX: Changed titleCache to titleJson
     if (options.lang && a.quiz.titleJson) {
       quizTitle = getLocalized(a.quiz.titleJson, options.lang, a.quiz.title)
     }

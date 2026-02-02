@@ -1,4 +1,4 @@
-import { useToast } from '@/components/Toast'
+import { dispatchToast } from '@/utils/toastEmitter'
 
 const base = (import.meta.env.VITE_API_URL ?? '').replace(/\/$/, '')
 const API_URL = `${base}/api`
@@ -6,11 +6,13 @@ const API_URL = `${base}/api`
 const CSRF_COOKIE = 'csrf_token'
 const CSRF_HEADER = 'x-csrf-token'
 
+// Toast helper for HTTP errors
 const toast = {
   error: (msg: string) => {
-    const safeMessage = typeof msg === 'string' && msg.trim() ? msg : 'Something went wrong'
-    // Access zustand store outside of React components
-    useToast.getState().push({ type: 'error', msg: safeMessage })
+    dispatchToast(msg, 'error')
+  },
+  success: (msg: string) => {
+    dispatchToast(msg, 'success')
   },
 }
 

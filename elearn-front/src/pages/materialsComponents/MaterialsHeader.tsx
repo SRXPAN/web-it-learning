@@ -1,5 +1,5 @@
 import { memo, useState, useRef, useEffect } from 'react'
-import { BookOpen, ChevronDown, ChevronLeft, ChevronRight, Check } from 'lucide-react'
+import { BookOpen, ChevronDown, ChevronLeft, ChevronRight, Check, Menu } from 'lucide-react'
 import { CategoryIcon } from './CategoryIcon'
 import { useTranslation } from '@/i18n/useTranslation'
 import type { Category, TopicNode } from './types'
@@ -8,12 +8,14 @@ interface MaterialsHeaderProps {
   activeCat: Category
   categories: Map<Category, TopicNode[]> // Виправлено тип
   onCategoryChange: (cat: Category) => void
+  onOpenSidebar?: () => void  // Mobile sidebar toggle
 }
 
 export const MaterialsHeader = memo(function MaterialsHeader({
   activeCat,
   categories,
   onCategoryChange,
+  onOpenSidebar,
 }: MaterialsHeaderProps) {
   const { t } = useTranslation()
   const [showDropdown, setShowDropdown] = useState(false)
@@ -82,6 +84,16 @@ export const MaterialsHeader = memo(function MaterialsHeader({
       <div className="px-4 sm:px-6 md:px-7 py-5 md:py-6 border-b border-neutral-100 dark:border-neutral-800/50">
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
           <div className="flex items-center gap-3">
+            {/* Mobile Hamburger Menu */}
+            {onOpenSidebar && (
+              <button
+                onClick={onOpenSidebar}
+                className="lg:hidden p-2 -ml-2 rounded-lg hover:bg-neutral-100 dark:hover:bg-neutral-800 text-neutral-600 dark:text-neutral-400 transition-colors"
+                aria-label="Open sections menu"
+              >
+                <Menu size={22} />
+              </button>
+            )}
             <div className="p-2.5 rounded-xl bg-primary-50 dark:bg-primary-900/20 text-primary-600 dark:text-primary-400">
               <BookOpen className="w-6 h-6" />
             </div>

@@ -14,11 +14,17 @@ interface TopicQueryParams {
 
 /**
  * Helper to get localized text from JSON field
+ * Searches for requested language, then falls back to any available language (UA, PL, EN)
  */
 function getLocalizedText(jsonField: any, lang: string, fallback: string): string {
   if (jsonField && typeof jsonField === 'object' && !Array.isArray(jsonField)) {
+    // First, try the requested language
     if (jsonField[lang]) return jsonField[lang]
-    if (jsonField['EN']) return jsonField['EN']
+    // Fallback: try all supported languages in order
+    const fallbackLangs = ['EN', 'UA', 'PL']
+    for (const fbLang of fallbackLangs) {
+      if (jsonField[fbLang]) return jsonField[fbLang]
+    }
   }
   return fallback
 }

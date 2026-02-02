@@ -1,11 +1,12 @@
-import { useState, useEffect, useMemo, useCallback } from 'react'
+import { useState, useEffect, useMemo, useCallback, useRef } from 'react'
 import {
   Trophy, CheckCircle2, Clock, Sparkles, ChevronRight,
-  Award, Target, Lock, Loader2, ArrowRight, RotateCcw
+  Award, Target, Lock, Loader2, ArrowRight, RotateCcw, Save
 } from 'lucide-react'
 
 import { api } from '@/lib/http'
 import { useTranslation } from '@/i18n/useTranslation'
+import { useAuth } from '@/auth/AuthContext'
 import type { Quiz, QuizLite, Lang, LocalizedString } from '@packages/shared'
 
 interface TopicQuizSectionProps {
@@ -26,6 +27,18 @@ const getLocalizedText = (json: LocalizedString | undefined | null, fallback: st
   return json[lang] || json['EN'] || fallback
 }
 
+// Helper to generate localStorage key for quiz session
+function getQuizStorageKey(quizId: string, userId: string): string {
+  return `quiz_session_${quizId}_${userId}`
+}
+
+interface PersistedQuizSession {
+  currentQuestion: number
+  answers: Record<string, string>
+  timeLeft: number
+  savedAt: number
+}
+
 export function TopicQuizSection({
   quizzes,
   allMaterialsViewed,
@@ -35,10 +48,13 @@ export function TopicQuizSection({
   onQuizComplete,
 }: TopicQuizSectionProps) {
   const { t } = useTranslation()
+  const { user } = useAuth()
   const [quiz, setQuiz] = useState<Quiz | null>(null)
   const [quizToken, setQuizToken] = useState<string | null>(null)
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const [draftSaved, setDraftSaved] = useState(false)
+  const saveTimeoutRef = useRef<NodeJS.Timeout | null>(null)
   
   // Quiz Session State
   const [quizStarted, setQuizStarted] = useState(false)
@@ -69,6 +85,91 @@ export function TopicQuizSection({
     if (quizStarted) return 'in-progress'
     return 'ready'
   }, [allMaterialsViewed, showResults, quizStarted])
+
+  // Prevent accidental exit when quiz is in progress
+  useEffect(() => {
+    const handleBeforeUnload = (e: BeforeUnloadEvent) => {
+      if (quizState === 'in-progress') {
+        e.preventDefault()
+        e.returnValue = '' // Trigger browser warning
+      }
+    }
+    window.addEventListener('beforeunload', handleBeforeUnload)
+    return () => window.removeEventListener('beforeunload', handleBeforeUnload)
+  }, [quizState])
+
+  // Storage key for this quiz session
+  const storageKey = useMemo(() => {
+    if (!quiz?.id || !user?.id) return null
+    return getQuizStorageKey(quiz.id, user.id)
+  }, [quiz?.id, user?.id])
+
+  // Clear session from localStorage
+  const clearSession = useCallback(() => {
+    if (storageKey) {
+      try {
+        localStorage.removeItem(storageKey)
+      } catch (e) {
+        console.warn('Failed to clear quiz session:', e)
+      }
+    }
+  }, [storageKey])
+
+  // Load persisted session when quiz loads
+  useEffect(() => {
+    if (!storageKey || !quiz || !quizStarted) return
+    
+    try {
+      const saved = localStorage.getItem(storageKey)
+      if (saved) {
+        const parsed: PersistedQuizSession = JSON.parse(saved)
+        // Check if session is not too old (max 2 hours)
+        const maxAge = 2 * 60 * 60 * 1000
+        if (Date.now() - parsed.savedAt < maxAge) {
+          setCurrentQuestion(parsed.currentQuestion)
+          setAnswers(parsed.answers)
+          // Restore time left if it's valid
+          if (parsed.timeLeft > 0 && parsed.timeLeft <= quiz.durationSec) {
+            setTimeLeft(parsed.timeLeft)
+          }
+        } else {
+          // Session expired, clear it
+          clearSession()
+        }
+      }
+    } catch (e) {
+      console.warn('Failed to load quiz session:', e)
+    }
+  }, [storageKey, quiz?.id, quizStarted])
+
+  // Save session to localStorage when answers or question change
+  useEffect(() => {
+    if (!storageKey || !quizStarted || showResults || !quiz) return
+    
+    // Only save if there's actual progress
+    if (Object.keys(answers).length === 0 && currentQuestion === 0) return
+    
+    try {
+      const session: PersistedQuizSession = {
+        currentQuestion,
+        answers,
+        timeLeft,
+        savedAt: Date.now()
+      }
+      localStorage.setItem(storageKey, JSON.stringify(session))
+      
+      // Show "Draft saved" indicator briefly
+      setDraftSaved(true)
+      if (saveTimeoutRef.current) clearTimeout(saveTimeoutRef.current)
+      saveTimeoutRef.current = setTimeout(() => setDraftSaved(false), 2000)
+    } catch (e) {
+      console.warn('Failed to save quiz session:', e)
+    }
+    
+    return () => {
+      if (saveTimeoutRef.current) clearTimeout(saveTimeoutRef.current)
+    }
+  }, [currentQuestion, answers, timeLeft, storageKey, quizStarted, showResults, quiz])
 
   // Timer Logic
   useEffect(() => {
@@ -147,6 +248,9 @@ export function TopicQuizSection({
       setShowResults(true)
       setQuizStarted(false)
 
+      // Clear localStorage after successful submission
+      clearSession()
+
       // Notify parent with actual pass/fail status
       onQuizComplete?.(result.passed)
     } catch (e) {
@@ -167,7 +271,8 @@ export function TopicQuizSection({
     setPassed(false)
     setCurrentQuestion(0)
     setError(null)
-  }, [])
+    clearSession() // Clear localStorage on reset
+  }, [clearSession])
 
   const formatTime = (seconds: number) => {
     const mins = Math.floor(seconds / 60)
@@ -305,9 +410,18 @@ export function TopicQuizSection({
           <div className="space-y-6">
             {/* Progress & Timer */}
             <div className="flex items-center justify-between">
-              <span className="text-sm font-bold text-neutral-500 uppercase tracking-wider">
-                {t('quiz.question', 'Question')} {currentQuestion + 1} / {quiz.questions.length}
-              </span>
+              <div className="flex items-center gap-3">
+                <span className="text-sm font-bold text-neutral-500 uppercase tracking-wider">
+                  {t('quiz.question', 'Question')} {currentQuestion + 1} / {quiz.questions.length}
+                </span>
+                {/* Draft Saved Indicator */}
+                <span className={`flex items-center gap-1 text-xs text-green-600 dark:text-green-400 transition-opacity duration-300 ${
+                  draftSaved ? 'opacity-100' : 'opacity-0'
+                }`}>
+                  <Save size={12} />
+                  Draft saved
+                </span>
+              </div>
               <div className={`flex items-center gap-2 px-3 py-1.5 rounded-lg font-mono font-medium text-sm ${
                 timeLeft < 30 ? 'bg-red-100 text-red-600 dark:bg-red-900/30 dark:text-red-400' : 'bg-neutral-100 text-neutral-600 dark:bg-neutral-800 dark:text-neutral-300'
               }`}>

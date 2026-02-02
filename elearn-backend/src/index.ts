@@ -16,6 +16,7 @@ import morgan from 'morgan'
 import cookieParser from 'cookie-parser'
 
 import { logger } from './utils/logger.js'
+import { prisma } from './db.js'
 
 // Import Routes
 import authRouter from './routes/auth.js'
@@ -32,7 +33,7 @@ import activityRouter from './routes/activity.js'
 
 // Import Middleware
 import { generalLimiter, authLimiter } from './middleware/rateLimit.js'
-import { validateCsrf, validateCsrfSoft } from './middleware/csrf.js'
+import { validateCsrf } from './middleware/csrf.js'
 import { errorHandler, notFoundHandler } from './middleware/errorHandler.js'
 
 const app = express()
@@ -80,11 +81,11 @@ app.use(cookieParser())
 app.use(express.json({ limit: '1mb' }))
 
 // --- CSRF Protection (Mutating methods only) ---
-// TEMPORARY: Using soft validation for cross-domain debugging
+// PRODUCTION: Using strict CSRF validation for all mutating methods
 app.use('/api', (req, res, next) => {
   const mutatingMethods = ['POST', 'PUT', 'PATCH', 'DELETE']
   if (mutatingMethods.includes(req.method)) {
-    return validateCsrfSoft(req, res, next)
+    return validateCsrf(req, res, next)
   }
   next()
 })
@@ -126,10 +127,9 @@ async function gracefulShutdown(signal: string) {
     }
     logger.info('HTTP server closed')
     try {
-      const { prisma } = await import('./db.js')
-      // Safe disconnect if using prisma extensions
+      // Use top-level imported prisma instance for stable shutdown
       if (prisma && '$disconnect' in prisma) {
-        await (prisma as any).$disconnect()
+        await prisma.$disconnect()
         logger.info('Database connection closed')
       }
     } catch (dbErr) {

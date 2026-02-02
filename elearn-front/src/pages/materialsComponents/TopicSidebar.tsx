@@ -1,5 +1,5 @@
-import { memo, useCallback } from 'react'
-import { ChevronRight, Layout, Pencil, Trash2, Plus } from 'lucide-react'
+import { memo, useCallback, useEffect } from 'react'
+import { ChevronRight, Layout, Pencil, Trash2, Plus, X } from 'lucide-react'
 import type { TopicNode } from './types'
 import { useTranslation } from '@/i18n/useTranslation'
 import type { Lang, LocalizedString } from '@packages/shared'
@@ -181,7 +181,7 @@ export const TopicSidebar = memo(function TopicSidebar({
   const { t, lang } = useTranslation()
   
   return (
-    <aside className="hidden lg:flex lg:flex-col sticky top-24 h-[calc(100vh-6rem)] overflow-hidden">
+    <aside className="hidden lg:flex lg:flex-col sticky top-24 h-[calc(100vh-6rem)] overflow-hidden" aria-label="Topic navigation">
       <div className="rounded-2xl md:rounded-3xl bg-white dark:bg-neutral-900 border border-neutral-200 dark:border-neutral-800 p-4 md:p-5 shadow-sm flex flex-col h-full">
         <div className="flex items-center gap-3 mb-4 shrink-0">
           <div className="inline-flex h-8 w-8 items-center justify-center rounded-lg bg-primary-100 dark:bg-primary-900/30 text-primary-600 dark:text-primary-300">
@@ -229,5 +229,135 @@ export const TopicSidebar = memo(function TopicSidebar({
         </nav>
       </div>
     </aside>
+  )
+})
+
+// Mobile Sidebar Drawer Component
+interface MobileSidebarProps extends TopicSidebarProps {
+  isOpen: boolean
+  onClose: () => void
+}
+
+export const MobileSidebar = memo(function MobileSidebar({
+  isOpen,
+  onClose,
+  catTopics,
+  activeTopicId,
+  activeSubId,
+  loading,
+  isEditable,
+  onSelectTopic,
+  onSelectSub,
+  onAddTopic,
+  onEditTopic,
+  onDeleteTopic,
+}: MobileSidebarProps) {
+  const { t, lang } = useTranslation()
+
+  // Close on escape key
+  useEffect(() => {
+    const handleEscape = (e: KeyboardEvent) => {
+      if (e.key === 'Escape' && isOpen) onClose()
+    }
+    document.addEventListener('keydown', handleEscape)
+    return () => document.removeEventListener('keydown', handleEscape)
+  }, [isOpen, onClose])
+
+  // Prevent body scroll when open
+  useEffect(() => {
+    if (isOpen) {
+      document.body.style.overflow = 'hidden'
+    } else {
+      document.body.style.overflow = ''
+    }
+    return () => { document.body.style.overflow = '' }
+  }, [isOpen])
+
+  // Handle topic selection and close drawer
+  const handleSelectTopic = useCallback((topicId: string) => {
+    onSelectTopic(topicId)
+    onClose()
+  }, [onSelectTopic, onClose])
+
+  const handleSelectSub = useCallback((topicId: string, subId: string) => {
+    onSelectSub(topicId, subId)
+    onClose()
+  }, [onSelectSub, onClose])
+
+  return (
+    <>
+      {/* Backdrop */}
+      <div
+        className={`fixed inset-0 z-40 bg-black/50 backdrop-blur-sm transition-opacity duration-300 lg:hidden ${
+          isOpen ? 'opacity-100' : 'opacity-0 pointer-events-none'
+        }`}
+        onClick={onClose}
+        aria-hidden="true"
+      />
+
+      {/* Drawer */}
+      <aside
+        className={`fixed inset-y-0 left-0 z-50 w-80 max-w-[85vw] bg-white dark:bg-neutral-900 shadow-2xl transform transition-transform duration-300 ease-out lg:hidden ${
+          isOpen ? 'translate-x-0' : '-translate-x-full'
+        }`}
+        aria-label="Mobile topic navigation"
+        aria-modal="true"
+        role="dialog"
+      >
+        {/* Header */}
+        <div className="flex items-center justify-between p-4 border-b border-neutral-200 dark:border-neutral-800">
+          <div className="flex items-center gap-3">
+            <div className="inline-flex h-8 w-8 items-center justify-center rounded-lg bg-primary-100 dark:bg-primary-900/30 text-primary-600 dark:text-primary-300">
+              <Layout size={18} />
+            </div>
+            <p className="text-sm font-bold text-neutral-600 dark:text-neutral-300 uppercase tracking-wide">
+              {t('materials.sections', 'Sections')}
+            </p>
+          </div>
+          <button
+            onClick={onClose}
+            className="p-2 rounded-lg hover:bg-neutral-100 dark:hover:bg-neutral-800 text-neutral-500 transition-colors"
+            aria-label={t('common.close', 'Close')}
+          >
+            <X size={20} />
+          </button>
+        </div>
+
+        {/* Content */}
+        <nav className="flex-1 overflow-y-auto p-4 space-y-2 h-[calc(100%-4rem)]">
+          {catTopics.map((topic, idx) => (
+            <SidebarTopicItem
+              key={topic.id}
+              topic={topic}
+              index={idx}
+              isActive={activeTopicId === topic.id}
+              activeSubId={activeSubId}
+              lang={lang as Lang}
+              isEditable={isEditable}
+              onSelectTopic={handleSelectTopic}
+              onSelectSub={handleSelectSub}
+              onEditTopic={onEditTopic}
+              onDeleteTopic={onDeleteTopic}
+            />
+          ))}
+
+          {catTopics.length === 0 && !loading && (
+            <div className="py-8 text-center text-xs text-neutral-400 border-2 border-dashed border-neutral-100 dark:border-neutral-800 rounded-xl">
+              {t('materials.noSections', 'No sections found')}
+            </div>
+          )}
+
+          {isEditable && (
+            <button
+              onClick={onAddTopic}
+              className="w-full mt-4 inline-flex items-center justify-center gap-2 rounded-xl border-2 border-dashed border-neutral-300 text-neutral-500 hover:border-primary-500 hover:text-primary-600 dark:border-neutral-700 dark:text-neutral-400 dark:hover:border-primary-400 dark:hover:text-primary-300 py-3 transition-colors"
+            >
+              <Plus size={18} />
+              <span className="text-sm font-semibold">{t('admin.createTopic', 'Create Topic')}</span>
+            </button>
+          )}
+        </nav>
+      </aside>
+    </>
   )
 })

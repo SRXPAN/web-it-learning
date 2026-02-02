@@ -19,7 +19,8 @@ export function generateCsrfToken(): string {
  */
 export function setCsrfToken(req: Request, res: Response): void {
   const token = generateCsrfToken()
-  const isProd = process.env.NODE_ENV === 'production'
+  // Robust isProd detection for Render and other platforms
+  const isProd = process.env.NODE_ENV === 'production' || process.env.RENDER === 'true'
   
   res.cookie(CSRF_COOKIE, token, {
     httpOnly: false, // JS має мати доступ для читання

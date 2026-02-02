@@ -1,10 +1,15 @@
 // src/utils/cookie.ts
 import type { CookieOptions } from 'express'
 import { getEnv } from './env.js'
+import { logger } from './logger.js'
 
-const isProd = process.env.NODE_ENV === 'production'
+// Robust isProd detection for Render and other platforms
+const isProd = process.env.NODE_ENV === 'production' || process.env.RENDER === 'true'
 const ACCESS_TOKEN_MAX_AGE = 15 * 60 * 1000 // 15 хвилин
 const REFRESH_TOKEN_MAX_AGE = parseInt(getEnv('REFRESH_TOKEN_EXPIRES_DAYS', '7')) * 24 * 60 * 60 * 1000
+
+// Log NODE_ENV on module load to verify production mode
+logger.info(`[Cookie Config] NODE_ENV=${process.env.NODE_ENV}, RENDER=${process.env.RENDER}, isProd=${isProd}, secure=${isProd}, sameSite=${isProd ? 'none' : 'lax'}`)
 
 /**
  * Налаштування cookie для access токена (короткоживучий)

@@ -129,6 +129,17 @@ export function SkeletonAvatar({ size = 40, showName = true, className = '' }: {
 // Page Specific Skeletons
 // ========================================
 
+/** Скелетон для сітки карток матеріалів (6 карток) */
+export function MaterialsGridSkeleton({ count = 6 }: { count?: number }) {
+  return (
+    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+      {Array.from({ length: count }).map((_, i) => (
+        <CardSkeleton key={i} />
+      ))}
+    </div>
+  )
+}
+
 /** Повний скелетон для Dashboard */
 export function SkeletonDashboard() {
   return (
@@ -247,3 +258,5 @@ export function PageLoader({ text = 'Завантаження...' }: { text?: st
 export function Loading({ text }: { text?: string }) {
   return <PageLoader text={text} />
 }
+// Alias exports for naming consistency
+export { SkeletonDashboard as DashboardSkeleton }
