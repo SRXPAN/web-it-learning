@@ -1,10 +1,14 @@
-# Cache static assets for 1 year
-/*.{js,css,png,jpg,jpeg,gif,svg,woff,woff2,ttf,eot,ico}$
-  Cache-Control: public, max-age=31536000, immutable
+# Cache static assets with short TTL for revalidation
+/assets/*.{js,css}
+  Cache-Control: public, max-age=3600, must-revalidate
+
+# Cache other static assets for 1 day (longer but with revalidation)
+/*.{png,jpg,jpeg,gif,svg,woff,woff2,ttf,eot,ico}
+  Cache-Control: public, max-age=86400, must-revalidate
 
 # Cache HTML with revalidation
 /*.html
-  Cache-Control: public, max-age=3600, must-revalidate
+  Cache-Control: public, max-age=0, must-revalidate
 
 # API calls - no cache
 /api/*
