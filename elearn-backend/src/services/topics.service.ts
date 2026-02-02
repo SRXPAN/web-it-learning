@@ -260,22 +260,27 @@ export async function getTopicByIdOrSlug(
       })).map(v => v.materialId)
     : []
 
+  // Ensure materials and quizzes are always arrays (never null/undefined) to prevent UI crashes
+  const safeMaterials = topic.materials || []
+  const safeQuizzes = topic.quizzes || []
+  const safeChildren = topic.children || []
+
   return {
     ...topic,
     name: getLocalizedText(topic.nameJson, lang, topic.name),
     description: getLocalizedText(topic.descJson, lang, topic.description),
-    children: topic.children.map(c => ({
+    children: safeChildren.map(c => ({
       ...c,
       name: getLocalizedText(c.nameJson, lang, c.name)
     })),
-    materials: topic.materials.map(m => ({
+    materials: safeMaterials.map(m => ({
       ...m,
       title: getLocalizedText(m.titleJson, lang, m.title),
       url: getLocalizedText(m.urlJson, lang, m.url || ''),
       content: getLocalizedText(m.contentJson, lang, m.content || ''),
       isSeen: viewedMaterials.includes(m.id)
     })),
-    quizzes: topic.quizzes.map(q => ({
+    quizzes: safeQuizzes.map(q => ({
       ...q,
       title: getLocalizedText(q.titleJson, lang, q.title)
     }))

@@ -20,12 +20,17 @@ router.get('/summary', requireAuth, asyncHandler(async (req: Request, res: Respo
   const userId = req.user!.id
   const lang = (req.query.lang as string || 'EN') as Lang
 
-  // 0. Get user info (for XP)
+  // 0. Get user info (for XP) - Real-time from database
   const user = await prisma.user.findUnique({
     where: { id: userId },
     select: { xp: true }
   })
   const userXp = user?.xp ?? 0
+
+  // Get real completed lessons count from database
+  const completedLessonsCount = await prisma.materialView.count({
+    where: { userId }
+  })
 
   // 1. Get REAL streak data (not hardcoded)
   const streakData = await calculateStreak(userId)
@@ -59,6 +64,7 @@ router.get('/summary', requireAuth, asyncHandler(async (req: Request, res: Respo
     
     return res.json({
       userXp,
+      completedLessons: completedLessonsCount,
       stats: {
         streak: { ...streakData, history },
         activity: { 
@@ -143,15 +149,53 @@ router.get('/summary', requireAuth, asyncHandler(async (req: Request, res: Respo
     history.push(activityDates.has(dateStr))
   }
 
-  // Daily goals (for now, placeholder)
-  const dailyGoals = [
-    { id: '1', text: 'Complete 1 lesson', isCompleted: false },
-    { id: '2', text: 'Score 80%+ on quiz', isCompleted: false },
-    { id: '3', text: 'Study 30 minutes', isCompleted: false }
+  // Daily goals - Use realistic goals based on activity
+  const dailyGoalsData = [
+    { id: '1', text: 'Complete 1 lesson', isCompleted: totalQuizAttempts > 0 },
+    { id: '2', text: 'Score 80%+ on quiz', isCompleted: false }, // Will be updated dynamically
+    { id: '3', text: 'Study 30 minutes', isCompleted: totalTimeSpent >= 1800 }
   ]
+
+  // Get weak spots: Topics where user scores are below 70%
+  const lowScoringQuizzes = await prisma.quizAttempt.groupBy({
+    by: ['quizId'],
+    where: {
+      userId,
+      score: { lt: 70 }
+    },
+    _avg: { score: true },
+    orderBy: { _avg: { score: 'asc' } },
+    take: 3
+  })
+
+  const weakSpotsList = []
+  for (const quiz of lowScoringQuizzes) {
+    const quizData = await prisma.quiz.findUnique({
+      where: { id: quiz.quizId },
+      select: { title: true, titleJson: true, topic: { select: { name: true } } }
+    })
+    if (quizData?.topic) {
+      const score = Math.round(quiz._avg?.score ?? 0)
+      weakSpotsList.push({
+        topic: quizData.topic.name,
+        advice: `You scored ${score}% on average. Practice this topic more to improve your understanding.`
+      })
+    }
+  }
+
+  // Tip of the Day - rotate through tips
+  const tips = [
+    'Practice makes perfect! Keep learning every day.',
+    'Review previous topics to strengthen your foundations.',
+    'Take breaks between sessions to retain information better.',
+    'Try to score 80%+ on quizzes for maximum XP.',
+    'Focus on weak spots first to improve faster.'
+  ]
+  const tipOfTheDay = tips[Math.floor(new Date().getTime() / 86400000) % tips.length]
 
   res.json({
     userXp,
+    completedLessons: completedLessonsCount,
     stats: {
       streak: {
         current: streakData.current,
@@ -165,11 +209,11 @@ router.get('/summary', requireAuth, asyncHandler(async (req: Request, res: Respo
       }
     },
     recentTopics,
-    dailyGoals,
-    weakSpots: [],
-    tipOfTheDay: 'Practice makes perfect! Keep learning every day.',
+    dailyGoals: dailyGoalsData,
+    weakSpots: weakSpotsList,
+    tipOfTheDay,
     achievements: [
-      { id: 'first_material', name: 'First Steps', description: 'View your first material', earned: totalTimeSpent > 0 },
+      { id: 'first_material', name: 'First Steps', description: 'View your first material', earned: completedLessonsCount > 0 },
       { id: 'quiz_master', name: 'Quiz Master', description: 'Complete 5 quizzes', earned: totalQuizAttempts >= 5 },
       { id: 'streak_7', name: '7-Day Streak', description: 'Maintain a 7-day streak', earned: streakData.current >= 7 }
     ]

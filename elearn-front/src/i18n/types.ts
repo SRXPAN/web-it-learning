@@ -216,6 +216,10 @@ export type TranslationKey =
   | 'quiz.achievement.perfectScore'
   | 'quiz.achievement.accuracy90'
   | 'quiz.error.historyLoadFailed'
+  | 'quiz.error.startFailed'
+  | 'quiz.error.submitFailed'
+  | 'quiz.hint.needPass'
+  
 
   // ============================================
   // LESSON (30 keys)

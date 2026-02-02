@@ -167,7 +167,11 @@ export async function submitQuizAttempt(
     }
   })
 
-  const xpEarned = correctCount * 10
+  // Pass threshold: user must score at least 70% to pass and earn XP
+  const PASS_THRESHOLD = 0.70
+  const scorePercentage = quiz.questions.length > 0 ? correctCount / quiz.questions.length : 0
+  const passed = scorePercentage >= PASS_THRESHOLD
+  const xpEarned = passed ? correctCount * 10 : 0
 
   // Save attempt in transaction
   await prisma.$transaction(async (tx) => {
@@ -181,27 +185,32 @@ export async function submitQuizAttempt(
       },
     })
     
-    logger.info(`[submitQuizAttempt] Created quiz attempt ${attempt.id} for user ${userId}, quiz ${quizId}. Score: ${correctCount}/${quiz.questions.length}`)
+    logger.info(`[submitQuizAttempt] Created quiz attempt ${attempt.id} for user ${userId}, quiz ${quizId}. Score: ${correctCount}/${quiz.questions.length}, Passed: ${passed}`)
 
     if (rows.length) {
       const rowsWithAttempt = rows.map((r) => ({ ...r, attemptId: attempt.id }))
       await tx.answer.createMany({ data: rowsWithAttempt, skipDuplicates: true })
     }
     
-    await tx.user.update({
-      where: { id: userId },
-      data: { xp: { increment: xpEarned } },
-    })
+    // Only award XP if user passed the quiz
+    if (xpEarned > 0) {
+      await tx.user.update({
+        where: { id: userId },
+        data: { xp: { increment: xpEarned } },
+      })
+    }
   })
 
   // Log quiz attempt in daily activity
   logger.info(`[submitQuizAttempt] Updating daily activity for user ${userId}`)
   await updateDailyActivity(userId, { quizAttempts: 1 })
-  logger.info(`[submitQuizAttempt] Quiz attempt successfully recorded for user ${userId}`)
+  logger.info(`[submitQuizAttempt] Quiz attempt successfully recorded for user ${userId}, passed: ${passed}`)
 
   return {
     correct: correctCount,
     total: quiz.questions.length,
+    score: Math.round(scorePercentage * 100),
+    passed,
     xpEarned,
     correctMap,
     solutions: explanationMap,

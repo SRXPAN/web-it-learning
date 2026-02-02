@@ -49,6 +49,7 @@ export function TopicQuizSection({
   // Results State
   const [showResults, setShowResults] = useState(false)
   const [score, setScore] = useState(0)
+  const [passed, setPassed] = useState(false)
   const [_correctIds, setCorrectIds] = useState<Record<string, string>>({})
 
   // Filter duplicate quizzes (by ID) - defensive programming
@@ -141,13 +142,13 @@ export function TopicQuizSection({
       )
       
       setScore(result.correct)
+      setPassed(result.passed)
       setCorrectIds(result.correctMap || {})
       setShowResults(true)
       setQuizStarted(false)
 
-      if (result.passed) {
-        onQuizComplete?.(true)
-      }
+      // Notify parent with actual pass/fail status
+      onQuizComplete?.(result.passed)
     } catch (e) {
       console.error('Failed to submit quiz:', e)
       setError(e instanceof Error ? e.message : 'Failed to submit quiz')
@@ -163,6 +164,7 @@ export function TopicQuizSection({
     setShowResults(false)
     setAnswers({})
     setScore(0)
+    setPassed(false)
     setCurrentQuestion(0)
     setError(null)
   }, [])
@@ -369,21 +371,22 @@ export function TopicQuizSection({
         {quizState === 'completed' && quiz && (
           <div className="space-y-6 text-center">
             <div className={`py-8 rounded-2xl border-2 border-dashed ${
-              score >= quiz.questions.length * 0.75
+              passed
                 ? 'bg-green-50 border-green-200 dark:bg-green-900/10 dark:border-green-900/30'
                 : 'bg-orange-50 border-orange-200 dark:bg-orange-900/10 dark:border-orange-900/30'
             }`}>
               <div className={`w-20 h-20 mx-auto rounded-full flex items-center justify-center mb-4 ${
-                score >= quiz.questions.length * 0.75 ? 'bg-green-100 text-green-600' : 'bg-orange-100 text-orange-600'
+                passed ? 'bg-green-100 text-green-600' : 'bg-orange-100 text-orange-600'
               }`}>
-                {score >= quiz.questions.length * 0.75 ? <Trophy size={40} /> : <Target size={40} />}
+                {passed ? <Trophy size={40} /> : <Target size={40} />}
               </div>
               
               <h3 className="text-2xl font-bold text-neutral-900 dark:text-white mb-1">
-                {score >= quiz.questions.length * 0.75 ? t('quiz.congratulations', 'Congratulations!') : t('quiz.tryAgain', 'Keep Practicing')}
+                {passed ? t('quiz.congratulations', 'Congratulations!') : t('quiz.tryAgain', 'Keep Practicing')}
               </h3>
               <p className="text-neutral-500 dark:text-neutral-400">
                 You scored <span className="font-bold text-neutral-900 dark:text-white">{score}</span> out of {quiz.questions.length}
+                {!passed && <span className="block text-sm mt-1">{t('quiz.hint.needPass', 'You need at least 70% to pass and earn XP')}</span>}
               </p>
             </div>
 

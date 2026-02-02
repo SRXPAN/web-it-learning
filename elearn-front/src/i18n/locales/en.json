@@ -252,6 +252,15 @@
   "quiz.error": "An error occurred",
   "quiz.mode": "Mode",
   "quiz.mode.practice": "Practice",
+  "quiz.mode.exam": "Exam",
+  "quiz.timeLimit": "Time Limit",
+  "quiz.achievement.firstQuiz": "First Quiz Completed",
+  "quiz.achievement.perfectScore": "Perfect Score",
+  "quiz.achievement.accuracy90": "90% Accuracy",
+  "quiz.error.startFailed": "Failed to start quiz",
+  "quiz.error.submitFailed": "Failed to submit quiz",
+  "quiz.hint.needPass": "You need to pass the quiz to continue",
+  
 
   "lesson.breadcrumb.algorithms": "Algorithms",
   "lesson.breadcrumb.search": "Search",

@@ -68,11 +68,13 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   }
 
   async function register(name: string, email: string, password: string): Promise<void> {
-    const { user: userData } = await api<AuthResponse>('/auth/register', { 
+    // After registration, DO NOT set user - they need to verify email first
+    // The response is returned but we don't authenticate them yet
+    await api<AuthResponse>('/auth/register', { 
       method: 'POST', 
       body: JSON.stringify({ name, email, password }), 
     })
-    setUser(userData)
+    // Keep user as null until they verify email or log in
   }
 
   async function logout(): Promise<void> {
