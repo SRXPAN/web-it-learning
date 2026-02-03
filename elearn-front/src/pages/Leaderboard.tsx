@@ -116,7 +116,7 @@ export default function Leaderboard() {
             {t('leaderboard.title', 'Leaderboard')}
           </h1>
           <p className="text-neutral-500 mt-1">
-            {t('leaderboard.loading', 'Top learners this week')}
+            {t('leaderboard.subtitle', 'Top learners this week')}
           </p>
         </div>
         <div className="px-3 py-1 bg-primary-50 dark:bg-primary-900/30 text-primary-700 dark:text-primary-300 rounded-full text-sm font-medium">

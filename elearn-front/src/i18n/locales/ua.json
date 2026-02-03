@@ -404,6 +404,7 @@
   "editor.loading.questions": "Завантаження питань...",
 
   "leaderboard.title": "Рейтинг",
+  "leaderboard.subtitle": "Найкращі учні цього тижня",
   "leaderboard.user": "Користувач",
   "leaderboard.level": "Рівень",
   "leaderboard.participants": "Учасники",

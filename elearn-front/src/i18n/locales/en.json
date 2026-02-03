@@ -405,6 +405,7 @@
   "editor.loading.questions": "Loading questions...",
 
   "leaderboard.title": "Leaderboard",
+  "leaderboard.subtitle": "Top learners this week",
   "leaderboard.user": "User",
   "leaderboard.level": "Level",
   "leaderboard.participants": "Participants",

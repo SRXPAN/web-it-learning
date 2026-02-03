@@ -356,9 +356,10 @@ export type TranslationKey =
   | 'badge.legend'
 
   // ============================================
-  // LEADERBOARD (8 keys)
+  // LEADERBOARD (9 keys)
   // ============================================
   | 'leaderboard.title'
+  | 'leaderboard.subtitle'
   | 'leaderboard.loading'
   | 'leaderboard.participants'
   | 'leaderboard.level'
