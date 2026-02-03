@@ -81,10 +81,13 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       localStorage.setItem('refresh_token', response.refreshToken)
     }
     
-    // Refresh CSRF token after login (new session = new CSRF)
-    await fetchCsrfToken().catch(err => console.warn('CSRF refresh warning:', err))
-    
+    // Set user first
     setUser(response.user)
+    
+    // Refresh CSRF token after login (new session = new CSRF)
+    // Add a small delay to ensure cookies are set properly before fetching CSRF
+    await new Promise(resolve => setTimeout(resolve, 100))
+    await fetchCsrfToken().catch(err => console.warn('CSRF refresh warning:', err))
   }
 
   async function register(name: string, email: string, password: string): Promise<void> {
@@ -106,7 +109,13 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       // Clear localStorage tokens
       localStorage.removeItem('access_token')
       localStorage.removeItem('refresh_token')
+      
+      // Clear user state first
       setUser(null)
+      
+      // Wait for React to update before redirecting to prevent DOM errors
+      await new Promise(resolve => setTimeout(resolve, 150))
+      
       // Опціонально: повне перезавантаження, щоб очистити кеш стану додатка
       // window.location.href = '/login'
     }

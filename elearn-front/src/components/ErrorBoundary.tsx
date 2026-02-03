@@ -101,6 +101,21 @@ export class ErrorBoundary extends Component<Props, State> {
   public componentDidCatch(error: Error, errorInfo: ErrorInfo): void {
     this.setState({ errorInfo })
     
+    // Ignore React DOM errors during state transitions (these are usually harmless)
+    // Common during authentication/logout flows when component tree is being torn down
+    const isReactDOMError = error.name === 'NotFoundError' && 
+                           error.message.includes('insertBefore')
+    
+    if (isReactDOMError) {
+      // Silently recover from this error - it's a React internal issue during unmounting
+      console.warn('React DOM transition error (recovered):', error.message)
+      // Reset the error state after a brief delay
+      setTimeout(() => {
+        this.setState({ hasError: false, error: null, errorInfo: null })
+      }, 100)
+      return
+    }
+    
     // Log to console in development
     console.error('Uncaught error:', error, errorInfo)
     

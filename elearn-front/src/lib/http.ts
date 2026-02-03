@@ -79,8 +79,14 @@ $api.interceptors.response.use(
     const data = error.response?.data as any
     const message = data?.message || data?.error || error.message || 'Something went wrong'
 
-    // Не показувати тост, якщо це 401 (бо ми перенаправляємо) або 429
-    if (status !== 401 && status !== 429) {
+    // Не показувати тост для певних випадків:
+    // - 401: автоматичне перенаправлення на логін
+    // - 429: rate limit (окремий UI для цього)
+    // - 403 для activity/ping: це не критична помилка, не треба показувати користувачу
+    const url = error.config?.url || ''
+    const isActivityPing = url.includes('/activity/ping')
+    
+    if (status !== 401 && status !== 429 && !(status === 403 && isActivityPing)) {
        // Перевіряємо, чи dispatchToast існує (щоб не ламало тести/SSR)
        try {
          dispatchToast(typeof message === 'string' ? message : 'Request failed', 'error')
