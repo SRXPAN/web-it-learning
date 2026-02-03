@@ -521,8 +521,11 @@
   "badge.firstSteps": "Pierwsze kroki",
   "badge.risingStar": "Wschodząca Gwiazda",
   "badge.dedicatedLearner": "Pilny Uczeń",
+  "badge.bookworm": "Moł książkowy",
   "badge.quizMaster": "Mistrz Quizów",
+  "badge.scholar": "Uczony",
   "badge.expert": "Ekspert",
+  "badge.guru": "Guru",
   "badge.legend": "Legenda",
 
   "category.programming": "Programowanie",

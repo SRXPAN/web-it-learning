@@ -27,8 +27,11 @@ const BADGE_INFO: Record<string, BadgeConfig> = {
   first_steps: { icon: Star, labelKey: 'badge.firstSteps', color: 'text-yellow-500', bg: 'bg-yellow-500/10' },
   rising_star: { icon: Flame, labelKey: 'badge.risingStar', color: 'text-orange-500', bg: 'bg-orange-500/10' },
   dedicated_learner: { icon: Medal, labelKey: 'badge.dedicatedLearner', color: 'text-blue-500', bg: 'bg-blue-500/10' },
+  bookworm: { icon: Award, labelKey: 'badge.bookworm', color: 'text-teal-500', bg: 'bg-teal-500/10' },
   quiz_master: { icon: Award, labelKey: 'badge.quizMaster', color: 'text-purple-500', bg: 'bg-purple-500/10' },
+  scholar: { icon: Medal, labelKey: 'badge.scholar', color: 'text-indigo-500', bg: 'bg-indigo-500/10' },
   expert: { icon: Trophy, labelKey: 'badge.expert', color: 'text-green-500', bg: 'bg-green-500/10' },
+  guru: { icon: Crown, labelKey: 'badge.guru', color: 'text-rose-500', bg: 'bg-rose-500/10' },
   legend: { icon: Crown, labelKey: 'badge.legend', color: 'text-amber-500', bg: 'bg-amber-500/10' },
 }
 

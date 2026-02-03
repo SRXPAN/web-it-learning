@@ -518,8 +518,11 @@
   "badge.firstSteps": "First Steps",
   "badge.risingStar": "Rising Star",
   "badge.dedicatedLearner": "Dedicated Learner",
+  "badge.bookworm": "Bookworm",
   "badge.quizMaster": "Quiz Master",
+  "badge.scholar": "Scholar",
   "badge.expert": "Expert",
+  "badge.guru": "Guru",
   "badge.legend": "Legend",
 
   "category.programming": "Programming",

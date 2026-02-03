@@ -347,13 +347,16 @@ export type TranslationKey =
   | 'error.noPermission'
 
   // ============================================
-  // BADGE (6 keys)
+  // BADGE (9 keys)
   // ============================================
   | 'badge.firstSteps'
   | 'badge.risingStar'
   | 'badge.dedicatedLearner'
+  | 'badge.bookworm'
   | 'badge.quizMaster'
+  | 'badge.scholar'
   | 'badge.expert'
+  | 'badge.guru'
   | 'badge.legend'
 
   // ============================================

@@ -520,8 +520,11 @@
   "badge.firstSteps": "Перші кроки",
   "badge.risingStar": "Висхідна зірка",
   "badge.dedicatedLearner": "Старанний учень",
+  "badge.bookworm": "Книжковий хробак",
   "badge.quizMaster": "Майстер тестів",
+  "badge.scholar": "Вчений",
   "badge.expert": "Експерт",
+  "badge.guru": "Гуру",
   "badge.legend": "Легенда",
 
   "category.programming": "Програмування",

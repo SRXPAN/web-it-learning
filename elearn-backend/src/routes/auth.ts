@@ -219,6 +219,76 @@ router.put(
   })
 )
 
+// PUT /api/auth/email — змінити email
+router.put(
+  '/email',
+  requireAuth,
+  asyncHandler(async (req: Request, res: Response) => {
+    const { newEmail, password } = req.body
+    
+    if (!newEmail || !password) {
+      throw AppError.badRequest('New email and password are required')
+    }
+    
+    // Validate email format
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
+    if (!emailRegex.test(newEmail)) {
+      throw AppError.badRequest('Invalid email format')
+    }
+    
+    // Only allow @gmail.com emails
+    if (!newEmail.toLowerCase().endsWith('@gmail.com')) {
+      throw AppError.badRequest('Email must end with @gmail.com')
+    }
+    
+    // Get user with password
+    const user = await prisma.user.findUnique({
+      where: { id: req.user!.id },
+      select: { id: true, password: true, email: true }
+    })
+    
+    if (!user) {
+      throw AppError.notFound('User not found')
+    }
+    
+    // Verify password
+    const isValid = await bcrypt.compare(password, user.password)
+    if (!isValid) {
+      throw AppError.unauthorized('Incorrect password')
+    }
+    
+    // Check if email is already in use
+    const existingUser = await prisma.user.findUnique({
+      where: { email: newEmail.toLowerCase().trim() }
+    })
+    
+    if (existingUser && existingUser.id !== user.id) {
+      throw AppError.conflict('Email already in use')
+    }
+    
+    // Update email
+    await prisma.user.update({
+      where: { id: user.id },
+      data: { 
+        email: newEmail.toLowerCase().trim(),
+        emailVerified: false // Require re-verification
+      }
+    })
+    
+    await auditLog({
+      userId: user.id,
+      action: AuditActions.UPDATE,
+      resource: AuditResources.USER,
+      resourceId: user.id,
+      metadata: { oldEmail: user.email, newEmail: newEmail.toLowerCase().trim() },
+      ip: req.ip,
+      userAgent: req.headers['user-agent'],
+    })
+    
+    return ok(res, { message: 'Email changed successfully' })
+  })
+)
+
 // POST /api/auth/forgot-password — запит на скидання паролю
 router.post(
   '/forgot-password',

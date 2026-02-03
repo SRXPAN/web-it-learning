@@ -1,6 +1,6 @@
 import { useState, useRef } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { Settings, Globe, Palette, Sun, Moon, Lock, Camera, Trash2, AlertTriangle } from 'lucide-react'
+import { Settings, Globe, Palette, Sun, Moon, Lock, Camera, Trash2, AlertTriangle, Mail } from 'lucide-react'
 
 import { useAuth } from '@/auth/AuthContext'
 import { useTheme } from '@/store/theme'
@@ -112,9 +112,9 @@ export default function Profile() {
   const [passwordForm, setPasswordForm] = useState({ current: '', new: '', confirm: '' })
   const [passwordState, setPasswordState] = useState({ loading: false, error: null as string | null, success: false })
   
-  // Email form state - reserved for future email change feature
-  const [_emailForm, _setEmailForm] = useState({ email: '', password: '' })
-  const [_emailState, _setEmailState] = useState({ loading: false, error: null as string | null, success: false })
+  // Email form state
+  const [emailForm, setEmailForm] = useState({ email: '', password: '' })
+  const [emailState, setEmailState] = useState({ loading: false, error: null as string | null, success: false })
   
   const [showDeleteDialog, setShowDeleteDialog] = useState(false)
   const [deleteLoading, setDeleteLoading] = useState(false)
@@ -202,6 +202,27 @@ export default function Profile() {
       setTimeout(() => setPasswordState(s => ({ ...s, success: false })), 3000)
     } catch (err: any) {
       setPasswordState({ loading: false, error: err.message || 'Failed', success: false })
+    }
+  }
+
+  const handleChangeEmail = async (e: React.FormEvent) => {
+    e.preventDefault()
+    setEmailState({ loading: true, error: null, success: false })
+    
+    // Validate email format
+    if (!emailForm.email.toLowerCase().endsWith('@gmail.com')) {
+      setEmailState({ loading: false, error: t('auth.emailMustBeGmail', 'Email must end with @gmail.com'), success: false })
+      return
+    }
+
+    try {
+      await apiPut('/auth/email', { newEmail: emailForm.email, password: emailForm.password })
+      setEmailState({ loading: false, error: null, success: true })
+      setEmailForm({ email: '', password: '' })
+      await refresh()
+      setTimeout(() => setEmailState(s => ({ ...s, success: false })), 3000)
+    } catch (err: any) {
+      setEmailState({ loading: false, error: err.message || 'Failed', success: false })
     }
   }
 
@@ -364,6 +385,51 @@ export default function Profile() {
           </form>
         </section>
       </div>
+
+      {/* 2.5 Email Change Section */}
+      <section className="card">
+        <SectionHeader icon={Mail} title={t('profile.action.changeEmail', 'Change Email')} />
+        
+        <form onSubmit={handleChangeEmail} className="space-y-4 max-w-md">
+          <div>
+            <label className="block text-sm font-medium text-neutral-700 dark:text-neutral-300 mb-1.5">
+              {t('profile.label.newEmail', 'New Email')}
+            </label>
+            <input
+              type="email"
+              value={emailForm.email}
+              onChange={e => setEmailForm(s => ({...s, email: e.target.value}))}
+              placeholder={t('profile.placeholder.newEmail', 'Enter new email')}
+              className="w-full rounded-xl border px-3 py-2.5 bg-white dark:bg-neutral-900 border-neutral-200 dark:border-neutral-800 focus:border-primary-500 focus:ring-2 focus:ring-primary-500/20 transition-all outline-none"
+              required
+            />
+            <p className="text-xs text-neutral-500 mt-1">{t('auth.emailMustBeGmail', 'Email must end with @gmail.com')}</p>
+          </div>
+          
+          <PasswordInput
+            value={emailForm.password}
+            onChange={e => setEmailForm(s => ({...s, password: e.target.value}))}
+            placeholder={t('profile.label.currentPassword', 'Current Password')}
+            required
+          />
+          
+          {emailState.error && (
+            <p className="text-xs text-red-500 bg-red-50 dark:bg-red-900/20 p-2 rounded-lg">{emailState.error}</p>
+          )}
+          {emailState.success && (
+            <p className="text-xs text-green-500 bg-green-50 dark:bg-green-900/20 p-2 rounded-lg">{t('profile.success.emailChanged', 'Email changed!')}</p>
+          )}
+
+          <LoadingButton 
+            type="submit" 
+            loading={emailState.loading}
+            className="w-full sm:w-auto"
+            disabled={!emailForm.email || !emailForm.password}
+          >
+            {t('profile.action.changeEmail', 'Change Email')}
+          </LoadingButton>
+        </form>
+      </section>
 
       {/* 3. Danger Zone */}
       <section className="card border-red-100 dark:border-red-900/30 overflow-hidden">
