@@ -78,8 +78,9 @@ export function setCsrfToken(req: Request, res: Response): void {
 }
 
 /**
- * Middleware для валідації CSRF токена (Stateless)
- * Перевіряє що токен валідний через HMAC
+ * Middleware для валідації CSRF токена (Stateless HMAC)
+ * Перевіряє що токен валідний через HMAC підпис
+ * НЕ вимагає порівняння з cookie - працює для cross-domain
  */
 export function validateCsrf(req: Request, res: Response, next: NextFunction): void {
   // Пропускаємо для безпечних методів
@@ -87,22 +88,21 @@ export function validateCsrf(req: Request, res: Response, next: NextFunction): v
     return next()
   }
 
-  const cookieToken = req.cookies?.[CSRF_COOKIE]
   const headerToken = req.headers[CSRF_HEADER] as string | undefined
+  const cookieToken = req.cookies?.[CSRF_COOKIE]
 
-  if (!cookieToken || !headerToken) {
+  // Приймаємо токен з header АБО з cookie (для cross-domain сумісності)
+  const tokenToValidate = headerToken || cookieToken
+
+  if (!tokenToValidate) {
+    logger.warn('[CSRF] Token missing', { method: req.method, path: req.path })
     res.status(403).json({ error: 'CSRF token missing' })
     return
   }
 
-  // Перевіряємо що cookie і header однакові
-  if (cookieToken !== headerToken) {
-    res.status(403).json({ error: 'CSRF token mismatch' })
-    return
-  }
-
-  // Перевіряємо валідність токена через HMAC
-  if (!verifyCsrfToken(headerToken)) {
+  // Перевіряємо валідність токена через HMAC (stateless)
+  if (!verifyCsrfToken(tokenToValidate)) {
+    logger.warn('[CSRF] Token invalid or expired', { method: req.method, path: req.path })
     res.status(403).json({ error: 'CSRF token invalid or expired' })
     return
   }
