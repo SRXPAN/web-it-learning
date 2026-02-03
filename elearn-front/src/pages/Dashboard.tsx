@@ -21,7 +21,7 @@ import {
 interface DashboardData {
   userXp: number;
   stats: {
-    streak: { current: number; longest: number; lastActiveDate: Date | null; history: boolean[] };
+    streak: { current: number; longest: number; lastActiveDate: Date | null; history: boolean[]; historyDates?: string[] };
     activity: { 
       timeSpent: number; 
       quizAttempts: number;
@@ -146,6 +146,16 @@ export default function Dashboard() {
   }
 
   if (!data) return null
+
+  const localeMap: Record<string, string> = { UA: 'uk-UA', PL: 'pl-PL', EN: 'en-US' }
+  const historyDates = data.stats.streak.historyDates
+  const streakLabels = Array.isArray(historyDates) && historyDates.length === 7
+    ? historyDates.map((dateStr) => {
+        const d = new Date(`${dateStr}T00:00:00Z`)
+        return d.toLocaleDateString(localeMap[lang] || 'en-US', { weekday: 'short' })
+      })
+    : streakDays
+  const todayIndex = Array.isArray(historyDates) ? historyDates.length - 1 : streakLabels.length - 1
 
   return (
     <div className="space-y-6 animate-in fade-in duration-500">
@@ -352,11 +362,12 @@ export default function Dashboard() {
               </div>
             </div>
             <div className="flex justify-between items-center bg-neutral-50 dark:bg-neutral-800/50 p-3 rounded-xl">
-              {streakDays.map((day, idx) => (
+              {streakLabels.map((day, idx) => (
                 <StreakDay 
                   key={idx} 
                   day={day} 
                   active={data.stats.streak.history[idx]} 
+                  isToday={idx === todayIndex}
                 />
               ))}
             </div>

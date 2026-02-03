@@ -130,9 +130,10 @@ export function WeakSpotItem({ topic, advice }: WeakSpotItemProps) {
 interface StreakDayProps {
   active: boolean
   day: string
+  isToday?: boolean
 }
 
-export function StreakDay({ active, day }: StreakDayProps) {
+export function StreakDay({ active, day, isToday = false }: StreakDayProps) {
   return (
     <div className="flex flex-col items-center gap-1">
       <div
@@ -140,11 +141,11 @@ export function StreakDay({ active, day }: StreakDayProps) {
           active
             ? 'bg-gradient-to-br from-primary-600 to-primary-700 shadow-neo text-white'
             : 'bg-neutral-200 dark:bg-neutral-800'
-        }`}
+        } ${isToday ? 'ring-2 ring-primary-400 ring-offset-2 ring-offset-neutral-50 dark:ring-offset-neutral-900' : ''}`}
       >
         {active && <div className="w-2 h-2 bg-white rounded-full" />}
       </div>
-      <span className="text-xs text-neutral-500 dark:text-neutral-400 font-medium">{day}</span>
+      <span className={`text-xs font-medium ${isToday ? 'text-primary-600 dark:text-primary-400' : 'text-neutral-500 dark:text-neutral-400'}`}>{day}</span>
     </div>
   )
 }
