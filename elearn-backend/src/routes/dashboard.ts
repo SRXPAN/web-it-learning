@@ -8,6 +8,7 @@ import {
   getRecentActivity,
   getViewedMaterialIds,
 } from '../services/progress.service.js'
+import { dailyGoalsDatabase } from '../config/dailyGoals.js'
 import type { Lang } from '../shared'
 
 const router = Router()
@@ -51,29 +52,45 @@ router.get('/summary', requireAuth, asyncHandler(async (req: Request, res: Respo
     select: { materialId: true, viewedAt: true },
   })
 
+  // Generate 7-day history for streak visualization (UTC-safe)
+  const today = new Date()
+  today.setUTCHours(0, 0, 0, 0)
+  const activityDates = new Set(activities.map(a => new Date(a.date).toISOString().split('T')[0]))
+  
+  const history: boolean[] = []
+  const historyDates: string[] = []
+  for (let i = 6; i >= 0; i--) {
+    const checkDate = new Date(today)
+    checkDate.setUTCDate(checkDate.getUTCDate() - i)
+    const dateStr = checkDate.toISOString().split('T')[0]
+    historyDates.push(dateStr)
+    history.push(activityDates.has(dateStr))
+  }
+
+  // Daily goals - localized by requested language
+  const findGoalText = (id: string) => {
+    const goal = dailyGoalsDatabase.find(g => g.id === id)
+    return goal?.translations?.[lang] || goal?.translations?.EN || 'Goal'
+  }
+  const dailyGoalsData = [
+    { id: 'g1', text: findGoalText('g1'), isCompleted: totalQuizAttempts > 0 },
+    { id: 'g6', text: findGoalText('g6'), isCompleted: completedLessonsCount > 0 },
+    { id: 'g18', text: findGoalText('g18'), isCompleted: totalTimeSpent >= 1800 }
+  ]
+
   if (recentViews.length === 0) {
-    // Generate empty 7-day history
-    const today = new Date()
-    today.setUTCHours(0, 0, 0, 0)
-    const history: boolean[] = []
-    for (let i = 6; i >= 0; i--) {
-      const checkDate = new Date(today)
-      checkDate.setDate(checkDate.getDate() - i)
-      history.push(false)
-    }
-    
     return res.json({
       userXp,
       completedLessons: completedLessonsCount,
       stats: {
-        streak: { ...streakData, history },
+        streak: { ...streakData, history, historyDates },
         activity: { 
           timeSpent: 0, 
           quizAttempts: 0
         }
       },
       recentTopics: [],
-      dailyGoals: [],
+      dailyGoals: dailyGoalsData,
       weakSpots: [],
       tipOfTheDay: 'Practice makes perfect! Keep learning every day.',
       achievements: [
@@ -136,26 +153,6 @@ router.get('/summary', requireAuth, asyncHandler(async (req: Request, res: Respo
     })
     .sort((a, b) => b.lastViewedAt.getTime() - a.lastViewedAt.getTime())
 
-  // Generate 7-day history for streak visualization
-  const today = new Date()
-  today.setUTCHours(0, 0, 0, 0)
-  const activityDates = new Set(activities.map(a => new Date(a.date).toISOString().split('T')[0]))
-  
-  const history: boolean[] = []
-  for (let i = 6; i >= 0; i--) {
-    const checkDate = new Date(today)
-    checkDate.setDate(checkDate.getDate() - i)
-    const dateStr = checkDate.toISOString().split('T')[0]
-    history.push(activityDates.has(dateStr))
-  }
-
-  // Daily goals - Use realistic goals based on activity
-  const dailyGoalsData = [
-    { id: '1', text: 'Complete 1 lesson', isCompleted: totalQuizAttempts > 0 },
-    { id: '2', text: 'Score 80%+ on quiz', isCompleted: false }, // Will be updated dynamically
-    { id: '3', text: 'Study 30 minutes', isCompleted: totalTimeSpent >= 1800 }
-  ]
-
   // Get weak spots: Topics where user scores are below 70%
   const lowScoringQuizzes = await prisma.quizAttempt.groupBy({
     by: ['quizId'],
@@ -201,7 +198,8 @@ router.get('/summary', requireAuth, asyncHandler(async (req: Request, res: Respo
         current: streakData.current,
         longest: streakData.longest,
         lastActiveDate: streakData.lastActiveDate,
-        history
+        history,
+        historyDates
       },
       activity: {
         timeSpent: totalTimeSpent,
