@@ -135,9 +135,9 @@ interface StreakDayProps {
 
 export function StreakDay({ active, day, isToday = false }: StreakDayProps) {
   return (
-    <div className="flex flex-col items-center gap-1">
+    <div className="flex flex-col items-center gap-1 min-w-0">
       <div
-        className={`w-8 h-8 rounded-lg transition-all flex items-center justify-center ${
+        className={`w-7 h-7 sm:w-8 sm:h-8 rounded-lg transition-all flex items-center justify-center ${
           active
             ? 'bg-gradient-to-br from-primary-600 to-primary-700 shadow-neo text-white'
             : 'bg-neutral-200 dark:bg-neutral-800'
@@ -145,7 +145,7 @@ export function StreakDay({ active, day, isToday = false }: StreakDayProps) {
       >
         {active && <div className="w-2 h-2 bg-white rounded-full" />}
       </div>
-      <span className={`text-xs font-medium ${isToday ? 'text-primary-600 dark:text-primary-400' : 'text-neutral-500 dark:text-neutral-400'}`}>{day}</span>
+      <span className={`text-[11px] sm:text-xs font-medium ${isToday ? 'text-primary-600 dark:text-primary-400' : 'text-neutral-500 dark:text-neutral-400'}`}>{day}</span>
     </div>
   )
 }

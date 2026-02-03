@@ -163,7 +163,7 @@ export default function Dashboard() {
       {/* 1. Hero Section */}
       <div className="card bg-white dark:bg-neutral-900 border-neutral-100 dark:border-neutral-800">
         <div className="grid md:grid-cols-[1fr_auto] gap-6 items-center">
-          <div className="flex items-center gap-5">
+          <div className="flex flex-col sm:flex-row sm:items-center gap-5">
             <div className="w-16 h-16 sm:w-20 sm:h-20 rounded-2xl bg-gradient-to-br from-primary-600 to-accent-500 flex items-center justify-center shadow-lg shadow-primary-500/20">
               <span className="text-3xl font-display font-bold text-white">
                 {user?.name?.charAt(0).toUpperCase() || 'U'}
@@ -189,7 +189,7 @@ export default function Dashboard() {
             </div>
           </div>
 
-          <div className="grid grid-cols-3 gap-3 w-full md:w-auto">
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 w-full md:w-auto">
             <StatCard 
               icon={Flame} 
               label={t('dashboard.streak', 'Streak')} 
@@ -229,7 +229,7 @@ export default function Dashboard() {
               <h2 className="text-xl font-display font-bold text-neutral-900 dark:text-white px-1">
                 {t('dashboard.continueLearning', 'Continue Learning')}
               </h2>
-              <div className="grid sm:grid-cols-2 gap-4">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 {data.recentTopics.map(topic => (
                   <div key={topic.id} className="card group hover:border-primary-200 dark:hover:border-primary-800 transition-colors">
                     <div className="flex flex-col h-full">
@@ -244,7 +244,7 @@ export default function Dashboard() {
                       
                       <div className="mt-auto space-y-4">
                         <ProgressBar value={topic.progress} className="h-1.5" />
-                        <div className="flex gap-3">
+                        <div className="flex flex-col sm:flex-row gap-2 sm:gap-3">
                           <Link 
                             to={`/materials?topic=${topic.slug}`} 
                             className="btn btn-sm flex-1 flex items-center justify-center gap-2"
@@ -289,7 +289,7 @@ export default function Dashboard() {
                       : 'bg-white border-neutral-100 dark:bg-neutral-800/50 dark:border-neutral-800'
                   }`}
                 >
-                  <label className="flex items-center gap-3 cursor-pointer flex-1 select-none">
+                  <label className="flex items-center gap-3 cursor-pointer flex-1 select-none min-w-0">
                     <div className={`w-5 h-5 rounded border flex items-center justify-center transition-colors ${
                       g.isCompleted
                         ? 'bg-green-500 border-green-500 text-white'
@@ -303,7 +303,7 @@ export default function Dashboard() {
                       checked={g.isCompleted} 
                       onChange={() => toggleGoal(g.id, g.isCompleted)}
                     />
-                    <span className={`font-medium transition-colors ${
+                    <span className={`font-medium transition-colors break-words ${
                       g.isCompleted 
                         ? 'text-green-700 dark:text-green-400 line-through decoration-green-500/30' 
                         : 'text-neutral-700 dark:text-neutral-200'
@@ -361,15 +361,17 @@ export default function Dashboard() {
                 </p>
               </div>
             </div>
-            <div className="flex justify-between items-center bg-neutral-50 dark:bg-neutral-800/50 p-3 rounded-xl">
-              {streakLabels.map((day, idx) => (
-                <StreakDay 
-                  key={idx} 
-                  day={day} 
-                  active={data.stats.streak.history[idx]} 
-                  isToday={idx === todayIndex}
-                />
-              ))}
+            <div className="bg-neutral-50 dark:bg-neutral-800/50 p-3 rounded-xl">
+              <div className="grid grid-cols-7 gap-2">
+                {streakLabels.map((day, idx) => (
+                  <StreakDay 
+                    key={idx} 
+                    day={day} 
+                    active={data.stats.streak.history[idx]} 
+                    isToday={idx === todayIndex}
+                  />
+                ))}
+              </div>
             </div>
           </div>
 
