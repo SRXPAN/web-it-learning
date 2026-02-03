@@ -171,6 +171,8 @@
   "dashboard.weekday.sat": "Сб",
   "dashboard.weekday.sun": "Нд",
   "dashboard.activityThisWeek": "Активність цього тижня",
+  "dashboard.LongestStreak": "Найдовша серія",
+  "dashboard.LastActive": "Остання активність",
 
   "materials.title": "Матеріали",
   "materials.all": "Всі матеріали",

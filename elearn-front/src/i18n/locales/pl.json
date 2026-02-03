@@ -171,6 +171,9 @@
   "dashboard.weekday.sat": "Sob",
   "dashboard.weekday.sun": "Ndz",
   "dashboard.activityThisWeek": "Aktywność w tym tygodniu",
+  "dashboard.LongestStreak": "Najdłuższa seria",
+  "dashboard.LastActive": "Ostatnia aktywność",
+
 
   "materials.title": "Materiały",
   "materials.all": "Wszystkie materiały",

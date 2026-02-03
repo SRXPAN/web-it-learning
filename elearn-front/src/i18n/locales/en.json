@@ -171,6 +171,8 @@
   "dashboard.weekday.sat": "Sat",
   "dashboard.weekday.sun": "Sun",
   "dashboard.activityThisWeek": "Activity This Week",
+  "dashboard.LongestStreak": "Longest Streak",
+  "dashboard.LastActive": "Last Active",
 
   "materials.title": "Materials",
   "materials.all": "All Materials",

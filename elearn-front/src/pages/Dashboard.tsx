@@ -8,7 +8,7 @@ import {
 import { useAuth } from '@/auth/AuthContext'
 import { useTranslation } from '@/i18n/useTranslation'
 import { useActivityTracker } from '@/hooks/useActivityTracker'
-import { apiGet, apiPost } from '@/lib/http'
+import { apiGet, apiPost, fetchCsrfToken } from '@/lib/http'
 import { SkeletonDashboard } from '@/components/Skeletons'
 import QuizHistory from '@/components/QuizHistory'
 import { 
@@ -124,11 +124,17 @@ export default function Dashboard() {
     try {
       await apiPost(`/progress/goals/${goalId}/toggle`, {})
     } catch {
-      // Revert if failed
-      setData(prev => prev ? ({
-        ...prev,
-        dailyGoals: prev.dailyGoals.map(g => g.id === goalId ? { ...g, isCompleted: currentState } : g)
-      }) : null)
+      try {
+        await fetchCsrfToken()
+        await apiPost(`/progress/goals/${goalId}/toggle`, {})
+        return
+      } catch {
+        // Revert if failed
+        setData(prev => prev ? ({
+          ...prev,
+          dailyGoals: prev.dailyGoals.map(g => g.id === goalId ? { ...g, isCompleted: currentState } : g)
+        }) : null)
+      }
     }
   }
 
@@ -149,13 +155,40 @@ export default function Dashboard() {
 
   const localeMap: Record<string, string> = { UA: 'uk-UA', PL: 'pl-PL', EN: 'en-US' }
   const historyDates = data.stats.streak.historyDates
-  const streakLabels = Array.isArray(historyDates) && historyDates.length === 7
-    ? historyDates.map((dateStr) => {
+  const historyMap = new Map<string, boolean>()
+  if (Array.isArray(historyDates)) {
+    historyDates.forEach((dateStr, idx) => {
+      historyMap.set(dateStr, Boolean(data.stats.streak.history[idx]))
+    })
+  }
+
+  const getWeekDatesFromMonday = (isoDate: string) => {
+    const base = new Date(`${isoDate}T00:00:00Z`)
+    const day = base.getUTCDay() // 0=Sun..6=Sat
+    const diffToMonday = (day + 6) % 7
+    const monday = new Date(base)
+    monday.setUTCDate(base.getUTCDate() - diffToMonday)
+    return Array.from({ length: 7 }, (_, i) => {
+      const d = new Date(monday)
+      d.setUTCDate(monday.getUTCDate() + i)
+      return d.toISOString().split('T')[0]
+    })
+  }
+
+  const todayStr = Array.isArray(historyDates) ? historyDates[historyDates.length - 1] : undefined
+  const orderedDates = todayStr ? getWeekDatesFromMonday(todayStr) : historyDates
+  const orderedHistory = Array.isArray(orderedDates)
+    ? orderedDates.map(dateStr => historyMap.get(dateStr) ?? false)
+    : data.stats.streak.history
+  const streakLabels = Array.isArray(orderedDates) && orderedDates.length === 7
+    ? orderedDates.map((dateStr) => {
         const d = new Date(`${dateStr}T00:00:00Z`)
         return d.toLocaleDateString(localeMap[lang] || 'en-US', { weekday: 'short' })
       })
     : streakDays
-  const todayIndex = Array.isArray(historyDates) ? historyDates.length - 1 : streakLabels.length - 1
+  const todayIndex = Array.isArray(orderedDates) && todayStr
+    ? Math.max(0, orderedDates.findIndex(date => date === todayStr))
+    : streakLabels.length - 1
 
   return (
     <div className="space-y-6 animate-in fade-in duration-500">
@@ -189,15 +222,7 @@ export default function Dashboard() {
             </div>
           </div>
 
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 w-full md:w-auto">
-            <StatCard 
-              icon={Flame} 
-              label={t('dashboard.streak', 'Streak')} 
-              value={data.stats.streak.current} 
-              sub={t('dashboard.days', 'days')}
-              color="text-orange-500"
-              bgColor="bg-orange-50 dark:bg-orange-900/20"
-            />
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 w-full md:w-auto">
             <StatCard 
               icon={Target} 
               label={t('dashboard.attempts', 'Attempts')} 
@@ -394,7 +419,7 @@ export default function Dashboard() {
                       <StreakDay 
                         key={idx} 
                         day={day} 
-                        active={data.stats.streak.history[idx]} 
+                        active={orderedHistory[idx]} 
                         isToday={idx === todayIndex}
                       />
                     ))}
