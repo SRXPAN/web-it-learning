@@ -108,27 +108,27 @@ export const MaterialsHeader = memo(function MaterialsHeader({
           </div>
 
           {/* Mobile Dropdown */}
-          <div className="relative sm:hidden" ref={dropdownRef}>
+          <div className="relative sm:hidden w-full" ref={dropdownRef}>
             <button
               onClick={() => setShowDropdown(!showDropdown)}
               className="w-full flex items-center justify-between gap-3 px-4 py-3 rounded-xl bg-neutral-100 dark:bg-neutral-800 border border-neutral-200 dark:border-neutral-700 transition-colors"
             >
-              <div className="flex items-center gap-3">
-                <span className="text-primary-600 dark:text-primary-400">
+              <div className="flex items-center gap-3 min-w-0">
+                <span className="text-primary-600 dark:text-primary-400 flex-shrink-0">
                   <CategoryIcon category={activeCat} />
                 </span>
-                <span className="font-medium text-neutral-900 dark:text-white">
+                <span className="font-medium text-neutral-900 dark:text-white truncate">
                   {getCategoryName(activeCat)}
                 </span>
               </div>
               <ChevronDown
                 size={18}
-                className={`text-neutral-500 transition-transform ${showDropdown ? 'rotate-180' : ''}`}
+                className={`text-neutral-500 transition-transform flex-shrink-0 ${showDropdown ? 'rotate-180' : ''}`}
               />
             </button>
 
             {showDropdown && (
-              <div className="absolute top-full left-0 right-0 mt-2 py-2 bg-white dark:bg-neutral-900 rounded-xl border border-neutral-200 dark:border-neutral-700 shadow-xl z-50 max-h-80 overflow-auto">
+              <div className="absolute top-full left-0 w-full mt-2 py-2 bg-white dark:bg-neutral-900 rounded-xl border border-neutral-200 dark:border-neutral-700 shadow-xl z-50 max-h-80 overflow-auto">
                 {catArray.map((cat) => {
                   const isActive = activeCat === cat
                   const count = categories.get(cat)?.length || 0
@@ -143,15 +143,15 @@ export const MaterialsHeader = memo(function MaterialsHeader({
                         isActive ? 'bg-primary-50 dark:bg-primary-900/20' : ''
                       }`}
                     >
-                      <div className="flex items-center gap-3">
-                        <span className={isActive ? 'text-primary-600 dark:text-primary-400' : 'text-neutral-500 dark:text-neutral-400'}>
+                      <div className="flex items-center gap-3 min-w-0 flex-1">
+                        <span className={`flex-shrink-0 ${isActive ? 'text-primary-600 dark:text-primary-400' : 'text-neutral-500 dark:text-neutral-400'}`}>
                           <CategoryIcon category={cat} />
                         </span>
-                        <span className={`font-medium ${isActive ? 'text-primary-700 dark:text-primary-300' : 'text-neutral-700 dark:text-neutral-300'}`}>
+                        <span className={`font-medium truncate ${isActive ? 'text-primary-700 dark:text-primary-300' : 'text-neutral-700 dark:text-neutral-300'}`}>
                           {getCategoryName(cat)}
                         </span>
                       </div>
-                      <div className="flex items-center gap-2">
+                      <div className="flex items-center gap-2 flex-shrink-0">
                         <span className="text-xs text-neutral-400 dark:text-neutral-500">{count}</span>
                         {isActive && <Check size={16} className="text-primary-600 dark:text-primary-400" />}
                       </div>
