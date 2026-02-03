@@ -1,4 +1,4 @@
-import { useCallback, useState, lazy, Suspense } from 'react'
+import { useCallback, useState, lazy, Suspense, useEffect } from 'react'
 import { Routes, Route, NavLink, useNavigate, useLocation } from 'react-router-dom'
 import { LayoutDashboard, BookOpen, Trophy, User, LogOut, LucideIcon, Menu, X, Shield } from 'lucide-react'
 
@@ -64,6 +64,22 @@ export default function App() {
   const { t } = useTranslation()
   const nav = useNavigate()
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false)
+  
+  // Suppress insertBefore errors from DOM mutation race conditions
+  useEffect(() => {
+    const originalError = console.error
+    console.error = function(...args) {
+      const msg = args[0]?.toString?.() || String(args[0])
+      if (msg?.includes?.('insertBefore') || msg?.includes?.('Node')) {
+        console.warn('[DOM Mutation] Suppressed insertBefore error:', msg)
+        return
+      }
+      originalError.apply(console, args)
+    }
+    return () => {
+      console.error = originalError
+    }
+  }, [])
   
   const handleLogout = useCallback(async () => {
     await logout()
