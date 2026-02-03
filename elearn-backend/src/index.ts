@@ -63,14 +63,28 @@ const allowed = Array.from(
   )
 )
 
+// Log allowed origins for debugging
+logger.info(`CORS allowed origins: ${allowed.join(', ')}`)
+
 app.use(cors({
   origin: (origin, cb) => {
-    if (!origin || allowed.includes(origin)) return cb(null, true)
-    return cb(new Error('CORS not allowed'), false)
+    // Allow requests with no origin (like mobile apps, Postman, etc.)
+    if (!origin) return cb(null, true)
+    
+    if (allowed.includes(origin)) {
+      return cb(null, true)
+    }
+    
+    logger.warn(`CORS: Blocked request from origin: ${origin}`)
+    return cb(new Error(`CORS not allowed for origin: ${origin}`), false)
   },
   credentials: true,
   methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
-  allowedHeaders: ['Content-Type', 'Authorization', 'x-csrf-token']
+  allowedHeaders: ['Content-Type', 'Authorization', 'x-csrf-token', 'X-Requested-With'],
+  exposedHeaders: ['Content-Length', 'Content-Type'],
+  maxAge: 86400, // 24 hours - cache preflight requests
+  preflightContinue: false,
+  optionsSuccessStatus: 204
 }))
 
 // --- Logging ---
@@ -79,6 +93,11 @@ app.use(cookieParser())
 
 // --- Body Parser ---
 app.use(express.json({ limit: '1mb' }))
+
+// --- Explicit OPTIONS handler for all routes ---
+// This ensures CORS preflight requests are handled correctly
+// Especially important when using Cloudflare or other proxies
+app.options('*', cors())
 
 // --- CSRF Protection (Mutating methods only) ---
 // Stateless CSRF validation - works across multiple instances

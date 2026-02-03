@@ -8,7 +8,7 @@ import {
 import { useAuth } from '@/auth/AuthContext'
 import { useTranslation } from '@/i18n/useTranslation'
 import { useActivityTracker } from '@/hooks/useActivityTracker'
-import { api } from '@/lib/http'
+import { apiGet, apiPost } from '@/lib/http'
 import { SkeletonDashboard } from '@/components/Skeletons'
 import QuizHistory from '@/components/QuizHistory'
 import { 
@@ -91,7 +91,7 @@ export default function Dashboard() {
         setLoading(true)
         // В реальності ти можеш зробити один запит GET /dashboard/summary
         // або кілька паралельних, як тут:
-        const response = await api<DashboardData>(`/dashboard/summary?lang=${lang}`)
+        const response = await apiGet<DashboardData>(`/dashboard/summary?lang=${lang}`)
         
         if (mounted) {
           setData(response)
@@ -122,7 +122,7 @@ export default function Dashboard() {
     }) : null)
 
     try {
-      await api(`/progress/goals/${goalId}/toggle`, { method: 'POST' })
+      await apiPost(`/progress/goals/${goalId}/toggle`, {})
     } catch {
       // Revert if failed
       setData(prev => prev ? ({

@@ -3,7 +3,7 @@ import { useSearchParams } from 'react-router-dom'
 
 import useCatalogStore from '@/store/catalog'
 import { useTranslation } from '@/i18n/useTranslation'
-import { api } from '@/lib/http'
+import { apiPost } from '@/lib/http'
 import type { Category } from '@packages/shared'
 
 import {
@@ -147,10 +147,7 @@ export default function Materials() {
     
     // Mark material as seen on backend
     try {
-      await api('/progress/viewed', {
-        method: 'POST',
-        body: JSON.stringify({ materialId: material.id })
-      })
+      await apiPost('/progress/viewed', { materialId: material.id })
     } catch (e) {
       console.error('Failed to mark material as complete', e)
       // Reload topics to ensure consistency if API call failed

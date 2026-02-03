@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react'
 import { X, AlignLeft, Link as LinkIcon, Video, FileText } from 'lucide-react'
 import { useTranslation } from '@/i18n/useTranslation'
-import { api } from '@/lib/http'
+import { apiPost } from '@/lib/http'
 import { LoadingButton } from '@/components/LoadingButton'
 import type { Material, Lang, LocalizedString, MaterialType } from '@packages/shared'
 
@@ -154,10 +154,7 @@ export const MaterialModal: React.FC<MaterialModalProps> = ({
           payload.urlJson = normalizedUrls
         }
 
-        await api(`/editor/topics/${lessonId}/materials`, {
-          method: 'POST',
-          body: JSON.stringify(payload)
-        })
+        await apiPost(`/editor/topics/${lessonId}/materials`, payload)
       }
 
       onSave()

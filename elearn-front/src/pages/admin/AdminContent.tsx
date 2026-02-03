@@ -14,7 +14,7 @@ import { QuizModal } from '@/pages/materialsComponents/QuizModal'
 import EditQuizModal from '@/pages/materialsComponents/EditQuizModal'
 import { SkeletonDashboard } from '@/components/Skeletons'
 import { LoadingButton } from '@/components/LoadingButton'
-import { api } from '@/lib/http'
+import { apiPost, apiPut } from '@/lib/http'
 
 import type { TopicNode, Material } from '@/pages/materialsComponents/types'
 import type { Lang, LocalizedString, Category, MaterialType } from '@packages/shared'
@@ -415,15 +415,9 @@ function TopicEditModal({
 
     try {
       if (isCreating) {
-        await api('/editor/topics', { 
-          method: 'POST', 
-          body: JSON.stringify(form) 
-        })
+        await apiPost('/editor/topics', form)
       } else {
-        await api(`/editor/topics/${form.id}`, { 
-          method: 'PUT', 
-          body: JSON.stringify(form) 
-        })
+        await apiPut(`/editor/topics/${form.id}`, form)
       }
       onSave()
     } catch (err: any) {

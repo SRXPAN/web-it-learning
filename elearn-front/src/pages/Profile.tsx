@@ -5,7 +5,7 @@ import { Settings, Globe, Palette, Sun, Moon, Lock, Camera, Trash2, AlertTriangl
 import { useAuth } from '@/auth/AuthContext'
 import { useTheme } from '@/store/theme'
 import { useTranslation } from '@/i18n/useTranslation'
-import { api } from '@/lib/http'
+import { apiGet, apiPost } from '@/lib/http'
 import type { Lang } from '@packages/shared'
 
 import PasswordInput from '@/components/PasswordInput'
@@ -143,14 +143,11 @@ export default function Profile() {
     setAvatarLoading(true)
     try {
       // Step 1: Presign upload
-      const presign = await api<{ fileId: string; uploadUrl: string }>('/files/presign-upload', {
-        method: 'POST',
-        body: JSON.stringify({
-          filename: file.name,
-          mimeType: file.type,
-          size: file.size,
-          category: 'avatars'
-        })
+      const presign = await apiPost<{ fileId: string; uploadUrl: string }>('/files/presign-upload', {
+        filename: file.name,
+        mimeType: file.type,
+        size: file.size,
+        category: 'avatars'
       })
 
       // Step 2: Upload to S3
@@ -165,16 +162,10 @@ export default function Profile() {
       }
 
       // Step 3: Confirm upload
-      await api('/files/confirm', {
-        method: 'POST',
-        body: JSON.stringify({ fileId: presign.fileId })
-      })
+      await apiPost('/files/confirm', { fileId: presign.fileId })
 
       // Step 4: Set as avatar
-      await api('/auth/avatar', {
-        method: 'POST',
-        body: JSON.stringify({ fileId: presign.fileId })
-      })
+      await apiPost('/auth/avatar', { fileId: presign.fileId })
 
       await refresh()
     } catch (err) {

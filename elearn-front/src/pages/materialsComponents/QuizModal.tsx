@@ -1,6 +1,6 @@
 import { memo, useState } from 'react'
 import { X, Plus, Trash2, CheckCircle2, Circle, Clock, Save, AlertCircle } from 'lucide-react'
-import { api } from '@/lib/http'
+import { apiPost } from '@/lib/http'
 import { useTranslation } from '@/i18n/useTranslation'
 import { LoadingButton } from '@/components/LoadingButton'
 import type { Difficulty } from '@packages/shared'
@@ -123,26 +123,20 @@ export const QuizModal = memo(function QuizModal({
     try {
       // 1. Create Quiz
       // Використовуємо editor endpoint замість admin, як було у lib/index.ts
-      const newQuiz = await api<{ id: string }>(`/editor/topics/${topicId}/quizzes`, {
-        method: 'POST',
-        body: JSON.stringify({
-          title,
-          durationSec,
-          topicId
-        })
+      const newQuiz = await apiPost<{ id: string }>(`/editor/topics/${topicId}/quizzes`, {
+        title,
+        durationSec,
+        topicId
       })
 
       // 2. Add Questions (Parallel requests for speed)
       if (newQuiz?.id) {
         await Promise.all(questions.map(q => 
-          api(`/editor/quizzes/${newQuiz.id}/questions`, {
-            method: 'POST',
-            body: JSON.stringify({
-              text: q.text,
-              difficulty: q.difficulty,
-              options: q.options,
-              tags: []
-            })
+          apiPost(`/editor/quizzes/${newQuiz.id}/questions`, {
+            text: q.text,
+            difficulty: q.difficulty,
+            options: q.options,
+            tags: []
           })
         ))
       }

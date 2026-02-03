@@ -4,7 +4,7 @@ import {
   Award, Target, Lock, Loader2, ArrowRight, RotateCcw, Save
 } from 'lucide-react'
 
-import { api } from '@/lib/http'
+import { apiGet, apiPost } from '@/lib/http'
 import { useTranslation } from '@/i18n/useTranslation'
 import { useAuth } from '@/auth/AuthContext'
 import type { Quiz, QuizLite, Lang, LocalizedString } from '@packages/shared'
@@ -194,7 +194,7 @@ export function TopicQuizSection({
     setLoading(true)
     setError(null)
     try {
-      const data = await api<Quiz & { token: string }>(`/quiz/${quizId}?lang=${lang}`)
+      const data = await apiGet<Quiz & { token: string }>(`/quiz/${quizId}?lang=${lang}`)
       // Normalize quiz data to ensure questions is always an array
       const normalizedQuiz = {
         ...data,
@@ -237,15 +237,12 @@ export function TopicQuizSection({
     try {
       setLoading(true)
       // Submit attempt
-      const result = await api<{ correct: number, correctMap: Record<string, string>, passed: boolean }>(
-        `/quiz/${quiz.id}/submit`, 
-        {
-          method: 'POST',
-          body: JSON.stringify({ 
-            token: quizToken,
-            answers: answerArray,
-            lang 
-          })
+      const result = await apiPost<{ correct: number, correctMap: Record<string, string>, passed: boolean }>(
+        `/quiz/${quiz.id}/submit`,
+        { 
+          token: quizToken,
+          answers: answerArray,
+          lang 
         }
       )
       
