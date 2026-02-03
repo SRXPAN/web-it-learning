@@ -99,12 +99,6 @@ export class ErrorBoundary extends Component<Props, State> {
   }
 
   public componentDidCatch(error: Error, errorInfo: ErrorInfo): void {
-    // Ignore DOM insertion errors - they're usually recoverable race conditions
-    if (error.message?.includes('insertBefore') || error.message?.includes('Node')) {
-      console.warn('[ErrorBoundary] Suppressed recoverable DOM error:', error.message)
-      return // Don't propagate to error UI
-    }
-    
     this.setState({ errorInfo })
     
     // Log to console in development

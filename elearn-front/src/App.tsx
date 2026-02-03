@@ -1,4 +1,4 @@
-import { useCallback, useState, lazy, Suspense, useEffect } from 'react'
+import { useCallback, useState } from 'react'
 import { Routes, Route, NavLink, useNavigate, useLocation } from 'react-router-dom'
 import { LayoutDashboard, BookOpen, Trophy, User, LogOut, LucideIcon, Menu, X, Shield } from 'lucide-react'
 
@@ -9,7 +9,7 @@ import ErrorBoundary from './components/ErrorBoundary'
 import CookieBanner from './components/CookieBanner'
 import Toasts from '@/components/Toast'
 
-// Core Pages (Eager or Lazy based on preference; lazy is better for bundle size)
+// Core Pages (All imported eagerly to prevent Suspense/lazy issues)
 import Dashboard from './pages/Dashboard'
 import Materials from './pages/Materials'
 import Leaderboard from './pages/Leaderboard'
@@ -18,19 +18,17 @@ import Login from './pages/Login'
 import Register from './pages/Register'
 import NotFound from './pages/NotFound'
 import LessonView from './pages/LessonView'
+import AdminLayout from './pages/admin/AdminLayout'
+import AdminDashboard from './pages/admin/AdminDashboard'
+import AdminUsers from './pages/admin/AdminUsers'
+import AdminFiles from './pages/admin/AdminFiles'
+import AdminAuditLogs from './pages/admin/AdminAuditLogs'
+import AdminContent from './pages/admin/AdminContent'
+import AdminUserDetails from './pages/admin/AdminUserDetails'
 
 // Hooks
 import { useAuth } from './auth/AuthContext'
 import { useTranslation } from './i18n/useTranslation'
-
-// Lazy Load Admin Pages
-const AdminLayout = lazy(() => import('./pages/admin/AdminLayout'))
-const AdminDashboard = lazy(() => import('./pages/admin/AdminDashboard'))
-const AdminUsers = lazy(() => import('./pages/admin/AdminUsers'))
-const AdminFiles = lazy(() => import('./pages/admin/AdminFiles'))
-const AdminAuditLogs = lazy(() => import('./pages/admin/AdminAuditLogs'))
-const AdminContent = lazy(() => import('./pages/admin/AdminContent'))
-const AdminUserDetails = lazy(() => import('./pages/admin/AdminUserDetails'))
 
 interface NavItemProps {
   to: string
@@ -53,33 +51,11 @@ function NavItem({ to, icon: Icon, label, onClick }: NavItemProps) {
   )
 }
 
-const PageLoader = () => (
-  <div className="flex items-center justify-center min-h-[60vh]">
-    <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary-600"></div>
-  </div>
-)
-
 export default function App() {
   const { user, logout, loading } = useAuth()
   const { t } = useTranslation()
   const nav = useNavigate()
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false)
-  
-  // Suppress insertBefore errors from DOM mutation race conditions
-  useEffect(() => {
-    const originalError = console.error
-    console.error = function(...args) {
-      const msg = args[0]?.toString?.() || String(args[0])
-      if (msg?.includes?.('insertBefore') || msg?.includes?.('Node')) {
-        console.warn('[DOM Mutation] Suppressed insertBefore error:', msg)
-        return
-      }
-      originalError.apply(console, args)
-    }
-    return () => {
-      console.error = originalError
-    }
-  }, [])
   
   const handleLogout = useCallback(async () => {
     await logout()
@@ -130,20 +106,18 @@ export default function App() {
   if (location.pathname.startsWith('/admin')) {
     return (
       <ErrorBoundary>
-        <Suspense fallback={<PageLoader />}>
-          <Routes>
-            <Route path="/admin" element={<RequireAuth roles={['ADMIN','EDITOR']}><AdminLayout /></RequireAuth>}>
-              <Route index element={<AdminDashboard />} />
-              <Route path="users" element={<RequireRole allowedRoles={['ADMIN']}><AdminUsers /></RequireRole>} />
-              <Route path="users/:id" element={<RequireRole allowedRoles={['ADMIN']}><AdminUserDetails /></RequireRole>} />
-              <Route path="content" element={<RequireRole allowedRoles={['ADMIN','EDITOR']}><AdminContent /></RequireRole>} />
-              <Route path="files" element={<RequireRole allowedRoles={['ADMIN']}><AdminFiles /></RequireRole>} />
-              <Route path="audit" element={<RequireRole allowedRoles={['ADMIN']}><AdminAuditLogs /></RequireRole>} />
-              {/* <Route path="settings" element={<RequireRole allowedRoles={['ADMIN']}><AdminSettings /></RequireRole>} /> */}
-              <Route path="*" element={<NotFound />} />
-            </Route>
-          </Routes>
-        </Suspense>
+        <Routes>
+          <Route path="/admin" element={<RequireAuth roles={['ADMIN','EDITOR']}><AdminLayout /></RequireAuth>}>
+            <Route index element={<AdminDashboard />} />
+            <Route path="users" element={<RequireRole allowedRoles={['ADMIN']}><AdminUsers /></RequireRole>} />
+            <Route path="users/:id" element={<RequireRole allowedRoles={['ADMIN']}><AdminUserDetails /></RequireRole>} />
+            <Route path="content" element={<RequireRole allowedRoles={['ADMIN','EDITOR']}><AdminContent /></RequireRole>} />
+            <Route path="files" element={<RequireRole allowedRoles={['ADMIN']}><AdminFiles /></RequireRole>} />
+            <Route path="audit" element={<RequireRole allowedRoles={['ADMIN']}><AdminAuditLogs /></RequireRole>} />
+            {/* <Route path="settings" element={<RequireRole allowedRoles={['ADMIN']}><AdminSettings /></RequireRole>} /> */}
+            <Route path="*" element={<NotFound />} />
+          </Route>
+        </Routes>
         <Toasts />
       </ErrorBoundary>
     )
@@ -247,17 +221,15 @@ export default function App() {
       {/* Main Content */}
       <main className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 py-8 animate-in fade-in slide-in-from-bottom-4 duration-500">
         <ErrorBoundary>
-          <Suspense fallback={<PageLoader />}>
-            <Routes>
-              <Route path="/" element={<RequireAuth><Dashboard/></RequireAuth>} />
-              <Route path="/dashboard" element={<RequireAuth><Dashboard/></RequireAuth>} />
-              <Route path="/materials" element={<RequireAuth><Materials/></RequireAuth>} />
-              <Route path="/lesson/:topicId/:lessonId" element={<RequireAuth><LessonView/></RequireAuth>} />
-              <Route path="/leaderboard" element={<RequireAuth><Leaderboard/></RequireAuth>} />
-              <Route path="/profile" element={<RequireAuth><Profile/></RequireAuth>} />
-              <Route path="*" element={<NotFound/>} />
-            </Routes>
-          </Suspense>
+          <Routes>
+            <Route path="/" element={<RequireAuth><Dashboard/></RequireAuth>} />
+            <Route path="/dashboard" element={<RequireAuth><Dashboard/></RequireAuth>} />
+            <Route path="/materials" element={<RequireAuth><Materials/></RequireAuth>} />
+            <Route path="/lesson/:topicId/:lessonId" element={<RequireAuth><LessonView/></RequireAuth>} />
+            <Route path="/leaderboard" element={<RequireAuth><Leaderboard/></RequireAuth>} />
+            <Route path="/profile" element={<RequireAuth><Profile/></RequireAuth>} />
+            <Route path="*" element={<NotFound/>} />
+          </Routes>
         </ErrorBoundary>
       </main>
 
