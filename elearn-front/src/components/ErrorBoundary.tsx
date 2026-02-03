@@ -106,13 +106,17 @@ export class ErrorBoundary extends Component<Props, State> {
     const isReactDOMError = error.name === 'NotFoundError' && 
                            error.message.includes('insertBefore')
     
-    if (isReactDOMError) {
+    const isReactUnmountError = error.message?.includes('unmount') ||
+                                error.message?.includes('component tree') ||
+                                errorInfo.componentStack?.includes('unmount')
+    
+    if (isReactDOMError || isReactUnmountError) {
       // Silently recover from this error - it's a React internal issue during unmounting
-      console.warn('React DOM transition error (recovered):', error.message)
-      // Reset the error state after a brief delay
+      console.warn('React DOM transition error (auto-recovered):', error.message)
+      // Reset the error state immediately to prevent error UI flash
       setTimeout(() => {
         this.setState({ hasError: false, error: null, errorInfo: null })
-      }, 100)
+      }, 50)
       return
     }
     

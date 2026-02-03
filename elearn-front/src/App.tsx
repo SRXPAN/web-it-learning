@@ -58,8 +58,16 @@ export default function App() {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false)
   
   const handleLogout = useCallback(async () => {
-    await logout()
-    nav('/login')
+    try {
+      await logout()
+      // Small delay to ensure state is settled before navigation
+      await new Promise(resolve => setTimeout(resolve, 50))
+      nav('/login', { replace: true })
+    } catch (error) {
+      // Even if logout fails, navigate to login
+      console.warn('Logout navigation error:', error)
+      nav('/login', { replace: true })
+    }
   }, [logout, nav])
 
   const closeMobileMenu = useCallback(() => {

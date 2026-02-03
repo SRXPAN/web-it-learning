@@ -101,23 +101,22 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   }
 
   async function logout(): Promise<void> {
+    // Clear user state immediately to prevent any further API calls
+    setUser(null)
+    
     try {
+      // Try to logout on backend, but don't block on failure
       await apiPost('/auth/logout', {})
     } catch (error) {
-      console.error('Logout failed:', error)
+      // Silently handle logout errors - session will be cleared anyway
+      console.warn('Backend logout failed (session cleared locally):', error)
     } finally {
       // Clear localStorage tokens
       localStorage.removeItem('access_token')
       localStorage.removeItem('refresh_token')
       
-      // Clear user state first
-      setUser(null)
-      
-      // Wait for React to update before redirecting to prevent DOM errors
-      await new Promise(resolve => setTimeout(resolve, 150))
-      
-      // Опціонально: повне перезавантаження, щоб очистити кеш стану додатка
-      // window.location.href = '/login'
+      // Wait for React to finish rendering before any navigation
+      await new Promise(resolve => setTimeout(resolve, 100))
     }
   }
 

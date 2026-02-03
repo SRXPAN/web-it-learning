@@ -83,10 +83,12 @@ $api.interceptors.response.use(
     // - 401: автоматичне перенаправлення на логін
     // - 429: rate limit (окремий UI для цього)
     // - 403 для activity/ping: це не критична помилка, не треба показувати користувачу
+    // - logout помилки: користувач все одно виходить, не треба показувати помилку
     const url = error.config?.url || ''
     const isActivityPing = url.includes('/activity/ping')
+    const isLogout = url.includes('/auth/logout')
     
-    if (status !== 401 && status !== 429 && !(status === 403 && isActivityPing)) {
+    if (status !== 401 && status !== 429 && !(status === 403 && isActivityPing) && !isLogout) {
        // Перевіряємо, чи dispatchToast існує (щоб не ламало тести/SSR)
        try {
          dispatchToast(typeof message === 'string' ? message : 'Request failed', 'error')

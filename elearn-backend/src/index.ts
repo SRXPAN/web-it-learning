@@ -106,6 +106,8 @@ const CSRF_EXEMPT_PATHS = [
   '/auth/login',
   '/auth/register', 
   '/auth/refresh',
+  '/auth/logout',      // Logout is safe to exempt - it only clears session
+  '/auth/logout-all',  // Same for logout all devices
   '/auth/forgot-password',
   '/auth/reset-password',
   '/auth/verify-email',
