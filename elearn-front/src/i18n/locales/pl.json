@@ -80,6 +80,7 @@
   "auth.error.loginFailed": "Logowanie nie powiodło się. Spróbuj ponownie.",
   "auth.error.registrationFailed": "Rejestracja nie powiodła się. Spróbuj ponownie.",
   "auth.agreeToTerms": "Zgadzam się z",
+  "auth.emailMustBeGmail": "Email musi kończyć się na @gmail.com",
   "auth.termsOfService": "Regulaminem",
   "auth.and": "i",
   "auth.privacyPolicy": "Polityką Prywatności",

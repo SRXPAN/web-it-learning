@@ -102,9 +102,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     // Set user - backend already set auth cookies
     setUser(response.user)
     
-    // Refresh CSRF token after registration
-    await new Promise(resolve => setTimeout(resolve, 100))
-    await fetchCsrfToken().catch(err => console.warn('CSRF refresh warning:', err))
+    // Refresh CSRF token after registration (don't block navigation)
+    setTimeout(() => {
+      fetchCsrfToken().catch(err => console.warn('CSRF refresh warning:', err))
+    }, 100)
   }
 
   async function logout(): Promise<void> {

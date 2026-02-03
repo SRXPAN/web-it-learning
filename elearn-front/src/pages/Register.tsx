@@ -41,6 +41,12 @@ export default function Register() {
       setErr(t('auth.agreeToTerms', 'You must agree to the terms'))
       return
     }
+
+    // Validate email domain - only @gmail.com allowed
+    if (!email.toLowerCase().endsWith('@gmail.com')) {
+      setErr(t('auth.emailMustBeGmail', 'Email must end with @gmail.com'))
+      return
+    }
     
     setLoading(true)
     try {

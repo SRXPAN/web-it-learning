@@ -78,7 +78,7 @@ export const MaterialsHeader = memo(function MaterialsHeader({
   }
 
   return (
-    <header className="rounded-2xl md:rounded-3xl bg-white dark:bg-neutral-900 border border-neutral-200 dark:border-neutral-800 shadow-sm overflow-hidden animate-in fade-in slide-in-from-top-4 duration-500">
+    <header className="rounded-2xl md:rounded-3xl bg-white dark:bg-neutral-900 border border-neutral-200 dark:border-neutral-800 shadow-sm animate-in fade-in slide-in-from-top-4 duration-500">
       
       {/* Top Section */}
       <div className="px-4 sm:px-6 md:px-7 py-5 md:py-6 border-b border-neutral-100 dark:border-neutral-800/50">
@@ -108,7 +108,7 @@ export const MaterialsHeader = memo(function MaterialsHeader({
           </div>
 
           {/* Mobile Dropdown */}
-          <div className="relative sm:hidden w-full" ref={dropdownRef}>
+          <div className="relative sm:hidden w-full overflow-visible" ref={dropdownRef}>
             <button
               onClick={() => setShowDropdown(!showDropdown)}
               className="w-full flex items-center justify-between gap-3 px-4 py-3 rounded-xl bg-neutral-100 dark:bg-neutral-800 border border-neutral-200 dark:border-neutral-700 transition-colors"
@@ -128,7 +128,7 @@ export const MaterialsHeader = memo(function MaterialsHeader({
             </button>
 
             {showDropdown && (
-              <div className="absolute top-full left-0 w-full mt-2 py-2 bg-white dark:bg-neutral-900 rounded-xl border border-neutral-200 dark:border-neutral-700 shadow-xl z-50 max-h-80 overflow-auto">
+              <div className="absolute top-full left-0 right-0 mt-2 py-2 bg-white dark:bg-neutral-900 rounded-xl border border-neutral-200 dark:border-neutral-700 shadow-xl z-[100] max-h-[60vh] overflow-y-auto">
                 {catArray.map((cat) => {
                   const isActive = activeCat === cat
                   const count = categories.get(cat)?.length || 0

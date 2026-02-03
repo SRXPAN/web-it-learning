@@ -80,6 +80,7 @@
   "auth.error.loginFailed": "Не вдалося увійти. Спробуй ще раз.",
   "auth.error.registrationFailed": "Помилка реєстрації. Спробуй ще раз.",
   "auth.agreeToTerms": "Я погоджуюсь з",
+  "auth.emailMustBeGmail": "Email повинен закінчуватися на @gmail.com",
   "auth.termsOfService": "Умовами користування",
   "auth.and": "та",
   "auth.privacyPolicy": "Політикою конфіденційності",

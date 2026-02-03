@@ -324,6 +324,7 @@ export type TranslationKey =
   | 'auth.error.registrationFailed'
   | 'auth.placeholder.email'
   | 'auth.agreeToTerms'
+  | 'auth.emailMustBeGmail'
   | 'auth.termsOfService'
   | 'auth.and'
   | 'auth.privacyPolicy'

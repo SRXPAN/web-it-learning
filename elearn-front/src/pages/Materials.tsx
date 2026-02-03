@@ -191,14 +191,16 @@ export default function Materials() {
   return (
     <>
       <div className="min-h-screen bg-neutral-50 dark:bg-neutral-950 px-4 md:px-8 py-6 transition-colors duration-300">
-        <div className="max-w-7xl mx-auto space-y-6">
+        <div className="max-w-7xl mx-auto space-y-6 overflow-visible">
           
-          <MaterialsHeader
-            activeCat={activeCat}
-            categories={categories}
-            onCategoryChange={setActiveCat}
-            onOpenSidebar={() => setMobileSidebarOpen(true)}
-          />
+          <div className="relative z-20">
+            <MaterialsHeader
+              activeCat={activeCat}
+              categories={categories}
+              onCategoryChange={setActiveCat}
+              onOpenSidebar={() => setMobileSidebarOpen(true)}
+            />
+          </div>
 
           <div className="grid lg:grid-cols-[280px_1fr] gap-6 items-start">
             
