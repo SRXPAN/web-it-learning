@@ -1,5 +1,5 @@
 import { useState, useCallback, useRef, useEffect } from 'react'
-import { api } from '@/lib/http'
+import { apiPost, apiDelete } from '@/lib/http'
 
 interface PresignResponse {
   fileId: string
@@ -23,6 +23,38 @@ interface UploadProgress {
 
 export type FileCategory = 'avatars' | 'materials' | 'attachments'
 
+const MAX_FILE_SIZE: Record<FileCategory, number> = {
+  avatars: 5 * 1024 * 1024,      // 5MB
+  materials: 50 * 1024 * 1024,   // 50MB
+  attachments: 25 * 1024 * 1024, // 25MB
+}
+
+const ALLOWED_TYPES: Record<FileCategory, string[]> = {
+  avatars: ['image/jpeg', 'image/png', 'image/webp'],
+  materials: [
+    'application/pdf',
+    'image/jpeg',
+    'image/png',
+    'image/webp',
+    'video/mp4',
+    'video/webm',
+    'audio/mpeg',
+    'audio/mp4',
+    'text/plain',
+  ],
+  attachments: [
+    'application/pdf',
+    'image/jpeg',
+    'image/png',
+    'image/webp',
+    'video/mp4',
+    'video/webm',
+    'audio/mpeg',
+    'audio/mp4',
+    'text/plain',
+  ],
+}
+
 export function useFileUpload() {
   const [uploading, setUploading] = useState(false)
   const [progress, setProgress] = useState<UploadProgress | null>(null)
@@ -35,20 +67,30 @@ export function useFileUpload() {
     file: File,
     category: FileCategory = 'attachments'
   ): Promise<FileInfo | null> => {
-    setUploading(true)
     setError(null)
+
+    const maxSize = MAX_FILE_SIZE[category] ?? MAX_FILE_SIZE.attachments
+    if (file.size > maxSize) {
+      setError(`Файл занадто великий. Максимум ${(maxSize / (1024 * 1024)).toFixed(0)}MB.`)
+      return null
+    }
+
+    const allowedTypes = ALLOWED_TYPES[category] ?? ALLOWED_TYPES.attachments
+    if (!allowedTypes.includes(file.type)) {
+      setError('Непідтримуваний тип файлу.')
+      return null
+    }
+
+    setUploading(true)
     setProgress({ loaded: 0, total: file.size, percent: 0 })
 
     try {
       // 1. Отримуємо Presigned URL від бекенду
-      const presign = await api<PresignResponse>('/files/presign-upload', {
-        method: 'POST',
-        body: JSON.stringify({
-          filename: file.name,
-          mimeType: file.type,
-          size: file.size,
-          category,
-        })
+      const presign = await apiPost<PresignResponse>('/files/presign-upload', {
+        filename: file.name,
+        mimeType: file.type,
+        size: file.size,
+        category,
       })
 
       // 2. Завантажуємо файл напряму в R2/S3 через XHR (для прогресу)
@@ -83,10 +125,7 @@ export function useFileUpload() {
       })
 
       // 3. Підтверджуємо завантаження на бекенді
-      const fileInfo = await api<FileInfo>('/files/confirm', {
-        method: 'POST',
-        body: JSON.stringify({ fileId: presign.fileId })
-      })
+      const fileInfo = await apiPost<FileInfo>('/files/confirm', { fileId: presign.fileId })
 
       setProgress({ loaded: file.size, total: file.size, percent: 100 })
       return fileInfo
@@ -116,7 +155,7 @@ export function useFileUpload() {
 
   const deleteFile = useCallback(async (fileId: string): Promise<boolean> => {
     try {
-      await api(`/files/${fileId}`, { method: 'DELETE' })
+      await apiDelete(`/files/${fileId}`)
       return true
     } catch {
       return false
