@@ -251,11 +251,18 @@ export default function LessonView() {
 
   useEffect(() => {
     if (!lessonId) return
-    
+
+    const controller = new AbortController()
+    let mounted = true
+
     const fetchLesson = async () => {
       setLoading(true)
       try {
-        const data = await api<LessonData>(`/materials/${lessonId}?lang=${lang}`)
+        const data = await api<LessonData>(
+          `/materials/${lessonId}?lang=${lang}`,
+          { signal: controller.signal }
+        )
+        if (!mounted) return
         setLesson(data)
         
         // Auto-select tab based on type
@@ -264,12 +271,18 @@ export default function LessonView() {
         else setActiveTab('text')
         
       } catch (err) {
+        if (!mounted || controller.signal.aborted) return
         setError(t('common.loadFailed', 'Failed to load lesson'))
       } finally {
-        setLoading(false)
+        if (mounted) setLoading(false)
       }
     }
     fetchLesson()
+
+    return () => {
+      mounted = false
+      controller.abort()
+    }
   }, [lessonId, lang, t])
 
   const tocItems = [

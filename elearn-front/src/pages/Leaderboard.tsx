@@ -41,18 +41,21 @@ export default function Leaderboard() {
 
   useEffect(() => {
     let mounted = true
+    const controller = new AbortController()
 
     async function fetchLeaderboard() {
       try {
         setLoading(true)
         // Використовуємо новий api клієнт
-        const data = await api<LeaderboardUser[]>('/auth/leaderboard?limit=50')
+        const data = await api<LeaderboardUser[]>('/auth/leaderboard?limit=50', {
+          signal: controller.signal,
+        })
         if (mounted) {
           // Ensure data is an array (defensive check)
           setLeaderboard(Array.isArray(data) ? data : [])
         }
       } catch (e) {
-        if (mounted) {
+        if (mounted && !controller.signal.aborted) {
           setError(t('leaderboard.error.loadFailed', 'Failed to load leaderboard'))
           console.error(e)
         }
@@ -62,7 +65,10 @@ export default function Leaderboard() {
     }
     fetchLeaderboard()
     
-    return () => { mounted = false }
+    return () => {
+      mounted = false
+      controller.abort()
+    }
   }, [t])
 
   const getRankStyle = (rank: number) => {
