@@ -45,6 +45,10 @@ const useCatalogStore = create<CatalogState>((set, get) => ({
       // Використовуємо новий API клієнт
       const query = lang ? `?lang=${lang}` : ''
       const data = await api<TopicTree[]>(`/topics/tree${query}`)
+      
+      // Логування для дебагу
+      console.debug('[catalog] Received topics data:', { type: typeof data, isArray: Array.isArray(data), data })
+      
       // Defensive: ensure data is array
       const topics = Array.isArray(data) ? data : []
       set({ topics, loading: false, lang })
@@ -52,7 +56,7 @@ const useCatalogStore = create<CatalogState>((set, get) => ({
       const message = e instanceof Error ? e.message : 'Failed to load topics'
       set({ loading: false, error: message })
       // Не кидаємо помилку далі, щоб UI просто показав стан помилки, а не крашнувся
-      console.error(e)
+      console.error('[catalog] Error loading topics:', e)
     }
   },
   

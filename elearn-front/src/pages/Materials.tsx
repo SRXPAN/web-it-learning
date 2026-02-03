@@ -119,6 +119,12 @@ export default function Materials() {
   // --- Handlers ---
 
   const filteredMaterials = useCallback((list: Material[]) => {
+    // Захист від не-масивів (API може повернути об'єкт помилки вміст undefined)
+    if (!Array.isArray(list)) {
+      console.warn('[Materials] Expected array, got:', typeof list, list)
+      return []
+    }
+    
     let result = list
     
     // Filter by Tab
