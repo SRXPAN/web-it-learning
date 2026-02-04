@@ -81,25 +81,25 @@ export function TopicView({
   return (
     <div className="space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-500">
       
-      {/* Filters & Search Bar */}
-      <div className="rounded-2xl border border-neutral-200 dark:border-neutral-800 bg-white dark:bg-neutral-900 p-3 sm:p-4 shadow-sm sticky top-24 lg:static z-10">
+      {/* Filters & Search Bar - Always sticky for better mobile UX */}
+      <div className="rounded-2xl border border-neutral-200 dark:border-neutral-800 bg-white dark:bg-neutral-900 p-3 sm:p-4 shadow-sm sticky top-20 z-20">
         <div className="flex flex-col gap-3 sm:flex-row sm:gap-4 sm:justify-between">
           
-          {/* Tabs - Responsive with Icons Only on Mobile */}
-          <div className="flex flex-wrap gap-1.5 sm:gap-2">
+          {/* Tabs - Always show labels for better mobile UX */}
+          <div className="flex gap-1.5 overflow-x-auto pb-1 -mb-1 scrollbar-hide">
             {filterTabs.map(({ value, label, icon }) => (
               <button
                 key={value}
                 onClick={() => setTab(value)}
                 title={label}
-                className={`inline-flex items-center gap-1.5 px-2.5 sm:px-3 py-1.5 rounded-lg sm:rounded-xl text-xs font-medium transition-all touch-highlight ${
+                className={`inline-flex items-center gap-1 px-2.5 sm:px-3 py-1.5 rounded-lg sm:rounded-xl text-xs font-medium transition-all whitespace-nowrap flex-shrink-0 ${
                   tab === value
                     ? 'bg-primary-600 text-white shadow-md shadow-primary-600/20'
                     : 'bg-neutral-100 dark:bg-neutral-800 text-neutral-600 dark:text-neutral-400 hover:bg-neutral-200 dark:hover:bg-neutral-700'
                 }`}
               >
                 {icon}
-                <span className="hidden sm:inline">{label}</span>
+                <span>{label}</span>
               </button>
             ))}
           </div>

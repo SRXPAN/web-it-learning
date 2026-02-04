@@ -33,7 +33,7 @@
 @layer components {
   /* 🎴 Card System */
   .card {
-    @apply p-6 rounded-3xl bg-white shadow-neo border border-neutral-100
+    @apply p-4 sm:p-6 rounded-2xl sm:rounded-3xl bg-white shadow-neo border border-neutral-100
            transition-all duration-200 hover:shadow-neo-md;
   }
 
@@ -43,12 +43,13 @@
 
   .ds-card { @apply card; }
 
-  /* 🔘 Button System */
+  /* 🔘 Button System - Mobile-friendly minimum heights */
   .btn {
-    @apply px-6 py-3 rounded-2xl font-semibold text-white bg-primary-600
+    @apply px-4 sm:px-6 py-2.5 sm:py-3 rounded-xl sm:rounded-2xl font-semibold text-white bg-primary-600
            hover:bg-primary-700 active:bg-primary-800
            transition-all duration-200 
-           focus:outline-none focus:ring-2 focus:ring-primary-500 focus:ring-offset-2;
+           focus:outline-none focus:ring-2 focus:ring-primary-500 focus:ring-offset-2
+           min-h-[44px] sm:min-h-auto;
   }
 
   .dark .btn {
@@ -56,11 +57,12 @@
   }
 
   .btn-outline {
-    @apply px-6 py-3 rounded-2xl font-semibold 
+    @apply px-4 sm:px-6 py-2.5 sm:py-3 rounded-xl sm:rounded-2xl font-semibold 
            border-2 border-primary-600 text-primary-600
            hover:bg-primary-50 active:bg-primary-100
            transition-all duration-200
-           focus:outline-none focus:ring-2 focus:ring-primary-500 focus:ring-offset-2;
+           focus:outline-none focus:ring-2 focus:ring-primary-500 focus:ring-offset-2
+           min-h-[44px] sm:min-h-auto;
   }
 
   .dark .btn-outline {
@@ -71,14 +73,23 @@
   .ds-btn-outline { @apply btn-outline; }
 
   .btn-secondary {
-    @apply px-6 py-3 rounded-2xl font-semibold
+    @apply px-4 sm:px-6 py-2.5 sm:py-3 rounded-xl sm:rounded-2xl font-semibold
            bg-neutral-100 text-neutral-900
            hover:bg-neutral-200 active:bg-neutral-300
-           transition-all duration-200;
+           transition-all duration-200
+           min-h-[44px] sm:min-h-auto;
   }
 
   .dark .btn-secondary {
     @apply bg-neutral-800 text-neutral-100 hover:bg-neutral-700 active:bg-neutral-600;
+  }
+
+  .btn-sm {
+    @apply px-3 sm:px-4 py-2 sm:py-2 text-sm rounded-lg sm:rounded-xl min-h-[40px] sm:min-h-auto;
+  }
+
+  .btn-ghost {
+    @apply px-3 sm:px-4 py-2 sm:py-2 text-sm text-neutral-600 dark:text-neutral-400 hover:bg-neutral-100 dark:hover:bg-neutral-800 min-h-[40px] sm:min-h-auto;
   }
 
   /* 🏷️ Badge System */
@@ -179,6 +190,15 @@
   
   .gradient-text {
     @apply bg-gradient-to-r from-primary-600 to-accent-500 bg-clip-text text-transparent;
+  }
+
+  /* Hide scrollbar utility */
+  .scrollbar-hide {
+    -ms-overflow-style: none;
+    scrollbar-width: none;
+  }
+  .scrollbar-hide::-webkit-scrollbar {
+    display: none;
   }
 }
 

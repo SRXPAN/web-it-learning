@@ -294,17 +294,17 @@ export default function Profile() {
         </div>
       </section>
 
-      {/* 2. Settings Grid */}
-      <div className="grid md:grid-cols-2 gap-6">
+      {/* 2. Settings Grid - Better mobile layout */}
+      <div className="grid md:grid-cols-2 gap-4 sm:gap-6">
         
         {/* Appearance */}
         <section className="card h-full">
           <SectionHeader icon={Settings} title={t('profile.settings', 'Preferences')} />
           
-          <div className="space-y-6">
+          <div className="space-y-5 sm:space-y-6">
             {/* Language */}
             <div>
-              <label className="text-sm font-medium text-neutral-700 dark:text-neutral-300 mb-3 flex items-center gap-2">
+              <label className="text-xs sm:text-sm font-medium text-neutral-700 dark:text-neutral-300 mb-2 sm:mb-3 flex items-center gap-2">
                 <Globe size={16} /> {t('profile.language', 'Language')}
               </label>
               <div className="grid grid-cols-3 gap-2">
@@ -312,7 +312,7 @@ export default function Profile() {
                   <button
                     key={l}
                     onClick={() => setLang(l)}
-                    className={`px-3 py-2 rounded-xl text-sm font-medium transition-all border ${
+                    className={`px-2.5 sm:px-3 py-2.5 sm:py-2 rounded-lg sm:rounded-xl text-xs sm:text-sm font-medium transition-all border min-h-[40px] sm:min-h-auto ${
                       lang === l
                         ? 'bg-primary-600 text-white border-primary-600 shadow-md'
                         : 'bg-white dark:bg-neutral-900 text-neutral-600 dark:text-neutral-400 border-neutral-200 dark:border-neutral-700 hover:border-primary-300 dark:hover:border-primary-700'
@@ -326,29 +326,29 @@ export default function Profile() {
 
             {/* Theme */}
             <div>
-              <label className="text-sm font-medium text-neutral-700 dark:text-neutral-300 mb-3 flex items-center gap-2">
+              <label className="text-xs sm:text-sm font-medium text-neutral-700 dark:text-neutral-300 mb-2 sm:mb-3 flex items-center gap-2">
                 <Palette size={16} /> {t('profile.theme', 'Theme')}
               </label>
               <div className="grid grid-cols-2 gap-2">
                 <button
                   onClick={() => theme === 'dark' && toggle()}
-                  className={`flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl text-sm font-medium transition-all border ${
+                  className={`flex items-center justify-center gap-2 px-3 sm:px-4 py-2.5 sm:py-2.5 rounded-lg sm:rounded-xl text-xs sm:text-sm font-medium transition-all border min-h-[40px] sm:min-h-auto ${
                     theme === 'light'
                       ? 'bg-amber-100 text-amber-800 border-amber-200 shadow-sm'
                       : 'bg-white dark:bg-neutral-900 border-neutral-200 dark:border-neutral-700'
                   }`}
                 >
-                  <Sun size={16} /> {t('profile.light', 'Light')}
+                  <Sun size={16} /> <span className="hidden sm:inline">{t('profile.light', 'Light')}</span>
                 </button>
                 <button
                   onClick={() => theme === 'light' && toggle()}
-                  className={`flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl text-sm font-medium transition-all border ${
+                  className={`flex items-center justify-center gap-2 px-3 sm:px-4 py-2.5 sm:py-2.5 rounded-lg sm:rounded-xl text-xs sm:text-sm font-medium transition-all border min-h-[40px] sm:min-h-auto ${
                     theme === 'dark'
                       ? 'bg-indigo-100 dark:bg-indigo-900/40 text-indigo-800 dark:text-indigo-200 border-indigo-200 dark:border-indigo-800 shadow-sm'
                       : 'bg-white dark:bg-neutral-900 border-neutral-200 dark:border-neutral-700'
                   }`}
                 >
-                  <Moon size={16} /> {t('profile.dark', 'Dark')}
+                  <Moon size={16} /> <span className="hidden sm:inline">{t('profile.dark', 'Dark')}</span>
                 </button>
               </div>
             </div>
@@ -359,38 +359,56 @@ export default function Profile() {
         <section className="card h-full">
           <SectionHeader icon={Lock} title={t('profile.action.changePassword', 'Security')} />
           
-          <form onSubmit={handleChangePassword} className="space-y-4">
-            <PasswordInput
-              value={passwordForm.current}
-              onChange={e => setPasswordForm(s => ({...s, current: e.target.value}))}
-              placeholder={t('profile.label.currentPassword', 'Current Password')}
-              required
-            />
-            <PasswordInput
-              value={passwordForm.new}
-              onChange={e => setPasswordForm(s => ({...s, new: e.target.value}))}
-              placeholder={t('profile.label.newPassword', 'New Password')}
-              showStrength
-              required
-            />
-            <PasswordInput
-              value={passwordForm.confirm}
-              onChange={e => setPasswordForm(s => ({...s, confirm: e.target.value}))}
-              placeholder={t('profile.label.confirmNewPassword', 'Confirm Password')}
-              required
-            />
+          <form onSubmit={handleChangePassword} className="space-y-3 sm:space-y-4">
+            <div>
+              <label className="text-xs sm:text-sm font-medium text-neutral-700 dark:text-neutral-300 mb-1.5 block">
+                {t('profile.label.currentPassword', 'Current Password')}
+              </label>
+              <PasswordInput
+                value={passwordForm.current}
+                onChange={e => setPasswordForm(s => ({...s, current: e.target.value}))}
+                placeholder={t('profile.label.currentPassword', 'Current Password')}
+                autoComplete="current-password"
+                required
+              />
+            </div>
+            <div>
+              <label className="text-xs sm:text-sm font-medium text-neutral-700 dark:text-neutral-300 mb-1.5 block">
+                {t('profile.label.newPassword', 'New Password')}
+              </label>
+              <PasswordInput
+                value={passwordForm.new}
+                onChange={e => setPasswordForm(s => ({...s, new: e.target.value}))}
+                placeholder={t('profile.label.newPassword', 'New Password')}
+                autoComplete="new-password"
+                showStrength
+                required
+              />
+            </div>
+            <div>
+              <label className="text-xs sm:text-sm font-medium text-neutral-700 dark:text-neutral-300 mb-1.5 block">
+                {t('profile.label.confirmNewPassword', 'Confirm Password')}
+              </label>
+              <PasswordInput
+                value={passwordForm.confirm}
+                onChange={e => setPasswordForm(s => ({...s, confirm: e.target.value}))}
+                placeholder={t('profile.label.confirmNewPassword', 'Confirm Password')}
+                autoComplete="new-password"
+                required
+              />
+            </div>
             
             {passwordState.error && (
-              <p className="text-xs text-red-500 bg-red-50 dark:bg-red-900/20 p-2 rounded-lg">{passwordState.error}</p>
+              <p className="text-xs text-red-500 bg-red-50 dark:bg-red-900/20 p-2.5 rounded-lg">{passwordState.error}</p>
             )}
             {passwordState.success && (
-              <p className="text-xs text-green-500 bg-green-50 dark:bg-green-900/20 p-2 rounded-lg">{t('profile.success.passwordChanged', 'Password changed!')}</p>
+              <p className="text-xs text-green-500 bg-green-50 dark:bg-green-900/20 p-2.5 rounded-lg">{t('profile.success.passwordChanged', 'Password changed!')}</p>
             )}
 
             <LoadingButton 
               type="submit" 
               loading={passwordState.loading}
-              className="w-full"
+              className="w-full min-h-[44px] sm:min-h-[40px]"
               disabled={!passwordForm.current || !passwordForm.new}
             >
               {t('common.save', 'Update Password')}
@@ -399,13 +417,13 @@ export default function Profile() {
         </section>
       </div>
 
-      {/* 2.5 Email Change Section */}
+      {/* 2.5 Email Change Section - Better mobile layout */}
       <section className="card">
         <SectionHeader icon={Mail} title={t('profile.action.changeEmail', 'Change Email')} />
         
-        <form onSubmit={handleChangeEmail} className="space-y-4 max-w-md">
+        <form onSubmit={handleChangeEmail} className="space-y-4 w-full">
           <div>
-            <label className="block text-sm font-medium text-neutral-700 dark:text-neutral-300 mb-1.5">
+            <label className="block text-xs sm:text-sm font-medium text-neutral-700 dark:text-neutral-300 mb-1.5">
               {t('profile.label.newEmail', 'New Email')}
             </label>
             <input
@@ -413,30 +431,36 @@ export default function Profile() {
               value={emailForm.email}
               onChange={e => setEmailForm(s => ({...s, email: e.target.value}))}
               placeholder={t('profile.placeholder.newEmail', 'Enter new email')}
-              className="w-full rounded-xl border px-3 py-2.5 bg-white dark:bg-neutral-900 border-neutral-200 dark:border-neutral-800 focus:border-primary-500 focus:ring-2 focus:ring-primary-500/20 transition-all outline-none"
+              className="w-full rounded-xl border px-3 py-2.5 bg-white dark:bg-neutral-900 border-neutral-200 dark:border-neutral-800 focus:border-primary-500 focus:ring-2 focus:ring-primary-500/20 transition-all outline-none text-sm"
               required
             />
-            <p className="text-xs text-neutral-500 mt-1">{t('auth.emailMustBeGmail', 'Email must end with @gmail.com')}</p>
+            <p className="text-xs text-neutral-500 dark:text-neutral-400 mt-2">{t('auth.emailMustBeGmail', 'Email must end with @gmail.com')}</p>
           </div>
           
-          <PasswordInput
-            value={emailForm.password}
-            onChange={e => setEmailForm(s => ({...s, password: e.target.value}))}
-            placeholder={t('profile.label.currentPassword', 'Current Password')}
-            required
-          />
+          <div>
+            <label className="block text-xs sm:text-sm font-medium text-neutral-700 dark:text-neutral-300 mb-1.5">
+              {t('profile.label.currentPassword', 'Current Password')}
+            </label>
+            <PasswordInput
+              value={emailForm.password}
+              onChange={e => setEmailForm(s => ({...s, password: e.target.value}))}
+              placeholder={t('profile.label.currentPassword', 'Current Password')}
+              autoComplete="current-password"
+              required
+            />
+          </div>
           
           {emailState.error && (
-            <p className="text-xs text-red-500 bg-red-50 dark:bg-red-900/20 p-2 rounded-lg">{emailState.error}</p>
+            <p className="text-xs text-red-500 bg-red-50 dark:bg-red-900/20 p-2.5 rounded-lg">{emailState.error}</p>
           )}
           {emailState.success && (
-            <p className="text-xs text-green-500 bg-green-50 dark:bg-green-900/20 p-2 rounded-lg">{t('profile.success.emailChanged', 'Email changed!')}</p>
+            <p className="text-xs text-green-500 bg-green-50 dark:bg-green-900/20 p-2.5 rounded-lg">{t('profile.success.emailChanged', 'Email changed!')}</p>
           )}
 
           <LoadingButton 
             type="submit" 
             loading={emailState.loading}
-            className="w-full sm:w-auto"
+            className="w-full min-h-[44px] sm:min-h-[40px]"
             disabled={!emailForm.email || !emailForm.password}
           >
             {t('profile.action.changeEmail', 'Change Email')}
@@ -444,22 +468,22 @@ export default function Profile() {
         </form>
       </section>
 
-      {/* 3. Danger Zone */}
+      {/* 3. Danger Zone - Better mobile layout */}
       <section className="card border-red-100 dark:border-red-900/30 overflow-hidden">
         <div className="bg-red-50 dark:bg-red-900/10 -m-6 mb-6 p-4 px-6 border-b border-red-100 dark:border-red-900/30 flex items-center gap-3">
-          <AlertTriangle className="text-red-600 dark:text-red-400" size={20} />
-          <h3 className="font-bold text-red-900 dark:text-red-200">
+          <AlertTriangle className="text-red-600 dark:text-red-400 flex-shrink-0" size={20} />
+          <h3 className="font-bold text-red-900 dark:text-red-200 text-sm sm:text-base">
             {t('profile.dangerZone', 'Danger Zone')}
           </h3>
         </div>
         
         <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
-          <p className="text-sm text-neutral-600 dark:text-neutral-400 max-w-lg">
+          <p className="text-xs sm:text-sm text-neutral-600 dark:text-neutral-400">
             {t('profile.deleteAccountWarning', 'Deleting your account is irreversible. All your progress, badges and settings will be permanently lost.')}
           </p>
           <button
             onClick={() => setShowDeleteDialog(true)}
-            className="btn-outline border-red-200 dark:border-red-900 text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/20 w-full sm:w-auto shrink-0"
+            className="btn-outline border-red-200 dark:border-red-900 text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/20 w-full sm:w-auto shrink-0 min-h-[44px] sm:min-h-[40px]"
           >
             {t('profile.action.deleteAccount', 'Delete Account')}
           </button>

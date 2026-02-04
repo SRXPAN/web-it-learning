@@ -115,81 +115,81 @@ export default function Leaderboard() {
   }
 
   return (
-    <div className="space-y-8 animate-in fade-in duration-500">
+    <div className="space-y-6 sm:space-y-8 animate-in fade-in duration-500 pb-6">
       
-      {/* Header */}
-      <div className="flex items-center justify-between">
+      {/* Header - Better mobile spacing */}
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
         <div>
-          <h1 className="text-3xl font-display font-bold text-neutral-900 dark:text-white">
+          <h1 className="text-2xl sm:text-3xl font-display font-bold text-neutral-900 dark:text-white">
             {t('leaderboard.title', 'Leaderboard')}
           </h1>
-          <p className="text-neutral-500 mt-1">
+          <p className="text-sm sm:text-base text-neutral-500 dark:text-neutral-400 mt-1">
             {t('leaderboard.subtitle', 'Top learners this week')}
           </p>
         </div>
-        <div className="px-3 py-1 bg-primary-50 dark:bg-primary-900/30 text-primary-700 dark:text-primary-300 rounded-full text-sm font-medium">
+        <div className="px-3 py-2 sm:py-1 bg-primary-50 dark:bg-primary-900/30 text-primary-700 dark:text-primary-300 rounded-full text-xs sm:text-sm font-medium whitespace-nowrap self-start sm:self-auto">
           {leaderboard.length} {t('leaderboard.participants', 'participants')}
         </div>
       </div>
 
-      {/* Top 3 Podium with Crowns (Only show if we have at least 3 users) */}
+      {/* Top 3 Podium - Improved mobile layout */}
       {leaderboard.length >= 3 && (
-        <div className="relative pt-8 pb-8 px-4 border-b border-neutral-200 dark:border-neutral-800">
-          <div className="flex items-end justify-center gap-4 sm:gap-8 text-center">
+        <div className="relative pt-6 sm:pt-8 pb-6 sm:pb-8 px-2 sm:px-4 border-b border-neutral-200 dark:border-neutral-800">
+          <div className="flex items-end justify-center gap-2 sm:gap-6 md:gap-8 text-center">
             
             {/* 2nd Place - Silver Crown */}
-            <div className="flex flex-col items-center order-1 w-24 sm:w-32 group">
-              <Medal className="text-slate-400 mb-2" size={28} style={{ filter: 'drop-shadow(0 0 8px rgba(100,116,139,0.4))' }} />
-              <div className="relative mb-3">
-                <div className="w-16 h-16 sm:w-20 sm:h-20 rounded-full bg-gradient-to-br from-slate-200 to-slate-300 dark:from-slate-700 dark:to-slate-600 flex items-center justify-center shadow-xl ring-4 ring-white dark:ring-neutral-900 z-10 relative group-hover:scale-105 transition-transform duration-300">
-                  <span className="text-2xl font-bold text-slate-600 dark:text-slate-200">2</span>
+            <div className="flex flex-col items-center order-1 w-20 sm:w-32 group">
+              <Medal className="text-slate-400 mb-1.5 sm:mb-2" size={24} style={{ filter: 'drop-shadow(0 0 8px rgba(100,116,139,0.4))' }} />
+              <div className="relative mb-2 sm:mb-3">
+                <div className="w-14 h-14 sm:w-20 sm:h-20 rounded-full bg-gradient-to-br from-slate-200 to-slate-300 dark:from-slate-700 dark:to-slate-600 flex items-center justify-center shadow-xl ring-2 sm:ring-4 ring-white dark:ring-neutral-900 z-10 relative group-hover:scale-105 transition-transform duration-300">
+                  <span className="text-xl sm:text-2xl font-bold text-slate-600 dark:text-slate-200">2</span>
                 </div>
-                <div className="absolute -bottom-1 left-1/2 -translate-x-1/2 bg-slate-500 text-white text-[10px] font-bold px-2 py-0.5 rounded-full shadow-sm">
+                <div className="absolute -bottom-1 left-1/2 -translate-x-1/2 bg-slate-500 text-white text-[9px] sm:text-[10px] font-bold px-1.5 sm:px-2 py-0.5 rounded-full shadow-sm whitespace-nowrap">
                   {leaderboard[1].level} LVL
                 </div>
               </div>
-              <h3 className="font-semibold text-sm sm:text-base truncate w-full text-neutral-900 dark:text-white mb-0.5">
+              <h3 className="font-semibold text-xs sm:text-base truncate w-full text-neutral-900 dark:text-white mb-0.5 px-1">
                 {leaderboard[1].name}
               </h3>
-              <p className="text-xs font-medium text-slate-500 dark:text-slate-400">
+              <p className="text-[10px] sm:text-xs font-medium text-slate-500 dark:text-slate-400">
                 {leaderboard[1].xp.toLocaleString()} XP
               </p>
             </div>
             
             {/* 1st Place - Gold Crown */}
-            <div className="flex flex-col items-center order-0 w-28 sm:w-40 z-10 -mt-8 group">
-              <Crown className="text-yellow-500 mb-2 animate-bounce drop-shadow-lg" size={40} />
-              <div className="relative mb-4">
-                <div className="w-20 h-20 sm:w-24 sm:h-24 rounded-full bg-gradient-to-br from-yellow-300 to-amber-500 flex items-center justify-center shadow-xl shadow-amber-500/20 ring-4 ring-white dark:ring-neutral-900 z-10 relative group-hover:scale-105 transition-transform duration-300">
-                  <span className="text-4xl font-bold text-white">1</span>
+            <div className="flex flex-col items-center order-0 w-24 sm:w-40 z-10 -mt-4 sm:-mt-8 group">
+              <Crown className="text-yellow-500 mb-1 sm:mb-2 animate-bounce drop-shadow-lg" size={32} />
+              <div className="relative mb-2 sm:mb-4">
+                <div className="w-16 h-16 sm:w-24 sm:h-24 rounded-full bg-gradient-to-br from-yellow-300 to-amber-500 flex items-center justify-center shadow-xl shadow-amber-500/20 ring-2 sm:ring-4 ring-white dark:ring-neutral-900 z-10 relative group-hover:scale-105 transition-transform duration-300">
+                  <span className="text-3xl sm:text-4xl font-bold text-white">1</span>
                 </div>
-                <div className="absolute -bottom-2 left-1/2 -translate-x-1/2 bg-yellow-600 text-white text-xs font-bold px-3 py-0.5 rounded-full shadow-sm border border-white dark:border-neutral-900">
+                <div className="absolute -bottom-2 left-1/2 -translate-x-1/2 bg-yellow-600 text-white text-[9px] sm:text-xs font-bold px-2 sm:px-3 py-0.5 rounded-full shadow-sm border border-white dark:border-neutral-900 whitespace-nowrap">
                   {leaderboard[0].level} LVL
                 </div>
               </div>
-              <h3 className="font-bold text-base sm:text-lg truncate w-full text-neutral-900 dark:text-white mb-0.5">
+              <h3 className="font-bold text-sm sm:text-lg truncate w-full text-neutral-900 dark:text-white mb-0.5 px-1">
                 {leaderboard[0].name}
               </h3>
-              <p className="text-sm font-bold text-amber-600 dark:text-amber-400">
+              <p className="text-xs sm:text-sm font-bold text-amber-600 dark:text-amber-400">
                 {leaderboard[0].xp.toLocaleString()} XP
               </p>
             </div>
             
             {/* 3rd Place - Bronze Crown */}
-            <div className="flex flex-col items-center order-2 w-24 sm:w-32 group">
-              <Trophy className="text-orange-700 mb-2" size={28} style={{ filter: 'drop-shadow(0 0 8px rgba(180,83,9,0.4))' }} />
-              <div className="relative mb-3">
-                <div className="w-16 h-16 sm:w-20 sm:h-20 rounded-full bg-gradient-to-br from-orange-300 to-amber-700 flex items-center justify-center shadow-xl ring-4 ring-white dark:ring-neutral-900 z-10 relative group-hover:scale-105 transition-transform duration-300">
-                  <span className="text-2xl font-bold text-white/90">3</span>
+            <div className="flex flex-col items-center order-2 w-20 sm:w-32 group">
+              <Trophy className="text-orange-700 mb-1.5 sm:mb-2" size={24} style={{ filter: 'drop-shadow(0 0 8px rgba(180,83,9,0.4))' }} />
+              <div className="relative mb-2 sm:mb-3">
+                <div className="w-14 h-14 sm:w-20 sm:h-20 rounded-full bg-gradient-to-br from-orange-300 to-amber-700 flex items-center justify-center shadow-xl ring-2 sm:ring-4 ring-white dark:ring-neutral-900 z-10 relative group-hover:scale-105 transition-transform duration-300">
+                  <span className="text-xl sm:text-2xl font-bold text-white/90">3</span>
                 </div>
-                <div className="absolute -bottom-1 left-1/2 -translate-x-1/2 bg-orange-700 text-white text-[10px] font-bold px-2 py-0.5 rounded-full shadow-sm">
+                <div className="absolute -bottom-1 left-1/2 -translate-x-1/2 bg-orange-700 text-white text-[9px] sm:text-[10px] font-bold px-1.5 sm:px-2 py-0.5 rounded-full shadow-sm whitespace-nowrap">
                   {leaderboard[2].level} LVL
                 </div>
               </div>
-              <h3 className="font-semibold text-sm sm:text-base truncate w-full text-neutral-900 dark:text-white mb-0.5">
+              <h3 className="font-semibold text-xs sm:text-base truncate w-full text-neutral-900 dark:text-white mb-0.5 px-1">
                 {leaderboard[2].name}
               </h3>
-              <p className="text-xs font-medium text-orange-600 dark:text-orange-400">
+              <p className="text-[10px] sm:text-xs font-medium text-orange-600 dark:text-orange-400">
                 {leaderboard[2].xp.toLocaleString()} XP
               </p>
             </div>

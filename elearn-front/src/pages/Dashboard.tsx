@@ -201,38 +201,38 @@ export default function Dashboard() {
     : streakLabels.length - 1
 
   return (
-    <div className="space-y-6 animate-in fade-in duration-500">
+    <div className="space-y-4 sm:space-y-6 animate-in fade-in duration-500 pb-6">
       
-      {/* 1. Hero Section */}
+      {/* 1. Hero Section - Improved mobile spacing */}
       <div className="card bg-white dark:bg-neutral-900 border-neutral-100 dark:border-neutral-800">
-        <div className="grid md:grid-cols-[1fr_auto] gap-6 items-center">
-          <div className="flex flex-col sm:flex-row sm:items-center gap-5">
-            <div className="w-16 h-16 sm:w-20 sm:h-20 rounded-2xl bg-gradient-to-br from-primary-600 to-accent-500 flex items-center justify-center shadow-lg shadow-primary-500/20">
-              <span className="text-3xl font-display font-bold text-white">
+        <div className="grid md:grid-cols-[1fr_auto] gap-4 sm:gap-6 items-start md:items-center">
+          <div className="flex flex-col sm:flex-row sm:items-center gap-3 sm:gap-5">
+            <div className="w-14 h-14 sm:w-20 sm:h-20 rounded-2xl bg-gradient-to-br from-primary-600 to-accent-500 flex items-center justify-center shadow-lg shadow-primary-500/20 flex-shrink-0">
+              <span className="text-2xl sm:text-3xl font-display font-bold text-white">
                 {user?.name?.charAt(0).toUpperCase() || 'U'}
               </span>
             </div>
-            <div className="flex-1">
-              <h1 className="text-2xl sm:text-3xl font-display font-bold text-neutral-900 dark:text-white">
+            <div className="flex-1 min-w-0">
+              <h1 className="text-xl sm:text-3xl font-display font-bold text-neutral-900 dark:text-white break-words">
                 {t('dashboard.welcome', 'Welcome')}, {user?.name}!
               </h1>
-              <div className="mt-2 flex items-center gap-4 text-sm text-neutral-600 dark:text-neutral-400">
-                <span className="px-2 py-0.5 rounded-md bg-neutral-100 dark:bg-neutral-800 font-medium">
+              <div className="mt-2 flex flex-wrap items-center gap-2 sm:gap-4 text-xs sm:text-sm text-neutral-600 dark:text-neutral-400">
+                <span className="px-2.5 py-1 rounded-md bg-neutral-100 dark:bg-neutral-800 font-medium">
                   {t('dashboard.level', 'Lvl')} {level}
                 </span>
-                <span>{xp} XP</span>
+                <span className="font-medium">{xp} XP</span>
               </div>
-              <div className="mt-3 max-w-xs space-y-1">
+              <div className="mt-3 space-y-1">
                 <div className="flex justify-between text-xs font-medium text-neutral-500">
                   <span>{t('dashboard.nextLevel', 'Next Level')}</span>
                   <span>{progressToNext}%</span>
                 </div>
-                <ProgressBar value={progressToNext} className="h-2" />
+                <ProgressBar value={progressToNext} className="h-1.5 sm:h-2" />
               </div>
             </div>
           </div>
 
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 w-full md:w-auto">
+          <div className="grid grid-cols-2 sm:grid-cols-2 gap-2 sm:gap-3 w-full md:w-auto">
             <StatCard 
               icon={Target} 
               label={t('dashboard.attempts', 'Attempts')} 

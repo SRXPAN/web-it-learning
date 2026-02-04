@@ -7,6 +7,7 @@ interface PasswordInputProps extends Omit<InputHTMLAttributes<HTMLInputElement>,
   showStrength?: boolean
   value: string
   onChange: (e: React.ChangeEvent<HTMLInputElement>) => void
+  autoComplete?: 'current-password' | 'new-password' | 'off'
 }
 
 /** * Calculate password strength (0-5)
@@ -23,7 +24,7 @@ function getPasswordStrength(password: string): number {
 }
 
 const PasswordInput = forwardRef<HTMLInputElement, PasswordInputProps>(
-  ({ showStrength = false, value, onChange, className = '', ...props }, ref) => {
+  ({ showStrength = false, value, onChange, className = '', autoComplete = 'off', ...props }, ref) => {
     const { t } = useTranslation()
     const [visible, setVisible] = useState(false)
     const [focused, setFocused] = useState(false)
@@ -67,6 +68,7 @@ const PasswordInput = forwardRef<HTMLInputElement, PasswordInputProps>(
             onChange={onChange}
             onFocus={() => setFocused(true)}
             onBlur={() => setFocused(false)}
+            autoComplete={autoComplete}
             className={clsx(
               'w-full rounded-xl border px-3 py-3 pr-10 bg-white dark:bg-neutral-900',
               'border-neutral-200 dark:border-neutral-800 text-neutral-900 dark:text-white',
