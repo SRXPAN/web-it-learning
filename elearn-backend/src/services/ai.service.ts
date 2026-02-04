@@ -1,6 +1,6 @@
 // src/services/ai.service.ts
 import { GoogleGenerativeAI } from '@google/generative-ai'
-import pdfParse from 'pdf-parse'
+import * as pdfParse from 'pdf-parse'
 import { YoutubeTranscript } from 'youtube-transcript'
 import { getGeminiApiKey, isGeminiConfigured } from '../utils/env.js'
 import { AppError } from '../utils/AppError.js'
@@ -132,7 +132,9 @@ class AiService {
         throw AppError.badRequest('PDF file is too large. Maximum 10MB allowed.')
       }
 
-      const data = await pdfParse(buffer)
+      // pdf-parse exports default function - handle both CJS and ESM
+      const parsePdf = (pdfParse as any).default || pdfParse
+      const data = await parsePdf(buffer)
       const text = data.text?.trim()
 
       if (!text || text.length < 50) {
